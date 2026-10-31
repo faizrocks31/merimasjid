@@ -1,0 +1,473 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Masjid {
+  id                         String                      @id @default(cuid())
+  name                       String
+  slug                       String                      @unique
+  address                    String?
+  phone                      String?
+  email                      String?
+  logoUrl                    String?
+  timezone                   String                      @default("Asia/Kolkata")
+  currency                   String                      @default("INR")
+  financialYearStartMonth    Int                         @default(4)
+  receiptPrefix              String                      @default("MSA")
+  receiptFooter              String?
+  status                     String                      @default("ACTIVE")
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  deletedAt                  DateTime?
+  maxCategories              Int?
+  maxMembers                 Int?
+  maxStaff                   Int?
+  subscriptionEndsAt         DateTime?
+  subscriptionStatus         String?
+  auditLogs                  AuditLog[]
+  collectionEvents           CollectionEvent[]
+  collectionEventAssignments CollectionEventAssignment[]
+  categories                 ContributionCategory[]
+  plans                      ContributionPlan[]
+  duesPeriods                DuesPeriod[]
+  expenses                   Expense[]
+  expenseCategories          ExpenseCategory[]
+  expenseSequences           ExpenseSequence[]
+  notificationSettings       MasjidNotificationSettings?
+  users                      MasjidUser[]
+  members                    Member[]
+  memberSequences            MemberSequence?
+  notifications              NotificationLog[]
+  payments                   Payment[]
+  allocations                PaymentAllocation[]
+  receiptEvents              ReceiptEvent[]
+  receiptSequences           ReceiptSequence[]
+  reversals                  Reversal[]
+  subscriptions              Subscription[]
+
+  @@index([subscriptionStatus])
+  @@index([deletedAt])
+}
+
+model User {
+  id              String         @id @default(cuid())
+  name            String
+  email           String         @unique
+  phone           String?
+  passwordHash    String
+  status          String         @default("ACTIVE")
+  lastLoginAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  upiId           String?
+  auditLogs       AuditLog[]
+  expensesEntered Expense[]      @relation("ExpenseEnteredBy")
+  memberships     MasjidUser[]
+  memberProfiles  Member[]
+  paymentsEntered Payment[]      @relation("PaymentEnteredBy")
+  receiptEvents   ReceiptEvent[]
+}
+
+model MasjidUser {
+  id        String    @id @default(cuid())
+  masjidId  String
+  userId    String
+  role      String
+  status    String    @default("ACTIVE")
+  invitedAt DateTime?
+  joinedAt  DateTime?
+  createdAt DateTime  @default(now())
+  masjid    Masjid    @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([masjidId, userId])
+  @@index([userId])
+  @@index([masjidId, status])
+}
+
+model Member {
+  id                         String                      @id @default(cuid())
+  masjidId                   String
+  memberNo                   String
+  fullName                   String
+  fatherName                 String?
+  phone                      String?
+  alternatePhone             String?
+  address                    String?
+  joinDate                   DateTime                    @default(now())
+  status                     String                      @default("ACTIVE")
+  notes                      String?
+  userId                     String?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  telegramChatId             String?                     @unique
+  notifyTelegram             Int                         @default(1)
+  notifyInApp                Int                         @default(1)
+  notifyEmail                Int                         @default(0)
+  quietHoursStart            String?
+  quietHoursEnd              String?
+  timezone                   String                      @default("Asia/Kolkata")
+  idempotencyKey             String?
+  email                      String?
+  collectionEventAssignments CollectionEventAssignment[]
+  plans                      ContributionPlan[]
+  duesPeriods                DuesPeriod[]
+  masjid                     Masjid                      @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  user                       User?                       @relation(fields: [userId], references: [id])
+  payments                   Payment[]
+
+  @@unique([masjidId, memberNo])
+  @@unique([masjidId, idempotencyKey])
+  @@index([masjidId, status])
+  @@index([masjidId, fullName])
+  @@index([masjidId, phone])
+  @@index([masjidId, email])
+  @@index([userId])
+}
+
+model ContributionCategory {
+  id                 String              @id @default(cuid())
+  masjidId           String
+  name               String
+  code               String
+  restrictedPurpose  Boolean             @default(false)
+  reportingGroup     String?
+  active             Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  defaultAmountPaise Int?
+  frequency          String?
+  collectionMode     String?
+  schedulingRules    String?
+  defaultDueDay      Int?
+  defaultGraceDays   Int                 @default(0)
+  description        String?
+  collectionEvents   CollectionEvent[]
+  masjid             Masjid              @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  plans              ContributionPlan[]
+  allocations        PaymentAllocation[]
+
+  @@unique([masjidId, code])
+}
+
+model ContributionPlan {
+  id             String               @id @default(cuid())
+  masjidId       String
+  memberId       String
+  categoryId     String
+  frequency      String
+  amountPaise    Int
+  startDate      DateTime
+  endDate        DateTime?
+  dueDay         Int                  @default(10)
+  graceDays      Int                  @default(0)
+  status         String               @default("ACTIVE")
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  idempotencyKey String?
+  category       ContributionCategory @relation(fields: [categoryId], references: [id])
+  masjid         Masjid               @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  member         Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  duesPeriods    DuesPeriod[]
+  amountHistory  PlanAmountHistory[]
+
+  @@unique([masjidId, idempotencyKey])
+  @@unique([masjidId, memberId, categoryId], map: "ContributionPlan_masjid_member_category_active_key", where: raw("(status = 'ACTIVE'::text)"))
+  @@index([masjidId, memberId])
+  @@index([masjidId, status])
+}
+
+model PlanAmountHistory {
+  id            String           @id @default(cuid())
+  planId        String
+  amountPaise   Int
+  effectiveFrom DateTime
+  changedBy     String?
+  reason        String?
+  createdAt     DateTime         @default(now())
+  plan          ContributionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, effectiveFrom])
+}
+
+model DuesPeriod {
+  id                  String              @id @default(cuid())
+  masjidId            String
+  planId              String
+  memberId            String
+  periodStart         DateTime
+  periodEnd           DateTime
+  dueDate             DateTime
+  expectedAmountPaise Int
+  status              String              @default("PENDING")
+  createdAt           DateTime            @default(now())
+  masjid              Masjid              @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  member              Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan                ContributionPlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  allocations         PaymentAllocation[]
+
+  @@unique([planId, periodStart, periodEnd])
+  @@index([masjidId, status, dueDate])
+  @@index([masjidId, memberId])
+}
+
+/// A category-level collection event/period. Events are the scheduling unit
+/// for a contribution category; households (members) are attached to an event
+/// through CollectionEventAssignment.
+model CollectionEvent {
+  id                  String                      @id @default(cuid())
+  masjidId            String
+  categoryId          String
+  name                String
+  startDate           DateTime
+  endDate             DateTime?
+  dueDate             DateTime
+  expectedAmountPaise Int?
+  status              String                      @default("SCHEDULED")
+  applicableMonth     Int?
+  applicableYear      Int?
+  notes               String?
+  createdBy           String?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  category            ContributionCategory        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  masjid              Masjid                      @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  assignments         CollectionEventAssignment[]
+  allocations         PaymentAllocation[]
+
+  @@index([masjidId, categoryId, status])
+  @@index([masjidId, dueDate])
+}
+
+/// Links a household (member) to a collection event with its own expected
+/// amount and collection status.
+model CollectionEventAssignment {
+  id                  String          @id @default(cuid())
+  eventId             String
+  memberId            String
+  expectedAmountPaise Int
+  status              String          @default("PENDING")
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  masjidId            String
+  event               CollectionEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  masjid              Masjid          @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  member              Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, memberId])
+  @@index([memberId, status])
+  @@index([masjidId])
+  @@index([masjidId, eventId])
+  @@index([masjidId, memberId])
+}
+
+model Payment {
+  id                 String              @id @default(cuid())
+  masjidId           String
+  receiptNo          String
+  donorMemberId      String?
+  donorNameSnapshot  String
+  paymentDate        DateTime
+  amountPaise        Int
+  mode               String
+  referenceNo        String?
+  verificationStatus String              @default("MANUAL")
+  status             String              @default("SUCCESS")
+  enteredBy          String
+  notes              String?
+  idempotencyKey     String?
+  createdAt          DateTime            @default(now())
+  donorMember        Member?             @relation(fields: [donorMemberId], references: [id])
+  enteredByUser      User                @relation("PaymentEnteredBy", fields: [enteredBy], references: [id])
+  masjid             Masjid              @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  allocations        PaymentAllocation[]
+  receiptEvents      ReceiptEvent[]
+  reversals          Reversal?           @relation("OriginalPayment")
+  reversalFor        Reversal?           @relation("ReversalPayment")
+
+  @@unique([masjidId, receiptNo])
+  @@unique([masjidId, idempotencyKey])
+  @@index([masjidId, paymentDate])
+  @@index([masjidId, donorMemberId])
+  @@index([masjidId, status])
+  @@index([masjidId, mode])
+}
+
+model PaymentAllocation {
+  id                   String               @id @default(cuid())
+  masjidId             String
+  paymentId            String
+  duesPeriodId         String?
+  categoryId           String
+  allocatedAmountPaise Int
+  purposeNote          String?
+  createdAt            DateTime             @default(now())
+  collectionEventId    String?
+  category             ContributionCategory @relation(fields: [categoryId], references: [id])
+  collectionEvent      CollectionEvent?     @relation(fields: [collectionEventId], references: [id])
+  duesPeriod           DuesPeriod?          @relation(fields: [duesPeriodId], references: [id])
+  masjid               Masjid               @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  payment              Payment              @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([masjidId, paymentId])
+  @@index([duesPeriodId])
+  @@index([collectionEventId])
+}
+
+model ReceiptEvent {
+  id          String   @id @default(cuid())
+  masjidId    String
+  paymentId   String
+  eventType   String
+  actorUserId String
+  reason      String?
+  createdAt   DateTime @default(now())
+  actor       User     @relation(fields: [actorUserId], references: [id])
+  masjid      Masjid   @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([masjidId, paymentId])
+}
+
+model ReceiptSequence {
+  id            String @id @default(cuid())
+  masjidId      String
+  financialYear String
+  lastNumber    Int    @default(0)
+  masjid        Masjid @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+
+  @@unique([masjidId, financialYear])
+}
+
+model ExpenseSequence {
+  id            String @id @default(cuid())
+  masjidId      String
+  financialYear String
+  lastNumber    Int    @default(0)
+  masjid        Masjid @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+
+  @@unique([masjidId, financialYear])
+}
+
+model MemberSequence {
+  id         String @id @default(cuid())
+  masjidId   String @unique
+  lastNumber Int    @default(0)
+  masjid     Masjid @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+}
+
+model ExpenseCategory {
+  id        String    @id @default(cuid())
+  masjidId  String
+  name      String
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  expenses  Expense[]
+  masjid    Masjid    @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+
+  @@unique([masjidId, name])
+}
+
+model Expense {
+  id             String          @id @default(cuid())
+  masjidId       String
+  expenseNo      String
+  categoryId     String
+  date           DateTime
+  payee          String
+  amountPaise    Int
+  mode           String
+  referenceNo    String?
+  description    String?
+  attachmentUrl  String?
+  enteredBy      String
+  approvalStatus String          @default("PENDING")
+  createdAt      DateTime        @default(now())
+  idempotencyKey String?
+  category       ExpenseCategory @relation(fields: [categoryId], references: [id])
+  enteredByUser  User            @relation("ExpenseEnteredBy", fields: [enteredBy], references: [id])
+  masjid         Masjid          @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+
+  @@unique([masjidId, expenseNo])
+  @@unique([masjidId, idempotencyKey])
+  @@index([masjidId, date])
+  @@index([masjidId, approvalStatus])
+}
+
+model Reversal {
+  id                String   @id @default(cuid())
+  masjidId          String
+  originalPaymentId String   @unique
+  reversalPaymentId String?  @unique
+  amountPaise       Int
+  reason            String
+  approvedBy        String
+  createdAt         DateTime @default(now())
+  masjid            Masjid   @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  originalPayment   Payment  @relation("OriginalPayment", fields: [originalPaymentId], references: [id], onDelete: Cascade)
+  reversalPayment   Payment? @relation("ReversalPayment", fields: [reversalPaymentId], references: [id])
+
+  @@index([masjidId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  masjidId    String?
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  beforeJson  String?
+  afterJson   String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation(fields: [actorUserId], references: [id])
+  masjid      Masjid?  @relation(fields: [masjidId], references: [id], onUpdate: NoAction)
+
+  @@index([masjidId, createdAt])
+  @@index([masjidId, entityType, entityId])
+}
+
+model Subscription {
+  id               String    @id @default(cuid())
+  masjidId         String
+  planCode         String
+  status           String    @default("TRIAL")
+  startsAt         DateTime  @default(now())
+  endsAt           DateTime?
+  billingReference String?
+  createdAt        DateTime  @default(now())
+  masjid           Masjid    @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+
+  @@index([masjidId])
+}
+
+model NotificationLog {
+  id                String   @id @default(cuid())
+  masjidId          String
+  recipient         String
+  channel           String
+  template          String
+  status            String
+  providerReference String?
+  createdAt         DateTime @default(now())
+  masjid            Masjid   @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+
+  @@index([masjidId, createdAt])
+}
+
+model MasjidNotificationSettings {
+  id               String   @id @default(cuid())
+  masjidId         String   @unique
+  telegramEnabled  Boolean  @default(true)
+  emailEnabled     Boolean  @default(false)
+  inAppEnabled     Boolean  @default(true)
+  defaultTemplates String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  masjid           Masjid   @relation(fields: [masjidId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}

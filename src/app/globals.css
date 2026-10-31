@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border-subtle: var(--border-subtle);
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-soft: var(--brand-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --font-sans: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+  --font-manrope: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-devanagari: var(--font-devanagari), ui-sans-serif, sans-serif;
+  --font-arabic: var(--font-arabic), "Noto Naskh Arabic", serif;
+}
+
+:root {
+  /* Original tokens (kept for backward compatibility) */
+  --ink: #14201a;
+  --ink-muted: #5c6b62;
+  --surface: #f7f6f1;
+  --surface-raised: #ffffff;
+  --border-subtle: #e3e1d8;
+  --brand: #0f5132;
+  --brand-deep: #0a3b24;
+  --brand-soft: #e6efe9;
+  --gold: #a1791f;
+  --gold-soft: #f6eeda;
+  --danger: #9b1c1c;
+  --danger-soft: #fbeaea;
+  --success: #146c43;
+  --success-soft: #e3f2ea;
+  --warning: #8a5a00;
+  --warning-soft: #fdf1dc;
+
+  /* New design tokens (Step 2) */
+  --ink-primary: #13261c;
+  --ink-muted-new: #4e6055;
+  --surface-page: #f4f6f2;
+  --surface-card: #ffffff;
+  --surface-field: #eef2ec;
+  --border-tile: #e1e8df;
+  --brand-primary: #0b5d3b;
+  --brand-hero: #0b3d2a;
+  --gold-accent: #c9a227;
+  --gold-text: #6a5a10;
+  --receipt-cream: #fbf8ee;
+
+  /* Radii */
+  --radius-card: 28px;
+  --radius-tile: 18px;
+  --radius-pill: 999px;
+  --radius-receipt: 24px;
+}
+
+* {
+  border-color: var(--border-subtle);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  font-size: 17px; /* Slightly larger base for better readability */
+}
+
+body {
+  background: var(--surface-page);
+  color: var(--ink-primary);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04";
+  line-height: 1.6;
+}
+
+/* Urdu: proper RTL, Naskh shaping, slightly larger line height */
+html[dir="rtl"] body {
+  font-family: var(--font-arabic);
+  line-height: 2;
+  font-size: 1.05rem; /* Slightly larger for Arabic readability */
+}
+
+html[lang="hi"] body {
+  font-family: var(--font-devanagari);
+  line-height: 1.85;
+  font-size: 1.02rem; /* Slightly larger for Devanagari readability */
+}
+
+/* Numbers stay LTR even inside RTL text */
+.num {
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: plaintext;
+  direction: ltr;
+  display: inline-block;
+}
+
+/* Manrope font class for headlines */
+.font-manrope {
+  font-family: var(--font-manrope);
+}
+
+/* RTL-aware logical properties helpers */
+.margin-inline-start-auto { margin-inline-start: auto; }
+.margin-inline-end-auto { margin-inline-end: auto; }
+.padding-inline-start-0 { padding-inline-start: 0; }
+.padding-inline-end-0 { padding-inline-end: 0; }
+.text-start { text-align: start; }
+.text-end { text-align: end; }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+  @page {
+    margin: 12mm;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--brand-soft);
+}
+
+/* Scrollbars kept quiet but visible */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cfccc1 transparent;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
