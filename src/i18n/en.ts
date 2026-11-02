@@ -214,6 +214,9 @@ export const en = {
   staffEmptyHint: "Add a collector, admin or auditor for this Masjid.",
   staffList: "Staff list",
 
+  // Member Portal Notifications
+  // Moved to portal* keys below to avoid duplicate keys with notification settings section
+
   // Subscription
   subscription: "Subscription",
   subscriptionPlan: "Plan",
@@ -285,6 +288,25 @@ export const en = {
   telegramNotLinked: "Telegram not linked",
   linkTelegram: "Link Telegram",
   linkTelegramHint: "Message @{botName} on Telegram and click /start to link your account",
+
+  // Member Portal Login
+  portalSignIn: "Sign in to your account",
+  noAccount: "Don't have a portal account?",
+  contactAdmin: "Contact your masjid admin to create one.",
+
+  // Member Portal Notifications (prefix 'portal' avoids duplicate keys)
+  portalNotifications: "Notifications",
+  portalUnread: "unread",
+  portalAllCaughtUp: "All caught up!",
+  portalPaymentReceived: "Payment Received",
+  portalDuesReminder: "Due Reminder",
+  portalAnnouncement: "Announcement",
+  portalExpenseApproved: "Expense Approved",
+  portalMarkedRead: "Marked as read",
+  portalMarkAsRead: "Mark as read",
+  portalMarkAllRead: "Mark all as read",
+  portalNoNotifications: "No notifications yet",
+  portalNoNotificationsDesc: "Your notifications will appear here.",
 
   // Enhanced Contribution Category fields
   description: "Description",

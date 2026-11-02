@@ -254,9 +254,9 @@ export const ur: Dictionary = {
   telegramNotifications: "ٹیلیگرام اطلاعات",
   telegramNotificationsDesc: "ادائیگی کی تصدیق، واجب الادا یاد دہانی اور اعلانات ٹیلیگرام بوٹ کے ذریعے بھیجیں",
   emailNotifications: "ای میل اطلاعات",
-  emailNotificationsDesc: "ای میل کے ذریعے اطلاعات بھیجیں (SMTP ترتیب درکار)",
-  inAppNotifications: "ایپ میں اطلاعات",
-  inAppNotificationsDesc: "آڈٹ ٹریل کے لیے اطلاعات ہمیشہ ایپ میں محفوظ کریں",
+  emailNotificationsDesc: "ای میل کے ذریعے معلومات بھیجیں (SMTP ترتیب درکار)",
+  inAppNotifications: "ایپ میں معلومات",
+  inAppNotificationsDesc: "آڈٹ ٹریل کے لیے معلومات ہمیشہ ایپ میں محفوظ کریں",
   notificationsEnabled: "فعال",
   notificationsDisabled: "غیر فعال",
   botConnected: "بوٹ منسلک: @{botName}",
@@ -272,9 +272,9 @@ export const ur: Dictionary = {
   // Member notification preferences
   myPreferences: "میری ترجیحات",
   notificationPreferences: "اطلاعات کی ترجیحات",
-  receiveTelegram: "ٹیلیگرام اطلاعات موصول کریں",
-  receiveInApp: "ایپ میں اطلاعات موصول کریں",
-  receiveEmail: "ای میل اطلاعات موصول کریں",
+  receiveTelegram: "ٹیلیگرام معلومات موصول کریں",
+  receiveInApp: "ایپ میں معلومات موصول کریں",
+  receiveEmail: "ای میل معلومات موصول کریں",
   quietHours: "خاموش اوقات",
   quietHoursStart: "آغاز",
   quietHoursEnd: "اختتام",
@@ -287,6 +287,25 @@ export const ur: Dictionary = {
   telegramNotLinked: "ٹیلیگرام منسلک نہیں",
   linkTelegram: "ٹیلیگرام منسلک کریں",
   linkTelegramHint: "ٹیلیگرام پر @{botName} کو پیغام بھیجیں اور /start دبائیں",
+
+  // Member Portal Login
+  portalSignIn: "اپنے اکاؤنٹ میں سائن اِن کریں",
+  noAccount: "پورٹل اکاؤنٹ نہیں ہے؟",
+  contactAdmin: "اپنے مسجد ایڈمن سے اکاؤنٹ بنوائیں۔",
+
+  // Member Portal Notifications (prefix 'portal' avoids duplicate keys)
+  portalNotifications: "اطلاعات",
+  portalUnread: "غیر مطالعہ شدہ",
+  portalAllCaughtUp: "سب پڑھ لی گئیں!",
+  portalPaymentReceived: "ادائیگی وصول",
+  portalDuesReminder: "واجب الادا یاد دہانی",
+  portalAnnouncement: "اعلان",
+  portalExpenseApproved: "اخراجات منظور",
+  portalMarkedRead: "پڑھا گیا نشان دہی",
+  portalMarkAsRead: "پڑھا گیا نشان دہی کریں",
+  portalMarkAllRead: "سب کو پڑھا گیا نشان دہی کریں",
+  portalNoNotifications: "ابھی کوئی اطلاع نہیں",
+  portalNoNotificationsDesc: "آپ کی اطلاعیں یہاں ظاہر ہوں گی۔",
 
   // Enhanced Contribution Category fields
   description: "وضاحت",

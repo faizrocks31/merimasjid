@@ -32,7 +32,13 @@ export default async function PortalLayout({ children }: { children: React.React
           </div>
         </div>
         <PortalNav
-          labels={{ overview: t("memberPortal"), dues: t("dues"), receipts: t("myReceipts"), profile: t("profile") }}
+          labels={{
+            overview: t("memberPortal"),
+            dues: t("dues"),
+            receipts: t("myReceipts"),
+            notifications: t("portalNotifications"),
+            profile: t("profile"),
+          }}
         />
       </header>
       <main className="mx-auto max-w-4xl px-4 pb-16 pt-6 lg:px-6">{children}</main>

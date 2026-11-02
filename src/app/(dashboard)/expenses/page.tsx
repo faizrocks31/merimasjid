@@ -104,12 +104,12 @@ export default async function ExpensesPage() {
                             <ExpenseStatusBadge status={e.approvalStatus} />
                             {e.approvalStatus === "PENDING" && can(user.role, "expense:approve") ? (
                               <div className="flex gap-1">
-                                <form action={approveExpenseAction}>
+                                <form action={async (fd) => { await approveExpenseAction(fd); }}>
                                   <input type="hidden" name="expenseId" value={e.id} />
                                   <input type="hidden" name="decision" value="APPROVED" />
                                   <Button type="submit" size="sm" variant="secondary">{t("approved")}</Button>
                                 </form>
-                                <form action={approveExpenseAction}>
+                                <form action={async (fd) => { await approveExpenseAction(fd); }}>
                                   <input type="hidden" name="expenseId" value={e.id} />
                                   <input type="hidden" name="decision" value="REJECTED" />
                                   <Button type="submit" size="sm" variant="ghost">{t("rejected")}</Button>

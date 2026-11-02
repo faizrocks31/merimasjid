@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/portal", key: "overview" },
   { href: "/portal/dues", key: "dues" },
   { href: "/portal/receipts", key: "receipts" },
+  { href: "/portal/notifications", key: "notifications" },
   { href: "/portal/profile", key: "profile" },
 ];
 

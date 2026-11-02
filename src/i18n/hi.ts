@@ -288,6 +288,25 @@ export const hi: Dictionary = {
   linkTelegram: "टेलीग्राम जोड़ें",
   linkTelegramHint: "टेलीग्राम पर @{botName} को संदेश भेजें और /start दबाएं",
 
+  // Member Portal Login
+  portalSignIn: "अपने खाते में साइन इन करें",
+  noAccount: "पोर्टल खाता नहीं है?",
+  contactAdmin: "अपने मस्जिद एडमिन से खाता बनवाएं।",
+
+  // Member Portal Notifications (prefix 'portal' avoids duplicate keys)
+  portalNotifications: "सूचनाएं",
+  portalUnread: "अपठित",
+  portalAllCaughtUp: "सभी पढ़ी गईं!",
+  portalPaymentReceived: "भुगतान प्राप्त",
+  portalDuesReminder: "देय अनुस्मारक",
+  portalAnnouncement: "घोषणा",
+  portalExpenseApproved: "खर्च स्वीकृत",
+  portalMarkedRead: "पढ़ा गया चिह्नित",
+  portalMarkAsRead: "पढ़ा गया चिह्नित करें",
+  portalMarkAllRead: "सभी को पढ़ा गया चिह्नित करें",
+  portalNoNotifications: "अभी कोई सूचना नहीं",
+  portalNoNotificationsDesc: "आपकी सूचनाएं यहां दिखाई देंगी।",
+
   // Enhanced Contribution Category fields
   description: "विवरण",
   defaultAmount: "डिफ़ॉल्ट राशि",
