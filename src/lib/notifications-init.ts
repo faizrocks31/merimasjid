@@ -1,7 +1,4 @@
-import { PrismaClient } from "@prisma/client";
 import { setTelegramConfig, setEmailConfig, getTelegramSetupInstructions, sendNotification } from "./notifications";
-
-const prisma = new PrismaClient();
 
 // Initialize notification configs from env
 export function initNotifications() {
@@ -45,6 +42,8 @@ export function initNotifications() {
  * or when they click a deep link: https://t.me/yourbot?start=member_<memberId>
  */
 export async function linkMemberTelegram(memberId: string, telegramChatId: string) {
+  const { prisma } = await import("@/lib/db");
+
   // Verify this chat_id isn't already linked to another member
   const existing = await prisma.member.findFirst({
     where: { telegramChatId },
@@ -69,6 +68,8 @@ export async function linkMemberTelegram(memberId: string, telegramChatId: strin
  * Get all members with linked Telegram for broadcasting
  */
 export async function getMembersWithTelegram(masjidId: string) {
+  const { prisma } = await import("@/lib/db");
+
   return prisma.member.findMany({
     where: {
       masjidId,
@@ -112,5 +113,3 @@ export async function broadcastToMembers(
 if (typeof window === "undefined") {
   initNotifications();
 }
-
-export { prisma };

@@ -98,30 +98,41 @@ export async function createExpenseAction(_prev: ExpenseState, formData: FormDat
 }
 
 
-export async function approveExpenseAction(formData: FormData): Promise<void> {
+export async function approveExpenseAction(formData: FormData): Promise<ExpenseState> {
   const user = await requireStaff();
   assertCan(user.role, "expense:approve");
 
   const expenseId = String(formData.get("expenseId") ?? "");
   const decision = String(formData.get("decision") ?? "APPROVED");
-  if (!["APPROVED", "REJECTED"].includes(decision)) return;
+  if (!["APPROVED", "REJECTED"].includes(decision)) return { error: "Invalid decision." };
 
   const expense = await prisma.expense.findFirst({ where: { id: expenseId, masjidId: user.masjidId! } });
-  if (!expense) return;
+  if (!expense) return { error: "Expense not found." };
 
-  await prisma.$transaction(async (tx) => {
-    await tx.expense.update({ where: { id: expense.id }, data: { approvalStatus: decision } });
-    await writeAudit(tx, {
-      masjidId: user.masjidId,
-      actorUserId: user.id,
-      action: "expense.decide",
-      entityType: "Expense",
-      entityId: expense.id,
-      before: { approvalStatus: expense.approvalStatus },
-      after: { approvalStatus: decision },
+  // Separation of duties: ADMIN (or any role with expense:approve) cannot approve their own expense
+  if (expense.enteredBy === user.id) {
+    return { error: "You cannot approve an expense you entered yourself. Separation of duties required." };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.expense.update({ where: { id: expense.id }, data: { approvalStatus: decision } });
+      await writeAudit(tx, {
+        masjidId: user.masjidId,
+        actorUserId: user.id,
+        action: "expense.decide",
+        entityType: "Expense",
+        entityId: expense.id,
+        before: { approvalStatus: expense.approvalStatus },
+        after: { approvalStatus: decision },
+      });
     });
-  });
 
-  revalidatePath("/expenses");
-  revalidatePath("/dashboard");
+    revalidatePath("/expenses");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (err) {
+    console.error("approveExpenseAction failed", err);
+    return { error: "Could not update expense approval status." };
+  }
 }

@@ -13,12 +13,28 @@ export default defineConfig({
     headless: true,
     viewport: { width: 1440, height: 900 },
     actionTimeout: 15_000,
-    storageState: "e2e/auth-state.json",
   },
   projects: [
     {
-      name: "chromium",
+      name: "auth",
+      testMatch: "**/global-setup.ts",
       use: { browserName: "chromium" },
+    },
+    {
+      name: "login-tests",
+      testMatch: "**/login-check.spec.ts",
+      use: {
+        browserName: "chromium",
+        storageState: { cookies: [], origins: [] }, // No auth state for login tests
+      },
+    },
+    {
+      name: "e2e",
+      testIgnore: ["**/login-check.spec.ts", "**/global-setup.ts"],
+      use: {
+        browserName: "chromium",
+        storageState: "e2e/auth-state.json",
+      },
     },
   ],
   globalSetup: "./e2e/global-setup.ts",

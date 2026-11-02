@@ -10,6 +10,7 @@ import { parseISODate } from "@/lib/dates";
 import { nextReceiptNumber } from "@/lib/receipts/numbering";
 import { recomputePeriodStatus, recomputeAssignmentStatus, recomputeEventStatus } from "@/lib/dues";
 import { writeAudit } from "@/modules/audit/write";
+import { notifyPaymentReceived } from "@/lib/notifications";
 
 export type PaymentResult =
   | { ok: true; paymentId: string; receiptNo: string; duplicate?: boolean }
@@ -364,15 +365,37 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
         after: { receiptNo, amountPaise: input.amountPaise, mode: input.mode },
       });
 
-      return { paymentId: payment.id, receiptNo };
+      return { paymentId: payment.id, receiptNo, member, allocations: input.allocations };
     });
 
     if ("error" in result) return { ok: false, error: String(result.error) };
 
+    // Send notification if payment is for a registered member
+    if (result.member) {
+      const categoryNames = result.allocations.map(a => a.categoryId);
+      const categories = await prisma.contributionCategory.findMany({
+        where: { id: { in: categoryNames } },
+        select: { id: true, name: true },
+      });
+      const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+
+      for (const allocation of result.allocations) {
+        const categoryName = categoryMap.get(allocation.categoryId) ?? "Contribution";
+        await notifyPaymentReceived({
+          masjidId: user.masjidId!,
+          memberId: result.member!.id,
+          amount: allocation.amountPaise,
+          receiptNo: result.receiptNo,
+          category: categoryName,
+          date: paymentDate,
+        });
+      }
+    }
+
     revalidatePath("/dashboard");
     revalidatePath("/transactions");
     revalidatePath("/members");
-    return { ok: true, ...result };
+    return { ok: true, paymentId: result.paymentId, receiptNo: result.receiptNo };
   } catch (err) {
     if (err instanceof Error) {
       const msg = err.message;

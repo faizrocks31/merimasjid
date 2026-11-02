@@ -3,9 +3,7 @@
  * Determines which channels to use based on masjid settings + member preferences
  */
 
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/db";
 
 export type NotificationChannel = "TELEGRAM" | "EMAIL" | "IN_APP";
 

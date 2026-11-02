@@ -2,10 +2,10 @@
   "cookies": [
     {
       "name": "masjid_session",
-      "value": "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJjbXZzZHF1OWQwMDBpbGd1ZnJxajBvZGx4IiwibWFzamlkSWQiOiJjbXZzZGE5aDAwMDAwNm91ZmVnNGxxeWIzIiwicm9sZSI6IkFETUlOIiwiaXNQbGF0Zm9ybUFkbWluIjpmYWxzZSwiaWF0IjoxNzkzNDI4MjMxLCJleHAiOjE3OTM0NzE0MzF9.0kV74hmSF2f0LEYn8aCpm4rPpka-94UhVy5Lr8fy1kM",
+      "value": "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJjbXZzZHF1OWQwMDBpbGd1ZnJxajBvZGx4IiwibWFzamlkSWQiOiJjbXZzZGE5aDAwMDAwNm91ZmVnNGxxeWIzIiwicm9sZSI6IkFETUlOIiwiaXNQbGF0Zm9ybUFkbWluIjpmYWxzZSwiaWF0IjoxNzkzNjA1MjAyLCJleHAiOjE3OTM2NDg0MDJ9.o4omWQP9g0fnG8loreQoVhYX-G9N4RanM2IVTmRPshs",
       "domain": "localhost",
       "path": "/",
-      "expires": 1793471431.275565,
+      "expires": 1793648403.000454,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"

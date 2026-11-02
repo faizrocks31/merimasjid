@@ -36,6 +36,8 @@ export const hi: Dictionary = {
   cancel: "रद्द करें",
   edit: "संपादित करें",
   update: "अपडेट करें",
+  show: "दिखाएं",
+  perPage: "प्रति पृष्ठ",
   addCategory: "श्रेणी जोड़ें",
   addExpenseCategory: "व्यय श्रेणी जोड़ें",
   delete: "हटाएँ",

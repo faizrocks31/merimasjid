@@ -36,6 +36,8 @@ export const ur: Dictionary = {
   cancel: "منسوخ کریں",
   edit: "ترمیم",
   update: "اپ ڈیٹ کریں",
+  show: "دکھائیں",
+  perPage: "ہر صفحہ پر",
   addCategory: "کیٹیگری شامل کریں",
   addExpenseCategory: "اخراجات کی کیٹیگری شامل کریں",
   delete: "ہٹائیں",

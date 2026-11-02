@@ -426,7 +426,7 @@ model AuditLog {
   metadata    String?
   createdAt   DateTime @default(now())
   actor       User?    @relation(fields: [actorUserId], references: [id])
-  masjid      Masjid?  @relation(fields: [masjidId], references: [id], onUpdate: NoAction)
+  masjid      Masjid?  @relation(fields: [masjidId], references: [id], onUpdate: NoAction, onDelete: Restrict)
 
   @@index([masjidId, createdAt])
   @@index([masjidId, entityType, entityId])

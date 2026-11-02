@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { addMonths, istParts, monthPeriod } from "@/lib/dates";
 import { FREQUENCIES, PERIOD_STATUS, EVENT_STATUS } from "@/lib/constants";
+import { notifyDuesReminder } from "@/lib/notifications";
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
@@ -199,7 +200,8 @@ export async function sumEventAllocationsForMember(
  *
  * Guard: once an event reaches COMPLETED it must never be downgraded to OPEN
  * by a later reversal or assignment removal. The only allowed transition from
- * COMPLETED is to CANCELLED (handled by explicit admin action).
+ * COMPLETED is to CANCELLED (handled by explicit admin action) or SCHEDULED
+ * (full reversal - no payments at all).
  */
 export async function recomputeEventStatus(
   tx: Tx,
@@ -214,9 +216,10 @@ export async function recomputeEventStatus(
   });
   if (!event) return;
 
-  // Preserve COMPLETED status when the only possible downgrade would be to OPEN.
-  // After a reversal we may legitimately fall back to SCHEDULED (no payments at all).
-  // Compute the new status first, then guard against an OPEN downgrade.
+  // If already CANCELLED, preserve it
+  if (event.status === EVENT_STATUS.CANCELLED) {
+    return;
+  }
 
   // Total expected: sum of assignments if household-wise, else event's expectedAmountPaise
   const hasAssignments = event.assignments.length > 0;
@@ -232,26 +235,36 @@ export async function recomputeEventStatus(
   // Count paid assignments
   const paidAssignments = event.assignments.filter((a) => a.status === "PAID").length;
 
-  let status: string = EVENT_STATUS.SCHEDULED;
-  if (event.status === EVENT_STATUS.CANCELLED) {
-    status = EVENT_STATUS.CANCELLED;
-  } else if (expectedPaise > 0 && receivedPaise >= expectedPaise && paidAssignments === event.assignments.length) {
-    status = EVENT_STATUS.COMPLETED;
+  // Compute tentative status WITHOUT considering the COMPLETED→OPEN guard
+  let tentativeStatus: string = EVENT_STATUS.SCHEDULED;
+  if (expectedPaise > 0 && receivedPaise >= expectedPaise && paidAssignments === event.assignments.length) {
+    tentativeStatus = EVENT_STATUS.COMPLETED;
   } else if (receivedPaise > 0 || (hasAssignments && paidAssignments > 0)) {
-    status = EVENT_STATUS.OPEN;
+    tentativeStatus = EVENT_STATUS.OPEN;
   }
 
   // Guard: never downgrade COMPLETED → OPEN.
-  // If the event was COMPLETED and the computed status would be OPEN,
-  // keep it COMPLETED. Allow COMPLETED → SCHEDULED (full reversal) and COMPLETED → COMPLETED (no change).
-  if (event.status === EVENT_STATUS.COMPLETED && status === EVENT_STATUS.OPEN) {
-    status = EVENT_STATUS.COMPLETED;
+  // If the event was COMPLETED and the computed status would be OPEN, keep it COMPLETED.
+  // Allow COMPLETED → SCHEDULED (full reversal - no payments at all).
+  let finalStatus: string = tentativeStatus;
+  if (event.status === EVENT_STATUS.COMPLETED) {
+    if (tentativeStatus === EVENT_STATUS.OPEN) {
+      finalStatus = EVENT_STATUS.COMPLETED;
+    } else if (tentativeStatus === EVENT_STATUS.SCHEDULED && receivedPaise === 0) {
+      // Full reversal - allow transition to SCHEDULED
+      finalStatus = EVENT_STATUS.SCHEDULED;
+    } else {
+      finalStatus = EVENT_STATUS.COMPLETED;
+    }
   }
 
-  await tx.collectionEvent.update({
-    where: { id: event.id },
-    data: { status },
-  });
+  // Only update if status actually changes
+  if (finalStatus !== event.status) {
+    await tx.collectionEvent.update({
+      where: { id: event.id },
+      data: { status: finalStatus },
+    });
+  }
 }
 
 /** Generates periods for every active plan of a masjid. Used by a settings action. */
@@ -263,4 +276,50 @@ export async function generateAllDuesForMasjid(masjidId: string): Promise<number
   let total = 0;
   for (const p of plans) total += await generateDuesPeriods(p.id);
   return total;
+}
+
+/**
+ * Sends dues reminders for all pending/partial periods due within the next N days.
+ * This should be called by a cron job (e.g., daily).
+ */
+export async function sendDuesReminders(masjidId: string, daysAhead: number = 3): Promise<number> {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() + daysAhead);
+
+  const periods = await prisma.duesPeriod.findMany({
+    where: {
+      masjidId,
+      status: { in: ["PENDING", "PARTIAL"] },
+      dueDate: { lte: cutoffDate },
+    },
+    include: {
+      plan: { include: { category: { select: { name: true } } } },
+      member: { select: { id: true, fullName: true } },
+      allocations: {
+        include: { payment: { select: { status: true } } },
+      },
+    },
+  });
+
+  let sent = 0;
+  for (const period of periods) {
+    const allocated = period.allocations
+      ?.filter((a) => a.payment?.status === "SUCCESS")
+      .reduce((sum, a) => sum + a.allocatedAmountPaise, 0) ?? 0;
+    const outstanding = Math.max(period.expectedAmountPaise - allocated, 0);
+
+    if (outstanding > 0 && period.member) {
+      const periodLabel = `${period.plan.category.name} (${period.periodStart.toISOString().split("T")[0]} - ${period.periodEnd?.toISOString().split("T")[0] ?? period.periodStart.toISOString().split("T")[0]})`;
+      await notifyDuesReminder({
+        masjidId,
+        memberId: period.member.id,
+        amount: outstanding,
+        category: period.plan.category.name,
+        dueDate: period.dueDate,
+        period: periodLabel,
+      });
+      sent++;
+    }
+  }
+  return sent;
 }

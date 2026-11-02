@@ -28,10 +28,32 @@ async function globalSetup(config: FullConfig) {
   const browser = await chromium.launch();
   const page = await browser.newPage();
   await page.goto(`${BASE_URL}/login`);
+
+  // Wait for form to be ready
+  await page.waitForSelector('input[name="email"]', { timeout: 10000 });
+  await page.waitForSelector('input[name="password"]', { timeout: 10000 });
+  await page.waitForSelector('button[type="submit"]', { timeout: 10000 });
+
   await page.fill('input[name="email"]', ADMIN_EMAIL);
   await page.fill('input[name="password"]', ADMIN_PASSWORD);
   await page.click('button[type="submit"]');
-  await page.waitForURL('**/dashboard');
+
+  // Wait for navigation - the login action redirects via window.location.href
+  try {
+    await page.waitForURL('**/dashboard', { timeout: 60000 });
+  } catch {
+    // Fallback: wait for any navigation and check cookie
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+  }
+
+  // Verify session cookie exists
+  const cookies = await page.context().cookies();
+  const sessionCookie = cookies.find(c => c.name === 'masjid_session');
+  if (!sessionCookie) {
+    throw new Error('Session cookie not found after login');
+  }
+
   await page.context().storageState({ path: "e2e/auth-state.json" });
   await browser.close();
   console.log("Global setup complete - auth state saved");

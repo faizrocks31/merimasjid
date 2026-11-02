@@ -34,6 +34,8 @@ export const en = {
   cancel: "Cancel",
   edit: "Edit",
   update: "Update",
+  show: "Show",
+  perPage: "per page",
   addCategory: "Add Category",
   addExpenseCategory: "Add Expense Category",
   delete: "Delete",

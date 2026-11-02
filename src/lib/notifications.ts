@@ -3,9 +3,7 @@
  * Supports: Telegram (FREE), In-app, Email, WhatsApp (when ready)
  */
 
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/db";
 
 // ============================================
 // TYPES

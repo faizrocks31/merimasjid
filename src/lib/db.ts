@@ -1,6 +1,7 @@
 import "server-only";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { initNotifications } from "@/lib/notifications-init";
 
 /**
  * PostgreSQL connection.
@@ -38,5 +39,10 @@ function createClient(): PrismaClient {
 }
 
 export const prisma = globalForPrisma.prisma ?? createClient();
+
+// Initialize notifications on server startup
+if (typeof window === "undefined") {
+  initNotifications();
+}
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
