@@ -25,7 +25,7 @@ describe("Subscription enforcement", () => {
   });
 
   it("creates a TRIAL subscription and sets denormalized fields", async () => {
-    const sub = await createSubscriptionForMasjid(testMasjidId, "TRIAL");
+    const sub = await createSubscriptionForMasjid(prisma, testMasjidId, "TRIAL");
     expect(sub.planCode).toBe("TRIAL");
     expect(sub.status).toBe("TRIAL");
 
@@ -37,7 +37,7 @@ describe("Subscription enforcement", () => {
   });
 
   it("computes TRIAL status correctly within trial period", async () => {
-    await createSubscriptionForMasjid(testMasjidId, "TRIAL");
+    await createSubscriptionForMasjid(prisma, testMasjidId, "TRIAL");
     const effective = await getEffectiveSubscription(testMasjidId);
     expect(effective.status).toBe("TRIAL");
     expect(effective.trialEndsAt).toBeInstanceOf(Date);
@@ -48,7 +48,7 @@ describe("Subscription enforcement", () => {
     const endsAt = new Date(startsAt);
     endsAt.setMonth(endsAt.getMonth() + 1);
 
-    await createSubscriptionForMasjid(testMasjidId, "STARTER", startsAt, endsAt);
+    await createSubscriptionForMasjid(prisma, testMasjidId, "STARTER", startsAt, endsAt);
     const effective = await getEffectiveSubscription(testMasjidId);
     expect(effective.status).toBe("ACTIVE");
     expect(effective.plan.code).toBe("STARTER");
@@ -59,7 +59,7 @@ describe("Subscription enforcement", () => {
     const endsAt = new Date(startsAt);
     endsAt.setDate(endsAt.getDate() - 3); // Expired 3 days ago
 
-    await createSubscriptionForMasjid(testMasjidId, "STARTER", startsAt, endsAt);
+    await createSubscriptionForMasjid(prisma, testMasjidId, "STARTER", startsAt, endsAt);
     const effective = await getEffectiveSubscription(testMasjidId);
     expect(effective.status).toBe("GRACE");
     expect(effective.graceEndsAt).toBeInstanceOf(Date);
@@ -70,34 +70,34 @@ describe("Subscription enforcement", () => {
     const endsAt = new Date(startsAt);
     endsAt.setDate(endsAt.getDate() - 10); // Expired 10 days ago (past 7-day grace)
 
-    await createSubscriptionForMasjid(testMasjidId, "STARTER", startsAt, endsAt);
+    await createSubscriptionForMasjid(prisma, testMasjidId, "STARTER", startsAt, endsAt);
     const effective = await getEffectiveSubscription(testMasjidId);
     expect(effective.status).toBe("SUSPENDED");
   });
 
   it("checkLimit allows within limit", async () => {
-    await createSubscriptionForMasjid(testMasjidId, "STARTER");
+    await createSubscriptionForMasjid(prisma, testMasjidId, "STARTER");
     const result = await checkLimit(testMasjidId, "members", 100);
     expect(result.allowed).toBe(true);
     expect(result.limit).toBe(500);
   });
 
   it("checkLimit rejects when limit exceeded", async () => {
-    await createSubscriptionForMasjid(testMasjidId, "STARTER");
+    await createSubscriptionForMasjid(prisma, testMasjidId, "STARTER");
     const result = await checkLimit(testMasjidId, "members", 600);
     expect(result.allowed).toBe(false);
     expect(result.limit).toBe(500);
   });
 
   it("checkLimit returns true for unlimited (ENTERPRISE)", async () => {
-    await createSubscriptionForMasjid(testMasjidId, "ENTERPRISE");
+    await createSubscriptionForMasjid(prisma, testMasjidId, "ENTERPRISE");
     const result = await checkLimit(testMasjidId, "members", 10000);
     expect(result.allowed).toBe(true);
     expect(result.limit).toBe(-1);
   });
 
   it("syncAllSubscriptionStatuses updates denormalized fields", async () => {
-    await createSubscriptionForMasjid(testMasjidId, "STARTER");
+    await createSubscriptionForMasjid(prisma, testMasjidId, "STARTER");
     const { updated, errors } = await import("@/lib/subscription").then(m => m.syncAllSubscriptionStatuses());
     expect(updated).toBeGreaterThanOrEqual(1);
     expect(errors).toBe(0);
@@ -108,8 +108,8 @@ describe("Subscription enforcement", () => {
   });
 
   it("createSubscriptionForMasjid cancels previous subscription", async () => {
-    await createSubscriptionForMasjid(testMasjidId, "STARTER");
-    await createSubscriptionForMasjid(testMasjidId, "PROFESSIONAL");
+    await createSubscriptionForMasjid(prisma, testMasjidId, "STARTER");
+    await createSubscriptionForMasjid(prisma, testMasjidId, "PROFESSIONAL");
 
     const subs = await prisma.subscription.findMany({ where: { masjidId: testMasjidId } });
     expect(subs.length).toBe(2);

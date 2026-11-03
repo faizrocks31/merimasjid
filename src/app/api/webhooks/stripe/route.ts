@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createSubscriptionForMasjid, updateSubscription, cancelSubscription, changePlan, findSubscriptionByBillingReference } from "@/lib/subscription";
+import { prisma } from "@/lib/db";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-06-20",
@@ -113,7 +114,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   const endsAt = new Date(stripeSubscription.current_period_end * 1000);
 
   // Create or update subscription
-  await createSubscriptionForMasjid(subscription.masjidId, planCode, startsAt, endsAt, customerId);
+  await createSubscriptionForMasjid(prisma, subscription.masjidId, planCode, startsAt, endsAt, customerId);
 
   // If subscription is trialing, update status to TRIAL
   if (status === "trialing") {

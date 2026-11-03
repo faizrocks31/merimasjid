@@ -9,6 +9,7 @@ import { writeAudit } from "@/modules/audit/write";
 import { assertCan } from "@/lib/permissions";
 import { SUBSCRIPTION_PLANS, type SubscriptionPlanCode, getPlanOrThrow } from "@/lib/subscription-plans";
 import { createSubscriptionForMasjid, updateSubscription, cancelSubscription, reactivateSubscription, changePlan } from "@/lib/subscription";
+import { hashPassword } from "@/lib/auth";
 
 export type MasjidActionState = { ok?: boolean; error?: string } | undefined;
 
@@ -197,6 +198,232 @@ export async function createMasjidAction(
   redirect("/platform");
 }
 
+// ============================================
+// TWO-STEP MASJID REGISTRATION (SUPER_ADMIN only)
+// ============================================
+
+export type MasjidStep1State = { ok?: boolean; error?: string; fieldErrors?: Record<string, string>; masjidId?: string } | undefined;
+export type MasjidStep2State = { ok?: boolean; error?: string; fieldErrors?: Record<string, string> } | undefined;
+
+/**
+ * Step 1: Create masjid with basic details and plan selection.
+ * Validates required fields including phone and email, checks global duplicates
+ * against User table, creates masjid + default categories + subscription.
+ * Returns masjidId to proceed to Step 2.
+ */
+export async function createMasjidStep1Action(
+  _prev: MasjidStep1State,
+  formData: FormData,
+): Promise<MasjidStep1State> {
+  const user = await requirePlatformAdmin();
+
+  const name = String(formData.get("name") ?? "").trim();
+  const slug = slugify(String(formData.get("slug") ?? name));
+  const receiptPrefix = String(formData.get("receiptPrefix") ?? "").trim().toUpperCase();
+  const address = String(formData.get("address") ?? "").trim() || null;
+  const phone = String(formData.get("phone") ?? "").trim() || null;
+  const email = String(formData.get("email") ?? "").trim().toLowerCase() || null;
+  const financialYearStartMonth = Number(formData.get("financialYearStartMonth") ?? 4);
+  const receiptFooter =
+    String(formData.get("receiptFooter") ?? "").trim() || "Jazak Allah Khair for your contribution.";
+  const planCode = String(formData.get("planCode") ?? "TRIAL") as SubscriptionPlanCode;
+
+  // Validation
+  if (!name) return { error: "Name is required.", fieldErrors: { name: "Required" } };
+  if (!slug) return { error: "Slug is required.", fieldErrors: { slug: "Required" } };
+  if (receiptPrefix.length < 2 || receiptPrefix.length > 8) {
+    return { error: "Receipt prefix must be 2-8 characters.", fieldErrors: { receiptPrefix: "2-8 chars" } };
+  }
+  if (!/^[A-Z0-9]+$/.test(receiptPrefix)) {
+    return { error: "Receipt prefix must be uppercase letters and digits only.", fieldErrors: { receiptPrefix: "Uppercase only" } };
+  }
+  if (financialYearStartMonth < 1 || financialYearStartMonth > 12) {
+    return { error: "Invalid financial year start month.", fieldErrors: { financialYearStartMonth: "Invalid" } };
+  }
+  if (!phone) return { error: "Phone is required.", fieldErrors: { phone: "Required" } };
+  if (!/^\d{10}$/.test(phone.replace(/^\+91/, ""))) {
+    return { error: "Enter a valid 10-digit mobile number.", fieldErrors: { phone: "Invalid format" } };
+  }
+  if (!email) return { error: "Email is required.", fieldErrors: { email: "Required" } };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Enter a valid email address.", fieldErrors: { email: "Invalid format" } };
+  }
+  if (!Object.keys(SUBSCRIPTION_PLANS).includes(planCode)) {
+    return { error: "Invalid plan selected.", fieldErrors: { planCode: "Invalid plan" } };
+  }
+
+  // Check slug/receiptPrefix duplicates
+  const duplicate = await findDuplicate(slug, receiptPrefix, null);
+  if (duplicate) return { error: duplicate };
+
+  // Check global email/mobile duplicates against User table
+  const normalizedPhone = phone.replace(/^\+91/, "");
+  const [existingEmail, existingPhone] = await Promise.all([
+    prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } }),
+    prisma.user.findFirst({ where: { phone: normalizedPhone }, select: { id: true } }),
+  ]);
+  if (existingEmail) {
+    return { error: "This email is already registered.", fieldErrors: { email: "Already in use" } };
+  }
+  if (existingPhone) {
+    return { error: "This mobile number is already registered.", fieldErrors: { phone: "Already in use" } };
+  }
+
+  try {
+    const masjid = await prisma.$transaction(async (tx) => {
+      const created = await tx.masjid.create({
+        data: {
+          name,
+          slug,
+          receiptPrefix,
+          address,
+          phone: normalizedPhone,
+          email,
+          financialYearStartMonth,
+          receiptFooter,
+          status: "ACTIVE",
+        },
+      });
+
+      for (const c of DEFAULT_CATEGORIES) {
+        await tx.contributionCategory.create({ data: { masjidId: created.id, ...c } });
+      }
+      for (const catName of DEFAULT_EXPENSE_CATEGORIES) {
+        await tx.expenseCategory.create({ data: { masjidId: created.id, name: catName } });
+      }
+
+      // Create subscription for the chosen plan (pass tx for transactional consistency)
+      await createSubscriptionForMasjid(tx, created.id, planCode);
+
+      await writeAudit(tx, {
+        masjidId: created.id,
+        actorUserId: user.id,
+        action: "masjid.create",
+        entityType: "Masjid",
+        entityId: created.id,
+        after: { name, slug, receiptPrefix, financialYearStartMonth, planCode },
+      });
+
+      return created;
+    });
+
+    revalidatePath("/platform");
+    return { ok: true, masjidId: masjid.id };
+  } catch (err) {
+    console.error("createMasjidStep1Action failed", err);
+    // Handle unique constraint races
+    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
+      const target = (err as { meta?: { target?: string[] } }).meta?.target?.[0];
+      if (target === "email") return { error: "This email is already registered.", fieldErrors: { email: "Already in use" } };
+      if (target === "phone") return { error: "This mobile number is already registered.", fieldErrors: { phone: "Already in use" } };
+      if (target === "slug") return { error: "A masjid with this slug already exists.", fieldErrors: { slug: "Taken" } };
+      if (target === "receiptPrefix") return { error: "A masjid with this receipt prefix already exists.", fieldErrors: { receiptPrefix: "Taken" } };
+    }
+    return { error: "Could not create masjid." };
+  }
+}
+
+/**
+ * Step 2: Create initial Masjid Admin account.
+ * Validates admin details, checks global email/mobile duplicates again (race-safe),
+ * creates User with hashed password, creates MasjidUser ADMIN membership.
+ */
+export async function createMasjidStep2Action(
+  _prev: MasjidStep2State,
+  formData: FormData,
+): Promise<MasjidStep2State> {
+  const user = await requirePlatformAdmin();
+
+  const masjidId = String(formData.get("masjidId") ?? "");
+  const adminName = String(formData.get("adminName") ?? "").trim();
+  const adminEmail = String(formData.get("adminEmail") ?? "").trim().toLowerCase();
+  const adminPhone = String(formData.get("adminPhone") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  // Validation
+  if (!masjidId) return { error: "Invalid request: masjidId missing." };
+  if (!adminName) return { error: "Admin name is required.", fieldErrors: { adminName: "Required" } };
+  if (!adminEmail) return { error: "Admin email is required.", fieldErrors: { adminEmail: "Required" } };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+    return { error: "Enter a valid email address.", fieldErrors: { adminEmail: "Invalid format" } };
+  }
+  if (!adminPhone) return { error: "Admin mobile is required.", fieldErrors: { adminPhone: "Required" } };
+  if (!/^\d{10}$/.test(adminPhone.replace(/^\+91/, ""))) {
+    return { error: "Enter a valid 10-digit mobile number.", fieldErrors: { adminPhone: "Invalid format" } };
+  }
+  if (!password) return { error: "Password is required.", fieldErrors: { password: "Required" } };
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters.", fieldErrors: { password: "Too short" } };
+  }
+  if (password !== confirmPassword) {
+    return { error: "Passwords do not match.", fieldErrors: { confirmPassword: "Mismatch" } };
+  }
+
+  // Verify masjid exists
+  const masjid = await prisma.masjid.findUnique({ where: { id: masjidId } });
+  if (!masjid) return { error: "Masjid not found." };
+
+  // Race-safe global duplicate checks
+  const normalizedPhone = adminPhone.replace(/^\+91/, "");
+  const [existingEmail, existingPhone] = await Promise.all([
+    prisma.user.findFirst({ where: { email: { equals: adminEmail, mode: "insensitive" } }, select: { id: true } }),
+    prisma.user.findFirst({ where: { phone: normalizedPhone }, select: { id: true } }),
+  ]);
+  if (existingEmail) {
+    return { error: "This email is already registered.", fieldErrors: { adminEmail: "Already in use" } };
+  }
+  if (existingPhone) {
+    return { error: "This mobile number is already registered.", fieldErrors: { adminPhone: "Already in use" } };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Create User account
+      const createdUser = await tx.user.create({
+        data: {
+          name: adminName,
+          email: adminEmail,
+          phone: normalizedPhone,
+          passwordHash: await hashPassword(password),
+        },
+      });
+
+      // Create MasjidUser ADMIN membership
+      await tx.masjidUser.create({
+        data: {
+          masjidId,
+          userId: createdUser.id,
+          role: "ADMIN",
+          status: "ACTIVE",
+          joinedAt: new Date(),
+        },
+      });
+
+      await writeAudit(tx, {
+        masjidId,
+        actorUserId: user.id,
+        action: "masjid.admin.create",
+        entityType: "MasjidUser",
+        entityId: createdUser.id,
+        after: { adminEmail, adminPhone: normalizedPhone, role: "ADMIN" },
+      });
+    });
+
+    revalidatePath("/platform");
+    revalidatePath(`/platform/masjids/${masjidId}`);
+    return { ok: true };
+  } catch (err) {
+    console.error("createMasjidStep2Action failed", err);
+    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
+      const target = (err as { meta?: { target?: string[] } }).meta?.target?.[0];
+      if (target === "email") return { error: "This email is already registered.", fieldErrors: { adminEmail: "Already in use" } };
+      if (target === "phone") return { error: "This mobile number is already registered.", fieldErrors: { adminPhone: "Already in use" } };
+    }
+    return { error: "Could not create admin account." };
+  }
+}
+
 /**
  * Updates a masjid's details, including its status.
  */
@@ -339,7 +566,7 @@ export async function createSubscriptionAction(
     const masjid = await prisma.masjid.findUnique({ where: { id: masjidId } });
     if (!masjid) return { error: "Masjid not found." };
 
-    await createSubscriptionForMasjid(masjidId, planCode, new Date(), undefined, billingReference ?? undefined);
+    await createSubscriptionForMasjid(prisma, masjidId, planCode, new Date(), undefined, billingReference ?? undefined);
 
     revalidatePath("/platform");
     revalidatePath(`/platform/masjids/${masjidId}`);

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { SUBSCRIPTION_PLANS, type SubscriptionPlan, type SubscriptionPlanCode, type SubscriptionStatus, GRACE_PERIOD_DAYS, SUBSCRIPTION_STATUS_LABELS } from "@/lib/subscription-plans";
+import type { Prisma } from "@prisma/client";
 
 /**
  * Core subscription logic for the SaaS platform.
@@ -143,7 +144,10 @@ export async function checkLimit(
   return { allowed, limit, currentCount };
 }
 
+type TxClient = Prisma.TransactionClient;
+
 export async function createSubscriptionForMasjid(
+  txOrPrisma: typeof prisma | TxClient,
   masjidId: string,
   planCode: SubscriptionPlanCode = "TRIAL",
   startsAt: Date = new Date(),
@@ -151,7 +155,7 @@ export async function createSubscriptionForMasjid(
   billingReference?: string
 ) {
   // Deactivate any existing subscription
-  await prisma.subscription.updateMany({
+  await txOrPrisma.subscription.updateMany({
     where: { masjidId },
     data: { status: "CANCELLED" },
   });
@@ -165,7 +169,7 @@ export async function createSubscriptionForMasjid(
     computedEndsAt.setMonth(computedEndsAt.getMonth() + 1);
   }
 
-  const subscription = await prisma.subscription.create({
+  const subscription = await txOrPrisma.subscription.create({
     data: {
       masjidId,
       planCode,
@@ -177,7 +181,7 @@ export async function createSubscriptionForMasjid(
   });
 
   // Update denormalized fields on Masjid
-  await updateMasjidSubscriptionFields(masjidId, subscription);
+  await updateMasjidSubscriptionFields(txOrPrisma, masjidId, subscription);
 
   return subscription;
 }
@@ -201,7 +205,7 @@ export async function updateSubscription(
     },
   });
 
-  await updateMasjidSubscriptionFields(subscription.masjidId, subscription);
+  await updateMasjidSubscriptionFields(prisma, subscription.masjidId, subscription);
 
   return subscription;
 }
@@ -212,7 +216,7 @@ export async function cancelSubscription(subscriptionId: string) {
     data: { status: "CANCELLED" },
   });
 
-  await updateMasjidSubscriptionFields(subscription.masjidId, subscription);
+  await updateMasjidSubscriptionFields(prisma, subscription.masjidId, subscription);
 
   return subscription;
 }
@@ -226,7 +230,7 @@ export async function reactivateSubscription(subscriptionId: string, newEndsAt?:
     },
   });
 
-  await updateMasjidSubscriptionFields(subscription.masjidId, subscription);
+  await updateMasjidSubscriptionFields(prisma, subscription.masjidId, subscription);
 
   return subscription;
 }
@@ -261,12 +265,13 @@ export async function changePlan(
     },
   });
 
-  await updateMasjidSubscriptionFields(updated.masjidId, updated);
+  await updateMasjidSubscriptionFields(prisma, updated.masjidId, updated);
 
   return updated;
 }
 
 async function updateMasjidSubscriptionFields(
+  txOrPrisma: typeof prisma | TxClient,
   masjidId: string,
   subscription: {
     id: string;
@@ -279,7 +284,7 @@ async function updateMasjidSubscriptionFields(
   const effective = await getEffectiveSubscription(masjidId);
   const plan = effective.plan;
 
-  await prisma.masjid.update({
+  await txOrPrisma.masjid.update({
     where: { id: masjidId },
     data: {
       subscriptionStatus: effective.status,

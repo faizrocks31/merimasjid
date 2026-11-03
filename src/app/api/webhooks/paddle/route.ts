@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSubscriptionForMasjid, updateSubscription, cancelSubscription, changePlan, findSubscriptionByBillingReference } from "@/lib/subscription";
 import { createHmac } from "crypto";
+import { prisma } from "@/lib/db";
 
 /**
  * Paddle webhook handler – verifies signature and processes subscription events.
@@ -159,7 +160,7 @@ async function handleSubscriptionCreated(data: PaddleWebhookData) {
   else if (status === "paused") effectiveStatus = "SUSPENDED";
   else effectiveStatus = "CANCELLED";
 
-  await createSubscriptionForMasjid(subscription.masjidId, planCode, currentPeriodStart, currentPeriodEnd ?? undefined, customerId);
+  await createSubscriptionForMasjid(prisma, subscription.masjidId, planCode, currentPeriodStart, currentPeriodEnd ?? undefined, customerId);
 
   // Update status if needed
   if (effectiveStatus !== "ACTIVE") {

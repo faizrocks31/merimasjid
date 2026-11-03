@@ -4,7 +4,7 @@ Subscription-Based Multi-Masjid Collection Management SaaS
 
 **Roadmap source:** `PROJECT IMPLEMENTATION ROADMAP.md`
 **Last updated:** 2026-11-02
-**Current phase:** Phase 8 — Member Portal and Notifications (ready to start)
+**Current phase:** Phase 9 — Member Portal and Notifications (ready to start; Phase 8 registration flow implemented)
 
 ---
 
@@ -682,13 +682,14 @@ backups/
 | 6 | Backup, restore and disaster recovery | **Complete** |
 | 7 | Subscription-based SaaS management | **Complete** |
 | 7a | Member form enhancements (email, alternate mobile, phone storage fix) | **Complete** |
-| 8 | Member portal and notifications | Not started |
-| 9 | Reports, exports and reconciliation | Not started |
-| 10 | Internationalization and user experience | Not started |
-| 11 | Security hardening | Not started |
-| 12 | Performance and operational reliability | Not started |
-| 13 | Automated testing and launch readiness | Not started |
-| 14 | Deployment and production launch | Not started |
+| **8** | **Two-Step Masjid Registration (Super Admin)** | **Complete** |
+| 9 | Member portal and notifications | **Ready to start** |
+| 10 | Reports, exports and reconciliation | Not started |
+| 11 | Internationalization and user experience | Not started |
+| 12 | Security hardening | Not started |
+| 13 | Performance and operational reliability | Not started |
+| 14 | Automated testing and launch readiness | Not started |
+| 15 | Deployment and production launch | Not started |
 
 ---
 
@@ -934,19 +935,20 @@ User requested three changes to the member creation/edit flow:
 | 7 | Subscription-based SaaS management | **Complete** |
 | 7a | Member form enhancements (email, alternate mobile, phone storage fix) | **Complete** |
 | **0b** | **Phase 0 Risk Remediation (R-8 through R-19)** | **Complete** |
-| 8 | Member portal and notifications | **Ready to start** |
-| 9 | Reports, exports and reconciliation | Not started |
-| 10 | Internationalization and user experience | Not started |
-| 11 | Security hardening | Not started |
-| 12 | Performance and operational reliability | Not started |
-| 13 | Automated testing and launch readiness | Not started |
-| 14 | Deployment and production launch | Not started |
+| **8** | **Two-Step Masjid Registration (Super Admin)** | **Complete** |
+| 9 | Member portal and notifications | **Ready to start** |
+| 10 | Reports, exports and reconciliation | Not started |
+| 11 | Internationalization and user experience | Not started |
+| 12 | Security hardening | Not started |
+| 13 | Performance and operational reliability | Not started |
+| 14 | Automated testing and launch readiness | Not started |
+| 15 | Deployment and production launch | Not started |
 
 ---
 
 ## What's Left According to Plan
 
-### ✅ **Fully Complete (Phases 0-7, 7a, 0b)**
+### ✅ **Fully Complete (Phases 0-8, 7a, 0b)**
 
 All foundation phases are complete:
 - Database migrated to PostgreSQL with clean baseline
@@ -958,33 +960,123 @@ All foundation phases are complete:
 - Subscription-based SaaS with plan limits, cron, webhooks
 - Member form enhancements (email, alternate mobile, raw phone storage)
 - **Phase 0 Risk Remediation** - All code-level risks (R-8 through R-19) addressed
+- **Two-Step Masjid Registration** - Super Admin 2-step flow with admin account creation
 
-### 🚀 **Ready to Start: Phase 8 — Member Portal and Notifications**
+### 🚀 **Ready to Start: Phase 9 — Member Portal and Notifications**
 
 **Priority:** High
 **Prerequisites:** All complete
 
-**Key tasks for Phase 8:**
+**Key tasks for Phase 9:**
 1. **Member Portal** — Self-service portal for members to view dues, make payments, download receipts
 2. **Notifications Integration** — Wire up `notifyPaymentReceived`, `notifyDuesReminder`, `notifyAnnouncement` into existing workflows
 3. **Telegram Bot Setup** — Complete external BotFather setup for production notifications
 4. **In-App Notifications UI** — Notification center in portal and staff dashboard
 5. **Email/WA Fallback** — Optional channels for members without Telegram
 
-### 📋 **Subsequent Phases (9-14)**
+### 📋 **Subsequent Phases (10-15)**
 
 | Phase | Name | Description |
 |-------|------|-------------|
-| 9 | Reports, exports and reconciliation | Financial reports, CSV/Excel exports, bank reconciliation |
-| 10 | Internationalization and user experience | RTL support, accessibility, mobile PWA |
-| 11 | Security hardening | CSP, rate limiting, audit logging, penetration testing |
-| 12 | Performance and operational reliability | Query optimization, caching, monitoring, health checks |
-| 13 | Automated testing and launch readiness | E2E coverage >90%, CI/CD, load testing |
-| 14 | Deployment and production launch | Vercel/AWS deployment, SSL, DNS, go-live checklist |
+| 10 | Reports, exports and reconciliation | Financial reports, CSV/Excel exports, bank reconciliation |
+| 11 | Internationalization and user experience | RTL support, accessibility, mobile PWA |
+| 12 | Security hardening | CSP, rate limiting, audit logging, penetration testing |
+| 13 | Performance and operational reliability | Query optimization, caching, monitoring, health checks |
+| 14 | Automated testing and launch readiness | E2E coverage >90%, CI/CD, load testing |
+| 15 | Deployment and production launch | Vercel/AWS deployment, SSL, DNS, go-live checklist |
+
+### User Request
+Super Admin creates a new masjid with a **two-step registration flow**:
+- **Step 1**: Masjid basic details + plan selection (required contact fields, duplicate checks)
+- **Step 2**: Create the initial Masjid Admin account (name, email, mobile, password) with global email/mobile uniqueness
+- After Step 2, the masjid is fully set up with its first Admin (MasjidUser role ADMIN) and a User login
+
+### Tasks Completed
+
+| # | Task | Result |
+| - | ---- | ------ |
+| 1 | Add `@unique` constraint on `User.phone` in schema | ✅ Done — `prisma/schema.prisma` (already present, migration created) |
+| 2 | Create `createMasjidStep1Action` server action | ✅ Done — `src/modules/platform/actions.ts` |
+| 3 | Create `createMasjidStep2Action` server action | ✅ Done — `src/modules/platform/actions.ts` |
+| 4 | Build Step 1 form component with plan selection | ✅ Done — `masjid-form-step1.tsx` |
+| 5 | Build Step 2 form component with admin password fields | ✅ Done — `masjid-form-step2.tsx` |
+| 6 | Create Step 1 page at `/platform/masjids/new` | ✅ Done — `new/page.tsx` |
+| 7 | Create Step 2 page at `/platform/masjids/new/step2` | ✅ Done — `new/step2/page.tsx` |
+| 8 | Add i18n translations (en/hi/ur) for ~25 new keys | ✅ Done — `src/i18n/en.ts`, `hi.ts`, `ur.ts` |
+| 9 | Fix subscription creation to work within transaction | ✅ Done — `src/lib/subscription.ts` |
+| 10 | Update webhook handlers to use transaction-aware subscription fn | ✅ Done — `paddle/route.ts`, `stripe/route.ts` |
+| 11 | Update tests for new subscription function signature | ✅ Done — `tests/subscription-enforcement.test.ts` |
+
+### Files Created/Modified
+
+| File | Change Type | Description |
+| ---- | ----------- | ----------- |
+| `prisma/schema.prisma` | Modified | `@unique` on `User.phone` (already present) |
+| `prisma/migrations/20261102171523_add_user_phone_unique/migration.sql` | Created | Migration for `User.phone` unique constraint |
+| `src/modules/platform/actions.ts` | Modified | Added `createMasjidStep1Action` + `createMasjidStep2Action` |
+| `src/app/(platform)/platform/masjids/new/page.tsx` | Created | Step 1 page |
+| `src/app/(platform)/platform/masjids/new/step2/page.tsx` | Created | Step 2 page |
+| `src/app/(platform)/platform/masjids/masjid-form-step1.tsx` | Created | Step 1 form component |
+| `src/app/(platform)/platform/masjids/masjid-form-step2.tsx` | Created | Step 2 form component |
+| `src/i18n/en.ts` | Modified | ~25 new translation keys |
+| `src/i18n/hi.ts` | Modified | ~25 new translation keys |
+| `src/i18n/ur.ts` | Modified | ~25 new translation keys |
+| `src/lib/subscription.ts` | Modified | `createSubscriptionForMasjid` accepts transaction client |
+| `src/app/api/webhooks/paddle/route.ts` | Modified | Pass `prisma` to subscription function |
+| `src/app/api/webhooks/stripe/route.ts` | Modified | Pass `prisma` to subscription function |
+| `tests/subscription-enforcement.test.ts` | Modified | Updated test calls with `prisma` parameter |
+
+### Database Migrations Added
+
+| Migration | Description |
+| --------- | ----------- |
+| `20261102171523_add_user_phone_unique` | Creates unique index on `User.phone` (needs `prisma migrate dev` to apply) |
+
+### Verification Results
+
+| Check | Result |
+|-------|--------|
+| TypeScript (`npm run typecheck`) | ✅ PASS — no type errors |
+| Unit tests (`npm test`) | ✅ PASS — 173/173 tests pass |
+| Lint (`npm run lint`) | ✅ PASS — no new errors |
+| Build (`npm run build`) | ✅ PASS — compilation succeeds |
+| Dev server | ✅ PASS — pages load, redirect to login correctly |
+
+### Key Implementation Details
+
+**Step 1 — Masjid Details:**
+- Fields: Name, Slug, Receipt Prefix, Address, **Phone (required)**, **Email (required)**, Financial Year Start Month, Receipt Footer, Plan Selection (TRIAL/STARTER/PROFESSIONAL/ENTERPRISE)
+- Global duplicate checks: Email/mobile checked against `User` table (case-insensitive for email)
+- Creates: Masjid + Default contribution categories + Default expense categories + Subscription (selected plan)
+- Audit log: `masjid.create`
+
+**Step 2 — Admin Account:**
+- Fields: Admin Full Name, Email, Mobile, Password, Confirm Password
+- Global duplicate checks: Email/mobile checked against `User` table (race-safe)
+- Password: bcrypt hashed via `hashPassword` (12 rounds)
+- Creates: `User` + `MasjidUser` (role: ADMIN, status: ACTIVE)
+- Audit log: `masjid.admin.create`
+
+**Subscription Plans:**
+- TRIAL: 30 days free, 100 members, 3 staff, 10 categories
+- STARTER: ₹999/mo, 500 members, 5 staff, 20 categories
+- PROFESSIONAL: ₹2,499/mo, 2,000 members, 15 staff, 50 categories
+- ENTERPRISE: ₹4,999/mo, unlimited
+
+### Remaining Work
+
+| Item | Description | Priority |
+|------|-------------|----------|
+| Apply `User.phone` unique migration | Run `npx prisma migrate dev --name add-user-phone-unique` against development DB | High |
+| Test full two-step flow with Super Admin account | End-to-end browser test with authenticated Super Admin | High |
+| Add E2E tests for registration flow | Playwright tests for Step 1 → Step 2 flow | Medium |
+
+---
 
 ### ⏳ **Immediate Next Steps**
 
 1. **Create Telegram bot** via @BotFather and add `TELEGRAM_BOT_TOKEN` to `.env`
 2. **Reset test data** - Clear TRIAL masjid members to allow clean E2E runs
-3. **Git commit** - Stage and commit all Phase 0b risk fix changes
-4. **Begin Phase 8** - Start with member portal authentication and notification wiring
+3. **Git commit** - Stage and commit all Phase 0b risk fix changes + Phase 8 two-step registration
+4. **Apply migration** - Run `npx prisma migrate dev --name add-user-phone-unique`
+5. **Begin Phase 9 (Member Portal)** - Start with member portal authentication and notification wiring
