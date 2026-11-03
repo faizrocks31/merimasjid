@@ -33,18 +33,27 @@ function recordFailure(key: string) {
 }
 
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  const rawEmail = formData.get("email");
+  const rawPassword = formData.get("password");
+  console.log('[DEBUG loginAction] rawEmail:', rawEmail, 'rawPassword:', rawPassword ? 'SET' : 'NOT SET');
+
   const parsed = loginSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password"),
+    email: rawEmail,
+    password: rawPassword,
   });
+  console.log('[DEBUG loginAction] parsed:', parsed.success, parsed.success ? '' : parsed.error.issues);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid credentials" };
   }
 
   const { email, password } = parsed.data;
+  console.log('[DEBUG loginAction] parsed email:', email, 'password length:', password.length);
   if (throttled(email)) {
     return { error: "Too many attempts. Please wait a few minutes and try again." };
   }
+
+  // Debug: check prisma connection
+  console.log('[DEBUG loginAction] DATABASE_URL prefix:', process.env.DATABASE_URL?.substring(0, 60));
 
   const user = await prisma.user.findUnique({
     where: { email },
@@ -53,11 +62,18 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
       memberProfiles: true,
     },
   });
+  console.log('[DEBUG loginAction] user found:', !!user, 'user status:', user?.status, 'user id:', user?.id);
+
+  // Also try raw query
+  const allUsers = await prisma.user.findMany({ where: { email: { in: ['superadmin@gmail.com', 'localadmin@gmail.com'] } } });
+  console.log('[DEBUG loginAction] allUsers count:', allUsers.length);
+  allUsers.forEach(u => console.log('[DEBUG loginAction]  -', u.email, 'status:', u.status));
 
   // Constant-ish response: always run a comparison so a missing user and a
   // wrong password are not trivially distinguishable by timing.
   const hash = user?.passwordHash ?? "$2a$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinv";
   const ok = await verifyPassword(password, hash);
+  console.log('[DEBUG loginAction] password verify ok:', ok, 'user:', !!user);
 
   if (!user || !ok || user.status !== "ACTIVE") {
     recordFailure(email);

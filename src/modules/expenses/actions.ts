@@ -106,17 +106,27 @@ export async function approveExpenseAction(formData: FormData): Promise<ExpenseS
   const decision = String(formData.get("decision") ?? "APPROVED");
   if (!["APPROVED", "REJECTED"].includes(decision)) return { error: "Invalid decision." };
 
-  const expense = await prisma.expense.findFirst({ where: { id: expenseId, masjidId: user.masjidId! } });
+  const expense = await prisma.expense.findFirst({
+    where: { id: expenseId, masjidId: user.masjidId! },
+  });
   if (!expense) return { error: "Expense not found." };
 
   // Separation of duties: ADMIN (or any role with expense:approve) cannot approve their own expense
   if (expense.enteredBy === user.id) {
     return { error: "You cannot approve an expense you entered yourself. Separation of duties required." };
   }
+  if (expense.approvalStatus !== "PENDING") {
+    return { error: "This expense has already been reviewed." };
+  }
 
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.expense.update({ where: { id: expense.id }, data: { approvalStatus: decision } });
+      const updated = await tx.expense.updateMany({
+        where: { id: expense.id, masjidId: user.masjidId!, approvalStatus: "PENDING" },
+        data: { approvalStatus: decision },
+      });
+      if (updated.count !== 1) throw new Error("EXPENSE_ALREADY_REVIEWED");
+
       await writeAudit(tx, {
         masjidId: user.masjidId,
         actorUserId: user.id,

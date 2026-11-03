@@ -962,6 +962,7 @@ describe("Edge cases: deleted masjid", () => {
 
   afterAll(async () => {
     await prisma.user.delete({ where: { id: tempUserId } });
+    await prisma.auditLog.deleteMany({ where: { masjidId: tempMasjid } });
     // Masjid may already be deleted
     await prisma.masjid.deleteMany({ where: { id: tempMasjid } });
   });

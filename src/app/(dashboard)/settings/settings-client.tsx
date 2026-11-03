@@ -9,9 +9,10 @@ import {
   ExpenseCategoriesPanel,
   MasjidSettingsForm,
   NotificationSettingsForm,
+  PrayerTimesForm,
 } from "./settings-forms";
 import { StaffList } from "../staff/staff-list";
-import { Building2, Gift, CreditCard, Bell, UserCheck } from "lucide-react";
+import { Building2, Gift, CreditCard, Bell, UserCheck, Clock } from "lucide-react";
 import { deleteCategoryAction, deleteExpenseCategoryAction } from "@/modules/settings/actions";
 
 const SETTINGS_TABS = [
@@ -20,6 +21,7 @@ const SETTINGS_TABS = [
   { key: "expenseCategories", label: "Expense Categories", icon: CreditCard, tooltip: "Expense Categories" },
   { key: "notifications", label: "Notifications", icon: Bell, tooltip: "Notifications" },
   { key: "staff", label: "Staff", icon: UserCheck, tooltip: "Staff" },
+  { key: "prayerTimes", label: "Namaz Times", icon: Clock, tooltip: "Prayer Times" },
 ] as const;
 
 interface MemberOption {
@@ -64,6 +66,15 @@ interface SettingsPageClientProps {
     receiptPrefix: string;
     financialYearStartMonth: number;
     receiptFooter: string | null;
+    // Prayer times
+    fajrTime: string | null;
+    sunriseTime: string | null;
+    dhuhrTime: string | null;
+    asrTime: string | null;
+    maghribTime: string | null;
+    ishaTime: string | null;
+    jummahTime: string | null;
+    prayerTimesUpdatedAt: Date | string | null;
   };
   contributionCategoryItems: {
     id: string;
@@ -168,7 +179,7 @@ export function SettingsPageClient({
         onValueChange={(v) => router.replace(`/settings?tab=${v}`, { scroll: false })}
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           {SETTINGS_TABS.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -197,7 +208,34 @@ export function SettingsPageClient({
                 receiptPrefix: masjid.receiptPrefix,
                 financialYearStartMonth: masjid.financialYearStartMonth,
                 receiptFooter: masjid.receiptFooter,
+                // Prayer times (kept for type compatibility)
+                fajrTime: masjid.fajrTime,
+                sunriseTime: masjid.sunriseTime,
+                dhuhrTime: masjid.dhuhrTime,
+                asrTime: masjid.asrTime,
+                maghribTime: masjid.maghribTime,
+                ishaTime: masjid.ishaTime,
+                jummahTime: masjid.jummahTime,
               }}
+            />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="prayerTimes" className="mt-5">
+          <Card>
+            <CardHeader><CardTitle>{labels.prayerTimes}</CardTitle></CardHeader>
+            <PrayerTimesForm
+              labels={labels}
+              masjid={{
+                fajrTime: masjid.fajrTime,
+                sunriseTime: masjid.sunriseTime,
+                dhuhrTime: masjid.dhuhrTime,
+                asrTime: masjid.asrTime,
+                maghribTime: masjid.maghribTime,
+                ishaTime: masjid.ishaTime,
+                jummahTime: masjid.jummahTime,
+              }}
+              prayerTimesUpdatedAt={masjid.prayerTimesUpdatedAt}
             />
           </Card>
         </TabsContent>

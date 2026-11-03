@@ -278,6 +278,29 @@ export const en = {
   cancelSubscription: "Cancel Subscription",
   reactivateSubscription: "Reactivate Subscription",
 
+  // Prayer Times
+  prayerTimes: "Prayer Times",
+  prayerTimesDesc: "Set daily prayer timings for your masjid",
+  fajrTime: "Fajr",
+  sunriseTime: "Sunrise",
+  dhuhrTime: "Dhuhr",
+  asrTime: "Asr",
+  maghribTime: "Maghrib",
+  ishaTime: "Isha",
+  jummahTime: "Jummah",
+  prayerTimeFormat: "Format: HH:MM (24-hour)",
+  prayerTimesSaved: "Prayer times saved",
+  prayerTimesLastUpdated: "Last updated: {date} at {time}",
+
+  // Analog Time Picker
+  selectTime: "Select Time",
+  hour: "Hour",
+  minute: "Minute",
+  am: "AM",
+  pm: "PM",
+  done: "Done",
+  cancelPicker: "Cancel",
+
   // Notification settings
   notifications: "Notifications",
   notificationSettings: "Notification Settings",
@@ -298,6 +321,17 @@ export const en = {
   saveNotificationSettings: "Save Notification Settings",
   notificationSettingsSaved: "Notification settings saved",
   notificationSettingsError: "Could not save notification settings",
+
+  // Announcement
+  sendAnnouncement: "Send Announcement",
+  announcementTitle: "Title",
+  announcementTitlePlaceholder: "e.g., Eid Prayer Schedule",
+  announcementBody: "Message",
+  announcementBodyPlaceholder: "Dear members...",
+  sendToTelegramChannel: "Also post to Telegram channel",
+  announcementSent: "Announcement sent to {count} members",
+  announcementFailed: "Failed to send announcement",
+  announcementDescription: "Send an announcement to all active members via in-app notifications (and optionally Telegram channel)",
 
   // Member notification preferences
   myPreferences: "My Preferences",
@@ -336,6 +370,26 @@ export const en = {
   portalMarkAllRead: "Mark all as read",
   portalNoNotifications: "No notifications yet",
   portalNoNotificationsDesc: "Your notifications will appear here.",
+
+  // Additional portal keys
+  totalNotifications: "total",
+  noNotifications: "None",
+
+  // Member Portal Home
+  quickActions: "Quick Actions",
+  viewDues: "View Dues",
+  viewReceipts: "View Receipts",
+  viewNotifications: "View Notifications",
+  noOutstandingDues: "No outstanding dues",
+  allDuesUpToDate: "All dues are up to date",
+  youHaveOutstandingDues: "You have outstanding dues",
+  duesAreOutstanding: "dues are outstanding",
+  youHaveNotifications: "You have notifications",
+  notificationsAreAvailable: "notifications are available",
+  paymentReceived: "Payment Received",
+  duesReminder: "Due Reminder",
+  announcement: "Announcement",
+  expenseApproved: "Expense Approved",
 
   // Enhanced Contribution Category fields
   description: "Description",

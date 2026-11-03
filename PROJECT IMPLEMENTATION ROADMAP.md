@@ -7,9 +7,9 @@
 **Database Adapter:** `@prisma/adapter-pg`
 **Implementation Approach:** Audit-driven, incremental, test-first
 **Priority:** Financial integrity, database safety, tenant isolation and data recovery
-**Last updated:** 2026-10-27
-**Current phase:** Phase 7 — Subscription-based SaaS Management (next — scheduled for tomorrow)
-**Completed phases:** 0, 1, 2, 3, 4, 5, 6
+**Last updated:** 2026-11-03
+**Current phase:** Phase 9 — Member Portal and Notifications (ready to start; Phase 8 registration flow + custom Phase 9 additions implemented)
+**Completed phases:** 0, 1, 2, 3, 4, 5, 6, 7, 8, Phase 9 Custom Additions (Prayer Times + Announcement Workflow)
 
 ---
 
@@ -756,7 +756,7 @@ Do not pretend that a subscription is paid based solely on a browser redirect or
 
 ---
 
-# 11. Phase 8 — Member Portal and Notifications
+# 11. Phase 9 — Member Portal and Notifications (Original Phase 8 in roadmap)
 
 **Priority:** High
 
@@ -807,7 +807,26 @@ WhatsApp, Telegram, SMS and email integrations must only be enabled when the rel
 
 ---
 
-# 12. Phase 9 — Reports, Exports and Reconciliation
+## ✅ **Phase 9 Custom Additions COMPLETED** (2026-11-03)
+
+The following custom additions were completed **in addition to** the original Phase 9 roadmap:
+
+### **Phase A: Prayer Times (5-time Namaz Timings)**
+- Prisma schema: added prayer time fields to Masjid model + migration `20261103084215_add_prayer_times`
+- Backend: settings form validation + i18n keys (en/hi/ur)
+- Frontend: MasjidSettingsForm prayer times section (7 fields: Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha, Jummah)
+- Portal: prayer times display in member dashboard card
+
+### **Phase B: Announcement Workflow**
+- Updated `notifyAnnouncement` helper with `memberId` parameter for per-member delivery
+- `sendAnnouncementAction` in settings/actions.ts with fanout to all active members
+- Settings UI: "Send Announcement" form with title, body, Telegram channel checkbox
+- i18n keys for announcement (en/hi/ur)
+- Tests: `tests/announcement.test.ts` — 14 integration tests (fanout, tenant isolation, inactive member exclusion, audit logging, portal read/unread, validation) — **All pass**
+
+---
+
+# 12. Phase 10 — Reports, Exports and Reconciliation (Original Phase 9 in roadmap)
 
 **Priority:** High
 
@@ -1165,7 +1184,7 @@ Follow this order unless repository evidence establishes a safer alternative.
 | 5     | Business rules and data integrity            | Phases 1–4                           |
 | 6     | Backup, restore and disaster recovery        | Phase 0; repeat after schema changes |
 | 7     | Subscription-based SaaS management           | Phases 3–5 and approved policy       |
-| 8     | Member portal and notifications              | Phases 2–5                           |
+| 8     | Member portal and notifications (Phase 9 in progress) | Phases 2–5                    |
 | 9     | Reports, exports and reconciliation          | Phases 2–5                           |
 | 10    | Internationalization and user experience     | Existing workflows stable            |
 | 11    | Security hardening                           | Continuous; final verification here  |

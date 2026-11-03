@@ -109,6 +109,7 @@ async function sendTelegramPhoto(
 
 async function sendInApp(payload: NotificationPayload): Promise<NotificationResult> {
   try {
+    const providerRef = `in_app_${Date.now()}`;
     await prisma.notificationLog.create({
       data: {
         masjidId: payload.masjidId,
@@ -116,10 +117,12 @@ async function sendInApp(payload: NotificationPayload): Promise<NotificationResu
         channel: "IN_APP",
         template: payload.template ?? "custom",
         status: "SENT",
-        providerReference: `in_app_${Date.now()}`,
+        providerReference: providerRef,
+        title: payload.title,
+        body: payload.body,
       },
     });
-    return { channel: "IN_APP", success: true, providerRef: `in_app_${Date.now()}` };
+    return { channel: "IN_APP", success: true, providerRef };
   } catch (e) {
     return { channel: "IN_APP", success: false, error: String(e) };
   }
@@ -262,17 +265,19 @@ export async function sendNotification(payload: NotificationPayload): Promise<No
         result = { channel, success: false, error: "Unknown channel" };
     }
 
-    // Log to DB
-    await prisma.notificationLog.create({
-      data: {
-        masjidId: payload.masjidId,
-        recipient: payload.memberId ?? payload.phone ?? payload.email ?? payload.telegramChatId ?? "unknown",
-        channel,
-        template: payload.template ?? "custom",
-        status: result.success ? "SENT" : "FAILED",
-        providerReference: result.providerRef,
-      },
-    }).catch(() => {}); // Don't fail notification if logging fails
+    // Log to DB (skip for IN_APP since sendInApp already logged it)
+    if (channel !== "IN_APP") {
+      await prisma.notificationLog.create({
+        data: {
+          masjidId: payload.masjidId,
+          recipient: payload.memberId ?? payload.phone ?? payload.email ?? payload.telegramChatId ?? "unknown",
+          channel,
+          template: payload.template ?? "custom",
+          status: result.success ? "SENT" : "FAILED",
+          providerReference: result.providerRef,
+        },
+      }).catch(() => {}); // Don't fail notification if logging fails
+    }
 
     results.push(result);
   }
@@ -320,12 +325,14 @@ export async function notifyDuesReminder(payload: {
 
 export async function notifyAnnouncement(payload: {
   masjidId: string;
+  memberId?: string;           // NEW: for per-member delivery
   title: string;
   body: string;
-  targetChatId?: string; // For channel broadcast
+  targetChatId?: string;       // for Telegram channel
 }) {
   return sendNotification({
     masjidId: payload.masjidId,
+    memberId: payload.memberId,
     telegramChatId: payload.targetChatId,
     title: `📢 ${payload.title}`,
     body: payload.body,

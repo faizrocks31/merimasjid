@@ -48,9 +48,20 @@ export async function createMemberAction(_prev: MemberFormState, formData: FormD
   }
   const input = parsed.data;
 
-  if (input.createPortalAccount) {
-    if (!input.portalEmail || !input.portalPassword) {
-      return { error: "Portal email and password are required to create a login." };
+  const portalEmail = input.email?.trim().toLowerCase();
+  const portalPhone = input.phone?.replace(/\D/g, "");
+  const shouldCreatePortal = Boolean(portalEmail && portalPhone);
+  if (portalEmail) {
+    const duplicateUser = await prisma.user.findFirst({
+      where: { email: { equals: portalEmail, mode: "insensitive" } },
+      select: { id: true },
+    });
+    const duplicateMember = await prisma.member.findFirst({
+      where: { masjidId: user.masjidId!, email: { equals: portalEmail, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicateUser || duplicateMember) {
+      return { error: "This email is already in use.", fieldErrors: { email: "Already in use" } };
     }
   }
 
@@ -89,14 +100,21 @@ export async function createMemberAction(_prev: MemberFormState, formData: FormD
       const memberNo = await nextMemberNumber(tx, user.masjidId!);
 
       let portalUserId: string | null = null;
-      if (input.createPortalAccount && input.portalEmail && input.portalPassword) {
-        const taken = await tx.user.findUnique({ where: { email: input.portalEmail }, select: { id: true } });
-        if (taken) throw new Error("PORTAL_EMAIL_TAKEN");
+      if (shouldCreatePortal && portalEmail && portalPhone) {
+        const [takenUser, takenMemberEmail] = await Promise.all([
+          tx.user.findFirst({ where: { email: { equals: portalEmail, mode: "insensitive" } }, select: { id: true } }),
+          tx.member.findFirst({
+            where: { masjidId: user.masjidId!, email: { equals: portalEmail, mode: "insensitive" } },
+            select: { id: true },
+          }),
+        ]);
+        if (takenUser || takenMemberEmail) throw new Error("PORTAL_EMAIL_TAKEN");
         const created = await tx.user.create({
           data: {
             name: input.fullName,
-            email: input.portalEmail,
-            passwordHash: await hashPassword(input.portalPassword),
+            email: portalEmail,
+            passwordHash: await hashPassword(portalPhone),
+            phone: portalPhone,
           },
         });
         portalUserId = created.id;
@@ -140,8 +158,8 @@ export async function createMemberAction(_prev: MemberFormState, formData: FormD
     revalidatePath("/members");
     redirect(`/members/${member.id}`);
   } catch (err) {
-    if (err instanceof Error && err.message === "PORTAL_EMAIL_TAKEN") {
-      return { error: "That portal email is already in use.", fieldErrors: { portalEmail: "Already in use" } };
+    if ((err instanceof Error && err.message === "PORTAL_EMAIL_TAKEN") || (err instanceof Error && "code" in err && err.code === "P2002")) {
+      return { error: "This email is already in use.", fieldErrors: { email: "Already in use" } };
     }
     if (err instanceof Error && err.message.startsWith("MEMBER_LIMIT_EXCEEDED:")) {
       const limit = err.message.split(":")[1];
@@ -168,6 +186,33 @@ export async function updateMemberAction(_prev: MemberFormState, formData: FormD
   const existing = await prisma.member.findFirst({ where: { id: memberId, masjidId: user.masjidId! } });
   if (!existing) return { error: "Member not found in this Masjid." };
 
+  const portalEmail = input.email?.trim().toLowerCase();
+  const portalPhone = input.phone?.replace(/\D/g, "");
+  const linkedUserId = existing.userId;
+
+  if (portalEmail) {
+    const [duplicateUser, duplicateMember] = await Promise.all([
+      prisma.user.findFirst({
+        where: {
+          email: { equals: portalEmail, mode: "insensitive" },
+          ...(linkedUserId ? { NOT: { id: linkedUserId } } : {}),
+        },
+        select: { id: true },
+      }),
+      prisma.member.findFirst({
+        where: {
+          masjidId: user.masjidId!,
+          email: { equals: portalEmail, mode: "insensitive" },
+          NOT: { id: existing.id },
+        },
+        select: { id: true },
+      }),
+    ]);
+    if (duplicateUser || duplicateMember) {
+      return { error: "This email is already in use.", fieldErrors: { email: "Already in use" } };
+    }
+  }
+
   // Check for duplicate phone (excluding this member)
   if (input.phone) {
     const rawPhone = input.phone.replace(/\D/g, "");
@@ -182,9 +227,27 @@ export async function updateMemberAction(_prev: MemberFormState, formData: FormD
 
   try {
     await prisma.$transaction(async (tx) => {
+      let userId = existing.userId;
+      if (portalEmail && userId) {
+        const collision = await tx.user.findFirst({
+          where: { email: { equals: portalEmail, mode: "insensitive" }, NOT: { id: userId } },
+          select: { id: true },
+        });
+        if (collision) throw new Error("PORTAL_EMAIL_TAKEN");
+        await tx.user.update({ where: { id: userId }, data: { email: portalEmail, name: input.fullName } });
+      } else if (portalEmail && portalPhone && !userId) {
+        const collision = await tx.user.findFirst({ where: { email: { equals: portalEmail, mode: "insensitive" } }, select: { id: true } });
+        if (collision) throw new Error("PORTAL_EMAIL_TAKEN");
+        const createdUser = await tx.user.create({
+          data: { name: input.fullName, email: portalEmail, phone: portalPhone, passwordHash: await hashPassword(portalPhone) },
+        });
+        userId = createdUser.id;
+      }
+
       await tx.member.update({
         where: { id: existing.id },
         data: {
+          userId,
           fullName: input.fullName,
           fatherName: input.fatherName ?? null,
           phone: input.phone ? input.phone.replace(/\D/g, "") : null,
@@ -212,6 +275,12 @@ export async function updateMemberAction(_prev: MemberFormState, formData: FormD
     revalidatePath(`/members/${existing.id}`);
     redirect(`/members/${existing.id}`);
   } catch (err) {
+    if (err instanceof Error && err.message === "PORTAL_EMAIL_TAKEN") {
+      return { error: "This email is already in use.", fieldErrors: { email: "Already in use" } };
+    }
+    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
+      return { error: "This email is already in use.", fieldErrors: { email: "Already in use" } };
+    }
     if (err && typeof err === "object" && "digest" in err) throw err;
     console.error("updateMemberAction failed", err);
     return { error: "Could not update the member." };

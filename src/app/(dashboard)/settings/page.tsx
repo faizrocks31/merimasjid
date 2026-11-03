@@ -13,6 +13,7 @@ const SETTINGS_TAB_KEYS = [
   "expenseCategories",
   "notifications",
   "staff",
+  "prayerTimes",
 ] as const;
 
 export default async function SettingsPage({
@@ -33,7 +34,27 @@ export default async function SettingsPage({
     : "masjid";
 
   const [masjid, categories, expenseCategories, memberships, notificationSettings, collectionEvents, members, assignments] = await Promise.all([
-    prisma.masjid.findUnique({ where: { id: masjidId } }),
+    prisma.masjid.findUnique({
+      where: { id: masjidId },
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        phone: true,
+        email: true,
+        receiptPrefix: true,
+        financialYearStartMonth: true,
+        receiptFooter: true,
+        fajrTime: true,
+        sunriseTime: true,
+        dhuhrTime: true,
+        asrTime: true,
+        maghribTime: true,
+        ishaTime: true,
+        jummahTime: true,
+        prayerTimesUpdatedAt: true,
+      }
+    }),
     prisma.contributionCategory.findMany({ where: { masjidId }, orderBy: { name: "asc" } }),
     prisma.expenseCategory.findMany({ where: { masjidId }, orderBy: { name: "asc" } }),
     prisma.masjidUser.findMany({
@@ -92,6 +113,18 @@ export default async function SettingsPage({
     name: t("name"),
     category: t("category"),
     saved: t("saved"),
+    // Prayer times labels
+    prayerTimes: t("prayerTimes"),
+    prayerTimesDesc: t("prayerTimesDesc"),
+    fajrTime: t("fajrTime"),
+    sunriseTime: t("sunriseTime"),
+    dhuhrTime: t("dhuhrTime"),
+    asrTime: t("asrTime"),
+    maghribTime: t("maghribTime"),
+    ishaTime: t("ishaTime"),
+    jummahTime: t("jummahTime"),
+    prayerTimeFormat: t("prayerTimeFormat"),
+    prayerTimesSaved: t("prayerTimesSaved"),
     staff: t("staff"),
     notifications: t("notifications"),
     telegramNotifications: t("telegramNotifications"),
@@ -110,6 +143,16 @@ export default async function SettingsPage({
     smtpNotConfigured: t("smtpNotConfigured"),
     saveNotificationSettings: t("saveNotificationSettings"),
     notificationSettingsSaved: t("notificationSettingsSaved"),
+    // Announcement labels
+    sendAnnouncement: t("sendAnnouncement"),
+    announcementTitle: t("announcementTitle"),
+    announcementTitlePlaceholder: t("announcementTitlePlaceholder"),
+    announcementBody: t("announcementBody"),
+    announcementBodyPlaceholder: t("announcementBodyPlaceholder"),
+    sendToTelegramChannel: t("sendToTelegramChannel"),
+    announcementSent: t("announcementSent"),
+    announcementFailed: t("announcementFailed"),
+    announcementDescription: t("announcementDescription"),
     // Category-specific labels
     edit: t("edit"),
     delete: t("delete"),

@@ -29,6 +29,15 @@ model Masjid {
   maxStaff                   Int?
   subscriptionEndsAt         DateTime?
   subscriptionStatus         String?
+  // Prayer times (stored as HH:mm 24-hour format)
+  fajrTime                   String?                     @default("05:30")
+  sunriseTime                String?                     @default("06:45")
+  dhuhrTime                  String?                     @default("12:30")
+  asrTime                    String?                     @default("16:00")
+  maghribTime                String?                     @default("18:15")
+  ishaTime                   String?                     @default("19:45")
+  jummahTime                 String?                     @default("13:00")
+  prayerTimesUpdatedAt       DateTime?
   auditLogs                  AuditLog[]
   collectionEvents           CollectionEvent[]
   collectionEventAssignments CollectionEventAssignment[]
@@ -454,10 +463,14 @@ model NotificationLog {
   template          String
   status            String
   providerReference String?
+  title             String?
+  body              String?
+  readAt            DateTime?
   createdAt         DateTime @default(now())
   masjid            Masjid   @relation(fields: [masjidId], references: [id], onDelete: Cascade)
 
   @@index([masjidId, createdAt])
+  @@index([masjidId, recipient, channel, readAt])
 }
 
 model MasjidNotificationSettings {

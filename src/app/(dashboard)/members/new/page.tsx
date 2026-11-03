@@ -19,6 +19,7 @@ export default async function NewMemberPage() {
     phone: t("phone"),
     alternateMobile: t("alternateMobile"),
     email: t("email"),
+    portalLoginHint: t("portalLoginHint"),
     address: t("address"),
     joinDate: t("joinDate"),
     status: t("status"),

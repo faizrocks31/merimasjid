@@ -277,6 +277,29 @@ export const hi: Dictionary = {
   cancelSubscription: "सदस्यता रद्द करें",
   reactivateSubscription: "सदस्यता पुनः सक्रिय करें",
 
+  // Prayer Times
+  prayerTimes: "नमाज़ के समय",
+  prayerTimesDesc: "अपनी मस्जिद के लिए दैनिक नमाज़ का समय सेट करें",
+  fajrTime: "फजर",
+  sunriseTime: "सूर्योदय",
+  dhuhrTime: "जोहर",
+  asrTime: "असर",
+  maghribTime: "मगरिब",
+  ishaTime: "इशा",
+  jummahTime: "जुम्मा",
+  prayerTimeFormat: "फॉर्मेट: HH:MM (24-घंटे)",
+  prayerTimesSaved: "नमाज़ के समय सेव हो गए",
+  prayerTimesLastUpdated: "अंतिम अपडेट: {date} को {time}",
+
+  // Analog Time Picker
+  selectTime: "समय चुनें",
+  hour: "घंटा",
+  minute: "मिनट",
+  am: "सुबह",
+  pm: "शाम",
+  done: "पूर्ण",
+  cancelPicker: "रद्द करें",
+
   // Notification settings
   notifications: "सूचनाएं",
   notificationSettings: "सूचना सेटिंग्स",
@@ -297,6 +320,17 @@ export const hi: Dictionary = {
   saveNotificationSettings: "सूचना सेटिंग्स सहेजें",
   notificationSettingsSaved: "सूचना सेटिंग्स सहेजी गईं",
   notificationSettingsError: "सूचना सेटिंग्स सहेजी नहीं जा सकीं",
+
+  // Announcement
+  sendAnnouncement: "घोषणा भेजें",
+  announcementTitle: "शीर्षक",
+  announcementTitlePlaceholder: "उदाहरण: ईद की नमाज़ का समय",
+  announcementBody: "संदेश",
+  announcementBodyPlaceholder: "प्रिय सदस्य...",
+  sendToTelegramChannel: "टेलीग्राम चैनल पर भी पोस्ट करें",
+  announcementSent: "{count} सदस्यों को घोषणा भेजी गई",
+  announcementFailed: "घोषणा भेजने में विफल",
+  announcementDescription: "सभी सक्रिय सदस्यों को ऐप सूचना (और वैकल्पिक रूप से टेलीग्राम चैनल) के माध्यम से घोषणा भेजें",
 
   // Member notification preferences
   myPreferences: "मेरी प्राथमिकताएं",
@@ -335,6 +369,26 @@ export const hi: Dictionary = {
   portalMarkAllRead: "सभी को पढ़ा गया चिह्नित करें",
   portalNoNotifications: "अभी कोई सूचना नहीं",
   portalNoNotificationsDesc: "आपकी सूचनाएं यहां दिखाई देंगी।",
+
+  // Additional portal keys
+  totalNotifications: "कुल",
+  noNotifications: "कोई नहीं",
+
+  // Member Portal Home
+  quickActions: "त्वरित कार्य",
+  viewDues: "देय राशि देखें",
+  viewReceipts: "रसीदें देखें",
+  viewNotifications: "सूचनाएं देखें",
+  noOutstandingDues: "कोई बकाया नहीं",
+  allDuesUpToDate: "सभी देय राशियाँ अद्यतित हैं",
+  youHaveOutstandingDues: "आपके पास बकाया देय राशियाँ हैं",
+  duesAreOutstanding: "देय राशियाँ बकाया हैं",
+  youHaveNotifications: "आपके पास सूचनाएं हैं",
+  notificationsAreAvailable: "सूचनाएं उपलब्ध हैं",
+  paymentReceived: "भुगतान प्राप्त",
+  duesReminder: "देय अनुस्मारक",
+  announcement: "घोषणा",
+  expenseApproved: "खर्च स्वीकृत",
 
   // Enhanced Contribution Category fields
   description: "विवरण",

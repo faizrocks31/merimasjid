@@ -75,6 +75,9 @@ export function MemberForm({ labels }: { labels: Labels }) {
 
   return (
     <form action={formAction} className="space-y-4">
+      <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-xs text-[var(--ink-muted)]">
+        {labels.portalLoginHint}
+      </p>
       {state?.error ? (
         <p role="alert" className="rounded-lg border border-[#f0cfcf] bg-[var(--danger-soft)] px-3 py-2 text-xs font-medium text-[var(--danger)]">
           {state.error}

@@ -122,6 +122,14 @@ export const VALIDATION_RULES = {
       receiptPrefix: { type: "string", required: true, min: 2, max: 8, pattern: /^[A-Z0-9]+$/, patternMsg: "Capital letters and digits only" },
       financialYearStartMonth: { type: "number", min: 1, max: 12, required: true },
       receiptFooter: { rule: "notes", required: false, max: 300 },
+      // Prayer times (stored as HH:mm 24-hour format)
+      fajrTime: { type: "string", required: false, min: 5, max: 5, pattern: /^([01]\d|2[0-3]):[0-5]\d$/, patternMsg: "Format: HH:MM (24-hour)", label: "Fajr" },
+      sunriseTime: { type: "string", required: false, min: 5, max: 5, pattern: /^([01]\d|2[0-3]):[0-5]\d$/, patternMsg: "Format: HH:MM (24-hour)", label: "Sunrise" },
+      dhuhrTime: { type: "string", required: false, min: 5, max: 5, pattern: /^([01]\d|2[0-3]):[0-5]\d$/, patternMsg: "Format: HH:MM (24-hour)", label: "Dhuhr" },
+      asrTime: { type: "string", required: false, min: 5, max: 5, pattern: /^([01]\d|2[0-3]):[0-5]\d$/, patternMsg: "Format: HH:MM (24-hour)", label: "Asr" },
+      maghribTime: { type: "string", required: false, min: 5, max: 5, pattern: /^([01]\d|2[0-3]):[0-5]\d$/, patternMsg: "Format: HH:MM (24-hour)", label: "Maghrib" },
+      ishaTime: { type: "string", required: false, min: 5, max: 5, pattern: /^([01]\d|2[0-3]):[0-5]\d$/, patternMsg: "Format: HH:MM (24-hour)", label: "Isha" },
+      jummahTime: { type: "string", required: false, min: 5, max: 5, pattern: /^([01]\d|2[0-3]):[0-5]\d$/, patternMsg: "Format: HH:MM (24-hour)", label: "Jummah" },
     },
 
     category: {
@@ -388,6 +396,14 @@ const settingsShape = {
   receiptPrefix: z.string().trim().min(2, "Prefix min 2 chars").max(8, "Prefix max 8 chars").regex(/^[A-Z0-9]+$/, "Capital letters and digits only"),
   financialYearStartMonth: z.coerce.number().int().min(1).max(12),
   receiptFooter: z.string().trim().max(300).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  // Prayer times (stored as HH:mm 24-hour format)
+  fajrTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  sunriseTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  dhuhrTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  asrTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  maghribTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  ishaTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  jummahTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
 };
 
 const categoryShape = {

@@ -8,7 +8,7 @@ import { settingsSchema, categorySchema, expenseCategorySchema, staffSchema, col
 import { writeAudit } from "@/modules/audit/write";
 import { checkLimit } from "@/lib/subscription";
 
-export type SettingsState = { error?: string; ok?: boolean; fieldErrors?: Record<string, string> } | undefined;
+export type SettingsState = { error?: string; ok?: boolean; message?: string; fieldErrors?: Record<string, string> } | undefined;
 
 export async function updateSettingsAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
   const user = await requireStaff();
@@ -22,6 +22,14 @@ export async function updateSettingsAction(_prev: SettingsState, formData: FormD
     receiptPrefix: String(formData.get("receiptPrefix") ?? "").toUpperCase(),
     financialYearStartMonth: Number(formData.get("financialYearStartMonth") ?? 4),
     receiptFooter: String(formData.get("receiptFooter") ?? ""),
+    // Prayer times
+    fajrTime: String(formData.get("fajrTime") ?? ""),
+    sunriseTime: String(formData.get("sunriseTime") ?? ""),
+    dhuhrTime: String(formData.get("dhuhrTime") ?? ""),
+    asrTime: String(formData.get("asrTime") ?? ""),
+    maghribTime: String(formData.get("maghribTime") ?? ""),
+    ishaTime: String(formData.get("ishaTime") ?? ""),
+    jummahTime: String(formData.get("jummahTime") ?? ""),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid settings" };
 
@@ -30,17 +38,38 @@ export async function updateSettingsAction(_prev: SettingsState, formData: FormD
   try {
     await prisma.$transaction(async (tx) => {
       const before = await tx.masjid.findUnique({ where: { id: user.masjidId! } });
+
+      // Check if any prayer time field changed
+      const prayerTimeFields = ["fajrTime", "sunriseTime", "dhuhrTime", "asrTime", "maghribTime", "ishaTime", "jummahTime"] as const;
+      const prayerTimesChanged = prayerTimeFields.some(
+        (field) => (input[field] ?? null) !== (before?.[field] ?? null)
+      );
+
+      const updateData: Record<string, unknown> = {
+        name: input.name,
+        address: input.address ?? null,
+        phone: input.phone ?? null,
+        email: input.email ?? null,
+        receiptPrefix: input.receiptPrefix,
+        financialYearStartMonth: input.financialYearStartMonth,
+        receiptFooter: input.receiptFooter ?? null,
+        // Prayer times
+        fajrTime: input.fajrTime ?? null,
+        sunriseTime: input.sunriseTime ?? null,
+        dhuhrTime: input.dhuhrTime ?? null,
+        asrTime: input.asrTime ?? null,
+        maghribTime: input.maghribTime ?? null,
+        ishaTime: input.ishaTime ?? null,
+        jummahTime: input.jummahTime ?? null,
+      };
+
+      if (prayerTimesChanged) {
+        updateData.prayerTimesUpdatedAt = new Date();
+      }
+
       await tx.masjid.update({
         where: { id: user.masjidId! },
-        data: {
-          name: input.name,
-          address: input.address ?? null,
-          phone: input.phone ?? null,
-          email: input.email ?? null,
-          receiptPrefix: input.receiptPrefix,
-          financialYearStartMonth: input.financialYearStartMonth,
-          receiptFooter: input.receiptFooter ?? null,
-        },
+        data: updateData,
       });
       await writeAudit(tx, {
         masjidId: user.masjidId,
@@ -113,6 +142,83 @@ export async function updateNotificationSettingsAction(
   } catch (err) {
     console.error("updateNotificationSettingsAction failed", err);
     return { error: "Could not save notification settings." };
+  }
+}
+
+export async function sendAnnouncementAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const user = await requireStaff();
+  assertCan(user.role, "settings:write");
+
+  const title = String(formData.get("announcementTitle") ?? "").trim();
+  const body = String(formData.get("announcementBody") ?? "").trim();
+  const sendToTelegram = formData.get("sendToTelegram") === "on";
+
+  if (!title) return { error: "Announcement title is required." };
+  if (title.length > 120) return { error: "Title must be 120 characters or less." };
+  if (!body) return { error: "Announcement message is required." };
+  if (body.length > 2000) return { error: "Message must be 2000 characters or less." };
+
+  try {
+    // Fetch all active members
+    const members = await prisma.member.findMany({
+      where: { masjidId: user.masjidId!, status: "ACTIVE" },
+      select: { id: true, telegramChatId: true, user: { select: { email: true } }, phone: true },
+    });
+
+    if (members.length === 0) {
+      return { error: "No active members found to send announcement." };
+    }
+
+    // Import notifyAnnouncement dynamically to avoid circular imports
+    const { notifyAnnouncement } = await import("@/lib/notifications");
+    const { initNotifications } = await import("@/lib/notifications-init");
+    initNotifications();
+
+    // Send to each member
+    const results = await Promise.all(
+      members.map((m) =>
+        notifyAnnouncement({
+          masjidId: user.masjidId!,
+          memberId: m.id,
+          title,
+          body,
+          targetChatId: m.telegramChatId ?? undefined,
+        })
+      )
+    );
+
+    // If sendToTelegram and channel ID is configured, also send to channel
+    let channelResult = null;
+    if (sendToTelegram && process.env.TELEGRAM_CHANNEL_ID) {
+      const { sendNotification } = await import("@/lib/notifications");
+      initNotifications();
+      channelResult = await sendNotification({
+        masjidId: user.masjidId!,
+        telegramChatId: process.env.TELEGRAM_CHANNEL_ID,
+        title: `📢 ${title}`,
+        body,
+        template: "announcement",
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await writeAudit(tx, {
+        masjidId: user.masjidId,
+        actorUserId: user.id,
+        action: "announcement.send",
+        entityType: "Announcement",
+        entityId: user.masjidId!,
+        after: { title, recipientCount: members.length, sentToTelegramChannel: !!channelResult },
+      });
+    });
+
+    revalidatePath("/settings");
+    revalidatePath("/portal/notifications");
+    const successfulRecipients = results.filter((r) => r.some((channel) => channel.success)).length;
+    return { ok: true, message: String(successfulRecipients) };
+  } catch (err) {
+    console.error("sendAnnouncementAction failed", err);
+    return { error: "Could not send announcement." };
   }
 }
 

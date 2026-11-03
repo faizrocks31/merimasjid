@@ -120,7 +120,9 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   // Only ACTIVE memberships are eligible — deactivated memberships are never
   // used for role/masjid resolution, so removing staff access takes effect on
   // the very next request.
-  const activeMemberships = user.memberships.filter((m) => m.status === "ACTIVE");
+  const activeMemberships = user.memberships.filter(
+    (m) => m.status === "ACTIVE" && m.masjid.deletedAt === null,
+  );
   const membership =
     activeMemberships.find((m) => m.masjidId === session.masjidId) ??
     activeMemberships.find((m) => m.masjid.status === "ACTIVE") ??
@@ -133,8 +135,11 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     // A member-portal-only account.
     if (user.memberProfiles.length > 0) {
       const profile = user.memberProfiles[0];
-      const masjid = await prisma.masjid.findUnique({ where: { id: profile.masjidId } });
-      const subscription = masjid ? await getEffectiveSubscription(masjid.id) : null;
+      const masjid = await prisma.masjid.findFirst({
+        where: { id: profile.masjidId, deletedAt: null },
+      });
+      if (!masjid) return null;
+      const subscription = await getEffectiveSubscription(masjid.id);
       return {
         id: user.id,
         name: user.name,

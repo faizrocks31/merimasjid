@@ -79,7 +79,7 @@ export function EditMemberForm({ member, labels }: { member: Member; labels: Lab
       <Card>
         <CardHeader><CardTitle>{labels.memberProfile}</CardTitle></CardHeader>
         <CardBody className="grid gap-4 sm:grid-cols-2">
-          <SimpleForm fields={profileFields} values={{}} disabled={pending} fieldsOnly={true} uncontrolled={true} />
+          <SimpleForm fields={profileFields} values={{}} disabled={pending} fieldsOnly={true} uncontrolled={true} errors={state?.fieldErrors ?? {}} />
         </CardBody>
       </Card>
 

@@ -89,7 +89,9 @@ export async function setMasjidStatusAction(formData: FormData): Promise<MasjidA
 }
 
 /**
- * Deletes a masjid that has no members and no payments.
+ * Soft-deletes a masjid by setting deletedAt.
+ * Hard deletion is prevented because AuditLog must be retained permanently.
+ * A masjid with members or payments cannot be deleted.
  */
 export async function deleteMasjidAction(formData: FormData): Promise<MasjidActionState> {
   const user = await requirePlatformAdmin();
@@ -99,27 +101,31 @@ export async function deleteMasjidAction(formData: FormData): Promise<MasjidActi
 
   const masjid = await prisma.masjid.findUnique({
     where: { id: masjidId },
-    select: { _count: { select: { members: true, payments: true } }, name: true },
+    select: { _count: { select: { members: true, payments: true } }, name: true, deletedAt: true },
   });
 
   if (!masjid) return { error: "Masjid not found." };
+  if (masjid.deletedAt) return { error: "Masjid is already deleted." };
   if (masjid._count.members > 0 || masjid._count.payments > 0) {
     return { error: "Cannot delete a masjid that has members or payments." };
   }
 
   try {
     await prisma.$transaction(async (tx) => {
-      // Write audit log BEFORE deleting the masjid to avoid FK violation
       await writeAudit(tx, {
         masjidId,
         actorUserId: user.id,
         action: "masjid.delete",
         entityType: "Masjid",
         entityId: masjidId,
-        before: { name: masjid.name },
+        before: { name: masjid.name, deletedAt: null },
+        after: { deletedAt: new Date().toISOString() },
       });
 
-      await tx.masjid.delete({ where: { id: masjidId } });
+      await tx.masjid.update({
+        where: { id: masjidId },
+        data: { deletedAt: new Date(), status: "DELETED" },
+      });
     });
   } catch (err) {
     console.error("deleteMasjidAction failed", err);

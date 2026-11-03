@@ -31,14 +31,16 @@ function connectionString(): string {
 }
 
 function createClient(): PrismaClient {
+  console.log('[DEBUG db.ts] Creating new PrismaClient, DATABASE_URL:', process.env.DATABASE_URL?.substring(0, 60));
   const adapter = new PrismaPg({ connectionString: connectionString() });
   return new PrismaClient({
     adapter,
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+    log: process.env.NODE_ENV === "development" ? ["warn", "error", "query"] : ["error"],
   });
 }
 
 export const prisma = globalForPrisma.prisma ?? createClient();
+console.log('[DEBUG db.ts] Prisma client exported, isNew:', !globalForPrisma.prisma);
 
 // Initialize notifications on server startup
 if (typeof window === "undefined") {

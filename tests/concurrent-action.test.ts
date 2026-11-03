@@ -143,6 +143,7 @@ afterAll(async () => {
   await prisma.member.deleteMany({ where: { masjidId } });
   await prisma.contributionCategory.deleteMany({ where: { masjidId } });
   await prisma.masjidUser.deleteMany({ where: { masjidId } });
+  await prisma.auditLog.deleteMany({ where: { masjidId } });
   await prisma.user.delete({ where: { id: userId } });
   await prisma.masjid.delete({ where: { id: masjidId } });
   await prisma.$disconnect();

@@ -3,8 +3,8 @@
 Subscription-Based Multi-Masjid Collection Management SaaS
 
 **Roadmap source:** `PROJECT IMPLEMENTATION ROADMAP.md`
-**Last updated:** 2026-11-02
-**Current phase:** Phase 9 — Member Portal and Notifications (ready to start; Phase 8 registration flow implemented)
+**Last updated:** 2026-11-03
+**Current phase:** Phase 9 — Member Portal and Notifications (ready to start; Phases 8, 9a, 9b, 9c complete)
 
 ---
 
@@ -921,7 +921,7 @@ User requested three changes to the member creation/edit flow:
 
 ---
 
-## Phase status summary (Updated 2026-11-02)
+## Phase status summary (Updated 2026-11-03)
 
 | Phase | Name | Status |
 | ----- | ---- | ------ |
@@ -936,6 +936,9 @@ User requested three changes to the member creation/edit flow:
 | 7a | Member form enhancements (email, alternate mobile, phone storage fix) | **Complete** |
 | **0b** | **Phase 0 Risk Remediation (R-8 through R-19)** | **Complete** |
 | **8** | **Two-Step Masjid Registration (Super Admin)** | **Complete** |
+| **9a** | **Prayer Times (5-time Namaz Timings)** | **Complete** |
+| **9b** | **Announcement Workflow** | **Complete** |
+| **9c** | **Prayer Times Input Redesign — AnalogTimePicker + Last Updated Display** | **Complete** |
 | 9 | Member portal and notifications | **Ready to start** |
 | 10 | Reports, exports and reconciliation | Not started |
 | 11 | Internationalization and user experience | Not started |
@@ -1073,10 +1076,65 @@ Super Admin creates a new masjid with a **two-step registration flow**:
 
 ---
 
-### ⏳ **Immediate Next Steps**
+### ✅ **Phase 9 Custom Additions COMPLETED** (2026-11-03)
+
+The following custom additions to Phase 9 were completed **in addition to** the original Phase 9 roadmap:
+
+#### **Phase A: Prayer Times (5-time Namaz Timings)**
+| # | Task | Result |
+|---|------|--------|
+| A1 | Prisma schema: add prayer time fields to Masjid model + migrate | ✅ Done — `prisma/schema.prisma`, migration `20261103084215_add_prayer_times` |
+| A2 | Backend: settings form validation + i18n keys | ✅ Done — `src/modules/settings/actions.ts`, `src/i18n/en.ts`, `hi.ts`, `ur.ts` |
+| A3 | Frontend: MasjidSettingsForm prayer times section (7 fields: Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha, Jummah) | ✅ Done — `src/app/(dashboard)/settings/settings-forms.tsx` |
+| A4 | Portal: prayer times display in member dashboard card | ✅ Done — `src/app/(portal)/portal/page.tsx`, `src/modules/portal/queries.ts` |
+
+#### **Phase B: Announcement Workflow**
+| # | Task | Result |
+|---|------|--------|
+| B1 | Update `notifyAnnouncement` helper with `memberId` parameter for per-member delivery | ✅ Done — `src/lib/notifications.ts` |
+| B2 | `sendAnnouncementAction` in settings/actions.ts with fanout to all active members | ✅ Done — `src/modules/settings/actions.ts` |
+| B3 | Settings UI: "Send Announcement" form with title, body, Telegram channel checkbox | ✅ Done — `src/app/(dashboard)/settings/settings-forms.tsx` |
+| B4 | i18n keys for announcement (en/hi/ur) | ✅ Done — `src/i18n/en.ts`, `hi.ts`, `ur.ts` |
+| B5 | Tests: `tests/announcement.test.ts` — 14 integration tests (fanout, tenant isolation, inactive member exclusion, audit logging, portal read/unread, validation) | ✅ Done — All 14 tests pass |
+
+#### **Phase C: Prayer Times Input Redesign — Adaptive Analog Time Picker + Last Updated Display** (2026-11-03)
+| # | Task | Result |
+|---|------|--------|
+| C1 | Prisma schema: add `prayerTimesUpdatedAt DateTime?` field to Masjid model | ✅ Done — `prisma/schema.prisma`, migration `20261103163304_add_prayer_times_updated_at` |
+| C2 | Backend: `updateSettingsAction` detects prayer time changes and updates `prayerTimesUpdatedAt` timestamp | ✅ Done — `src/modules/settings/actions.ts` |
+| C3 | Frontend: Created reusable `AnalogTimePicker` component (SVG analog clock, hour/minute modes, AM/PM toggle, modal/bottom sheet) | ✅ Done — `src/components/forms/AnalogTimePicker.tsx` (~400 lines) |
+| C4 | Settings: 6th "Namaz Times" tab with Clock icon (replaced simple time inputs with AnalogTimePicker for all 7 prayer times) | ✅ Done — `src/app/(dashboard)/settings/settings-forms.tsx`, `settings-client.tsx`, `page.tsx` |
+| C5 | Settings: "Last updated: [date] at [time]" display in PrayerTimesForm | ✅ Done — `src/app/(dashboard)/settings/settings-forms.tsx` |
+| C6 | Portal: "Last updated: [date] at [time]" display in member portal prayer times card | ✅ Done — `src/app/(portal)/portal/page.tsx` |
+| C7 | i18n: Added keys `selectTime`, `hour`, `minute`, `am`, `pm`, `done`, `cancelPicker`, `prayerTimesLastUpdated` (en/hi/ur) | ✅ Done — `src/i18n/en.ts`, `hi.ts`, `ur.ts` |
+| C8 | Portal queries: Include `prayerTimesUpdatedAt` in masjid select for member portal | ✅ Done — `src/modules/portal/queries.ts` |
+| C9 | Validation: Added prayer time validation rules (HH:mm 24-hour format regex) | ✅ Done — `src/lib/validation-registry.ts` |
+
+#### **Verification Results for Phase C (Prayer Times Redesign)**
+
+| Check | Result |
+|-------|--------|
+| TypeScript (`npm run typecheck`) | ✅ PASS — no type errors |
+| Unit tests (`npm test`) | ✅ PASS — **187/187 tests pass** |
+| Database migrations applied | ✅ PASS — prayer times + `prayerTimesUpdatedAt` migrations |
+| Dev server | ✅ PASS — `/settings?tab=prayerTimes` loads AnalogTimePicker; `/portal` shows last updated |
+
+### 🚀 **Ready to Start: Phase 9 — Member Portal and Notifications (Original Roadmap)**
+
+**Priority:** High
+**Prerequisites:** All complete
+
+**Key tasks for Phase 9 (Original):**
+1. **Member Portal** — Self-service portal for members to view dues, make payments, download receipts
+2. **Notifications Integration** — Wire up `notifyPaymentReceived`, `notifyDuesReminder`, `notifyAnnouncement` into existing workflows
+3. **Telegram Bot Setup** — Complete external BotFather setup for production notifications
+4. **In-App Notifications UI** — Notification center in portal and staff dashboard
+5. **Email/WA Fallback** — Optional channels for members without Telegram
+
+### ⏳ **Immediate Next Steps for Original Phase 9**
 
 1. **Create Telegram bot** via @BotFather and add `TELEGRAM_BOT_TOKEN` to `.env`
 2. **Reset test data** - Clear TRIAL masjid members to allow clean E2E runs
-3. **Git commit** - Stage and commit all Phase 0b risk fix changes + Phase 8 two-step registration
-4. **Apply migration** - Run `npx prisma migrate dev --name add-user-phone-unique`
+3. **Git commit** - Stage and commit all Phase 0b risk fix changes + Phase 8 two-step registration + Phase 9 custom additions
+4. **Apply pending migration** - Run `npx prisma migrate dev --name add-user-phone-unique`
 5. **Begin Phase 9 (Member Portal)** - Start with member portal authentication and notification wiring

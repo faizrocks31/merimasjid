@@ -2,19 +2,21 @@
 
 import { useActionState, useMemo, useTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Save, Edit, Trash2, X } from "lucide-react";
+import { Plus, Save, Edit, Trash2, X, MessageCircle } from "lucide-react";
 import {
   createCategoryAction,
   createExpenseCategoryAction,
   updateCategoryAction,
   updateExpenseCategoryAction,
   updateNotificationSettingsAction,
+  sendAnnouncementAction,
   updateSettingsAction,
   type SettingsState,
 } from "@/modules/settings/actions";
 import { getFormFields } from "@/lib/validation";
 import { Badge, Button, Card, CardHeader, CardTitle } from "@/components/ui";
 import { SimpleForm } from "@/components/forms/auto-form";
+import { AnalogTimePicker } from "@/components/forms/AnalogTimePicker";
 import { CategoryEventsPanel, type CollectionEventItem, type MemberOption, type AssignmentItem } from "./collection-event-forms";
 
 type Labels = Record<string, string>;
@@ -36,7 +38,7 @@ function Notice({ state, saved }: { state: SettingsState; saved: string }) {
   if (state?.ok) {
     return (
       <p className="rounded-lg border border-[#cfe6da] bg-[var(--success-soft)] px-3 py-2 text-[11px] font-medium text-[var(--success)]">
-        {saved} ✓
+        {state.message ? saved.replace("{count}", state.message) : saved} ✓
       </p>
     );
   }
@@ -75,6 +77,14 @@ export function MasjidSettingsForm({
     receiptPrefix: string;
     financialYearStartMonth: number;
     receiptFooter: string | null;
+    // Prayer times
+    fajrTime: string | null;
+    sunriseTime: string | null;
+    dhuhrTime: string | null;
+    asrTime: string | null;
+    maghribTime: string | null;
+    ishaTime: string | null;
+    jummahTime: string | null;
   };
 }) {
   const [state, formAction, pending] = useActionState<SettingsState, FormData>(updateSettingsAction, undefined);
@@ -95,6 +105,13 @@ export function MasjidSettingsForm({
         case "email": mapped.defaultValue = masjid.email ?? ""; break;
         case "receiptPrefix": mapped.defaultValue = masjid.receiptPrefix; break;
         case "receiptFooter": mapped.defaultValue = masjid.receiptFooter ?? ""; break;
+        case "fajrTime": mapped.defaultValue = masjid.fajrTime ?? ""; break;
+        case "sunriseTime": mapped.defaultValue = masjid.sunriseTime ?? ""; break;
+        case "dhuhrTime": mapped.defaultValue = masjid.dhuhrTime ?? ""; break;
+        case "asrTime": mapped.defaultValue = masjid.asrTime ?? ""; break;
+        case "maghribTime": mapped.defaultValue = masjid.maghribTime ?? ""; break;
+        case "ishaTime": mapped.defaultValue = masjid.ishaTime ?? ""; break;
+        case "jummahTime": mapped.defaultValue = masjid.jummahTime ?? ""; break;
       }
       return mapped;
     }),
@@ -110,11 +127,16 @@ export function MasjidSettingsForm({
     startTransition(() => formAction(formData));
   };
 
+  const prayerTimeFields = [
+    "fajrTime", "sunriseTime", "dhuhrTime", "asrTime", "maghribTime", "ishaTime", "jummahTime"
+  ];
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-5">
       <div className="grid gap-4 sm:grid-cols-2">
-        <SimpleForm fields={fields} values={{}} disabled={pending} fieldsOnly={true} uncontrolled={true} />
+        <SimpleForm fields={fields.filter(f => !prayerTimeFields.includes(f.name))} values={{}} disabled={pending} fieldsOnly={true} uncontrolled={true} />
       </div>
+
       <Notice state={state} saved={labels.settingsSaved} />
 
       <div className="flex justify-end">
@@ -125,6 +147,136 @@ export function MasjidSettingsForm({
       <p className="text-[11px] text-[var(--ink-muted)]">
         Changing the receipt prefix does not renumber existing receipts; numbering continues from the next free number.
       </p>
+    </form>
+  );
+}
+
+/**
+ * Prayer Times Form - Separate tab for namaz/prayer timings
+ */
+export function PrayerTimesForm({
+  labels,
+  masjid,
+  prayerTimesUpdatedAt,
+}: {
+  labels: Labels;
+  masjid: {
+    fajrTime: string | null;
+    sunriseTime: string | null;
+    dhuhrTime: string | null;
+    asrTime: string | null;
+    maghribTime: string | null;
+    ishaTime: string | null;
+    jummahTime: string | null;
+  };
+  prayerTimesUpdatedAt?: Date | string | null;
+}) {
+  const [state, formAction, pending] = useActionState<SettingsState, FormData>(updateSettingsAction, undefined);
+  const [, startTransition] = useTransition();
+  const [localTimes, setLocalTimes] = useState({
+    fajrTime: masjid.fajrTime ?? "",
+    sunriseTime: masjid.sunriseTime ?? "",
+    dhuhrTime: masjid.dhuhrTime ?? "",
+    asrTime: masjid.asrTime ?? "",
+    maghribTime: masjid.maghribTime ?? "",
+    ishaTime: masjid.ishaTime ?? "",
+    jummahTime: masjid.jummahTime ?? "",
+  });
+
+  // Sync local state with masjid prop changes
+  useEffect(() => {
+    setLocalTimes({
+      fajrTime: masjid.fajrTime ?? "",
+      sunriseTime: masjid.sunriseTime ?? "",
+      dhuhrTime: masjid.dhuhrTime ?? "",
+      asrTime: masjid.asrTime ?? "",
+      maghribTime: masjid.maghribTime ?? "",
+      ishaTime: masjid.ishaTime ?? "",
+      jummahTime: masjid.jummahTime ?? "",
+    });
+  }, [masjid]);
+
+  const handleTimeChange = (field: string, value: string) => {
+    setLocalTimes((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData();
+    Object.entries(localTimes).forEach(([key, value]) => {
+      formData.set(key, value);
+    });
+    startTransition(() => formAction(formData));
+  };
+
+  // Format last updated date
+  const formattedLastUpdated = useMemo(() => {
+    if (!prayerTimesUpdatedAt) return null;
+    const date = new Date(prayerTimesUpdatedAt);
+    return date.toLocaleString(undefined, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  }, [prayerTimesUpdatedAt]);
+
+  const prayerTimeFields = [
+    { key: "fajrTime", label: labels.fajrTime },
+    { key: "sunriseTime", label: labels.sunriseTime },
+    { key: "dhuhrTime", label: labels.dhuhrTime },
+    { key: "asrTime", label: labels.asrTime },
+    { key: "maghribTime", label: labels.maghribTime },
+    { key: "ishaTime", label: labels.ishaTime },
+    { key: "jummahTime", label: labels.jummahTime },
+  ] as const;
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 p-5">
+      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+        <h3 className="text-sm font-medium text-[var(--ink)] mb-3">{labels.prayerTimes}</h3>
+        <p className="text-[11px] text-[var(--ink-muted)] mb-4">{labels.prayerTimeFormat}</p>
+
+        {formattedLastUpdated && (
+          <p className="text-[11px] text-[var(--ink-muted)] mb-4">
+            {labels.prayerTimesLastUpdated.replace("{date}", formattedLastUpdated.split(",")[0]).replace("{time}", formattedLastUpdated.split(",")[1]?.trim() || "")}
+          </p>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {prayerTimeFields.map(({ key, label }) => (
+            <div key={key}>
+              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1">{label}</label>
+              <AnalogTimePicker
+                value={localTimes[key as keyof typeof localTimes] || ""}
+                onChange={(val) => handleTimeChange(key, val)}
+                label={label}
+                disabled={pending}
+                format="12h"
+                labels={{
+                  selectTime: labels.selectTime,
+                  hour: labels.hour,
+                  minute: labels.minute,
+                  am: labels.am,
+                  pm: labels.pm,
+                  done: labels.done,
+                  cancel: labels.cancelPicker,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Notice state={state} saved={labels.prayerTimesSaved} />
+
+      <div className="flex justify-end">
+        <Button type="submit" disabled={pending}>
+          <Save className="h-4 w-4" /> {pending ? labels.loading : labels.save}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -531,12 +683,17 @@ export function NotificationSettingsForm({
     updateNotificationSettingsAction,
     undefined
   );
+  const [announcementState, announcementFormAction, announcementPending] = useActionState<SettingsState, FormData>(
+    sendAnnouncementAction,
+    undefined
+  );
   const [, startTransition] = useTransition();
 
   const { botUsername, hasBotToken, hasChannelId, hasSmtp } = env;
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); startTransition(() => formAction(new FormData(e.currentTarget))); }} className="space-y-4 p-5">
+    <div className="space-y-4 p-5">
+      <form onSubmit={(e) => { e.preventDefault(); startTransition(() => formAction(new FormData(e.currentTarget))); }} className="space-y-4">
       <div className="space-y-4">
         {/* Telegram */}
         <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
@@ -642,6 +799,56 @@ export function NotificationSettingsForm({
           <Save className="h-4 w-4" /> {pending ? labels.loading : labels.saveNotificationSettings}
         </Button>
       </div>
-    </form>
+      </form>
+
+      {/* Announcement Form */}
+      <div className="mt-6 border-t border-[var(--border-subtle)] pt-6">
+        <h3 className="text-sm font-semibold text-[var(--ink)]">{labels.sendAnnouncement}</h3>
+        <p className="mt-1 text-[11px] text-[var(--ink-muted)]">{labels.announcementDescription}</p>
+        <form action={announcementFormAction} className="mt-4 space-y-3">
+          <div>
+            <label htmlFor="announcementTitle" className="mb-1 block text-sm font-medium">{labels.announcementTitle}</label>
+            <input
+              id="announcementTitle"
+              name="announcementTitle"
+              type="text"
+              maxLength={120}
+              required
+              placeholder={labels.announcementTitlePlaceholder}
+              disabled={announcementPending}
+              className="w-full rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-2.5 text-sm focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)]"
+            />
+          </div>
+          <div>
+            <label htmlFor="announcementBody" className="mb-1 block text-sm font-medium">{labels.announcementBody}</label>
+            <textarea
+              id="announcementBody"
+              name="announcementBody"
+              rows={4}
+              maxLength={2000}
+              required
+              placeholder={labels.announcementBodyPlaceholder}
+              disabled={announcementPending}
+              className="w-full rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-2.5 text-sm focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)]"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="sendToTelegram"
+              disabled={announcementPending || !hasBotToken || !hasChannelId}
+              className="h-4 w-4 rounded border-[var(--border-subtle)] text-[var(--brand)]"
+            />
+            <span>{labels.sendToTelegramChannel}</span>
+          </label>
+          <Notice state={announcementState} saved={labels.saved} />
+          <div className="flex justify-end">
+            <Button type="submit" disabled={announcementPending}>
+              <MessageCircle className="h-4 w-4" /> {announcementPending ? labels.loading : labels.sendAnnouncement}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

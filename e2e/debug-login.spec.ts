@@ -7,8 +7,11 @@ test('debug login', async ({ page }) => {
   page.on('request', req => console.log('REQUEST:', req.method(), req.url()));
   page.on('response', res => console.log('RESPONSE:', res.status(), res.url()));
 
+  // Clear any existing session first
+  await page.context().clearCookies();
+
   // Go to login page
-  await page.goto('http://localhost:3001/login');
+  await page.goto('http://localhost:3000/login');
 
   // Wait for login form to be visible
   await expect(page.locator('form')).toBeVisible();

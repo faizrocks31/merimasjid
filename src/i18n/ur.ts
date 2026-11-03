@@ -277,6 +277,29 @@ export const ur: Dictionary = {
   cancelSubscription: "رکنیت منسوخ کریں",
   reactivateSubscription: "رکنیت دوبارہ فعال کریں",
 
+  // Prayer Times
+  prayerTimes: "نماز کے اوقات",
+  prayerTimesDesc: "اپنی مسجد کے لیے روزانہ نماز کے اوقات مقرر کریں",
+  fajrTime: "فجر",
+  sunriseTime: "طلوع آفتاب",
+  dhuhrTime: "ظہر",
+  asrTime: "عصر",
+  maghribTime: "مغرب",
+  ishaTime: "عشاء",
+  jummahTime: "جمعہ",
+  prayerTimeFormat: "فارمیٹ: HH:MM (24-گھنٹے)",
+  prayerTimesSaved: "نماز کے اوقات محفوظ ہو گئے",
+  prayerTimesLastUpdated: "اخری ترمیم: {date} کو {time}",
+
+  // Analog Time Picker
+  selectTime: "وقت منتخب کریں",
+  hour: "گھنٹہ",
+  minute: "منٹ",
+  am: "صبح",
+  pm: "شام",
+  done: "مکمل",
+  cancelPicker: "منسوخ کریں",
+
   // Notification settings
   notifications: "اطلاعات",
   notificationSettings: "اطلاعات کی ترتیبات",
@@ -297,6 +320,17 @@ export const ur: Dictionary = {
   saveNotificationSettings: "اطلاعات کی ترتیبات محفوظ کریں",
   notificationSettingsSaved: "اطلاعات کی ترتیبات محفوظ ہو گئیں",
   notificationSettingsError: "اطلاعات کی ترتیبات محفوظ نہیں ہو سکیں",
+
+  // Announcement
+  sendAnnouncement: "اعلان بھیجیں",
+  announcementTitle: "عنوان",
+  announcementTitlePlaceholder: "مثلاً عید کی نماز کا شیڈول",
+  announcementBody: "پیغام",
+  announcementBodyPlaceholder: "محترم اراکین...",
+  sendToTelegramChannel: "ٹیلیگرام چینل پر بھی پوسٹ کریں",
+  announcementSent: "اعلان {count} اراکین کو بھیجا گیا",
+  announcementFailed: "اعلان بھیجنے میں ناکامی",
+  announcementDescription: "تمام فعال اراکین کو ایپ اطلاع ( اور اختیاری طور پر ٹیلیگرام چینل) کے ذریعے اعلان بھیجیں",
 
   // Member notification preferences
   myPreferences: "میری ترجیحات",
@@ -335,6 +369,26 @@ export const ur: Dictionary = {
   portalMarkAllRead: "سب کو پڑھا گیا نشان دہی کریں",
   portalNoNotifications: "ابھی کوئی اطلاع نہیں",
   portalNoNotificationsDesc: "آپ کی اطلاعیں یہاں ظاہر ہوں گی۔",
+
+  // Additional portal keys
+  totalNotifications: "کل",
+  noNotifications: "کوئی نہیں",
+
+  // Member Portal Home
+  quickActions: "فوری کارروائیاں",
+  viewDues: "واجبات دیکھیں",
+  viewReceipts: "رسیدیں دیکھیں",
+  viewNotifications: "اطلاعات دیکھیں",
+  noOutstandingDues: "کوئی باقی واجبات نہیں",
+  allDuesUpToDate: "سب واجبات آپ ڈیٹ ہیں",
+  youHaveOutstandingDues: "آپ کے پاس باقی واجبات ہیں",
+  duesAreOutstanding: "واجبات باقی ہیں",
+  youHaveNotifications: "آپ کے پاس اطلاعات ہیں",
+  notificationsAreAvailable: "اطلاعات دستیاب ہیں",
+  paymentReceived: "ادائیگی وصول",
+  duesReminder: "واجب الادا یاد دہانی",
+  announcement: "اعلان",
+  expenseApproved: "اخراجات منظور",
 
   // Enhanced Contribution Category fields
   description: "وضاحت",

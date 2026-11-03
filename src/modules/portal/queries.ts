@@ -14,7 +14,24 @@ export async function requirePortalMember() {
 
   const member = await prisma.member.findFirst({
     where: { id: user.memberId, masjidId: user.masjidId },
-    include: { masjid: { select: { name: true, address: true, phone: true, email: true } } },
+    include: {
+      masjid: {
+        select: {
+          name: true,
+          address: true,
+          phone: true,
+          email: true,
+          fajrTime: true,
+          sunriseTime: true,
+          dhuhrTime: true,
+          asrTime: true,
+          maghribTime: true,
+          ishaTime: true,
+          jummahTime: true,
+          prayerTimesUpdatedAt: true,
+        }
+      }
+    },
   });
   if (!member) notFound();
   return { user, member };
