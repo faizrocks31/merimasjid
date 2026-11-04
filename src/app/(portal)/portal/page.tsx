@@ -17,14 +17,24 @@ export default async function PortalHome() {
   const unreadCount = await getUnreadNotificationCount(member.id, user.masjidId!);
   const notifications = await getMemberNotificationsUI(member.id, user.masjidId!);
 
+  // Helper to convert 24-hour (HH:mm) to 12-hour format (h:mm AM/PM)
+  const formatTo12Hour = (time24: string | null): string => {
+    if (!time24) return "";
+    const [hours, minutes] = time24.split(":");
+    const hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
+  };
+
   const prayerTimes = [
-    { label: t("fajrTime"), time: member.masjid.fajrTime },
-    { label: t("sunriseTime"), time: member.masjid.sunriseTime },
-    { label: t("dhuhrTime"), time: member.masjid.dhuhrTime },
-    { label: t("asrTime"), time: member.masjid.asrTime },
-    { label: t("maghribTime"), time: member.masjid.maghribTime },
-    { label: t("ishaTime"), time: member.masjid.ishaTime },
-    { label: t("jummahTime"), time: member.masjid.jummahTime },
+    { label: t("fajrTime"), time: formatTo12Hour(member.masjid.fajrTime) },
+    { label: t("sunriseTime"), time: formatTo12Hour(member.masjid.sunriseTime) },
+    { label: t("dhuhrTime"), time: formatTo12Hour(member.masjid.dhuhrTime) },
+    { label: t("asrTime"), time: formatTo12Hour(member.masjid.asrTime) },
+    { label: t("maghribTime"), time: formatTo12Hour(member.masjid.maghribTime) },
+    { label: t("ishaTime"), time: formatTo12Hour(member.masjid.ishaTime) },
+    { label: t("jummahTime"), time: formatTo12Hour(member.masjid.jummahTime) },
   ].filter(pt => pt.time);
 
   return (
@@ -72,7 +82,7 @@ export default async function PortalHome() {
             </div>
             {member.masjid.prayerTimesUpdatedAt && (
               <p className="mt-3 text-[11px] text-[var(--ink-muted)] text-center">
-                {t("prayerTimesLastUpdated").replace("{date}", new Date(member.masjid.prayerTimesUpdatedAt).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })).replace("{time}", new Date(member.masjid.prayerTimesUpdatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }))}
+                {t("prayerTimesLastUpdated").replace("{date}", new Date(member.masjid.prayerTimesUpdatedAt).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })).replace("{time}", new Date(member.masjid.prayerTimesUpdatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: true }))}
               </p>
             )}
           </CardBody>
