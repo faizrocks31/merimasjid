@@ -11,6 +11,7 @@ import {
   updateNotificationSettingsAction,
   sendAnnouncementAction,
   updateSettingsAction,
+  updatePrayerTimesAction,
   type SettingsState,
 } from "@/modules/settings/actions";
 import { getFormFields } from "@/lib/validation";
@@ -171,7 +172,7 @@ export function PrayerTimesForm({
   };
   prayerTimesUpdatedAt?: Date | string | null;
 }) {
-  const [state, formAction, pending] = useActionState<SettingsState, FormData>(updateSettingsAction, undefined);
+  const [state, formAction, pending] = useActionState<SettingsState, FormData>(updatePrayerTimesAction, undefined);
   const [, startTransition] = useTransition();
   const [localTimes, setLocalTimes] = useState({
     fajrTime: masjid.fajrTime ?? "",

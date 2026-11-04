@@ -125,6 +125,7 @@ export default async function SettingsPage({
     jummahTime: t("jummahTime"),
     prayerTimeFormat: t("prayerTimeFormat"),
     prayerTimesSaved: t("prayerTimesSaved"),
+    prayerTimesLastUpdated: t("prayerTimesLastUpdated"),
     staff: t("staff"),
     notifications: t("notifications"),
     telegramNotifications: t("telegramNotifications"),

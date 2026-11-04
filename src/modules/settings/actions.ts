@@ -5,8 +5,20 @@ import { prisma } from "@/lib/db";
 import { requireStaff, hashPassword } from "@/lib/auth";
 import { assertCan } from "@/lib/permissions";
 import { settingsSchema, categorySchema, expenseCategorySchema, staffSchema, collectionEventSchema } from "@/lib/validation";
+import { z } from "zod";
 import { writeAudit } from "@/modules/audit/write";
 import { checkLimit } from "@/lib/subscription";
+
+// Prayer times schema (only validates prayer time fields)
+const prayerTimesSchema = z.object({
+  fajrTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  sunriseTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  dhuhrTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  asrTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  maghribTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  ishaTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  jummahTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+});
 
 export type SettingsState = { error?: string; ok?: boolean; message?: string; fieldErrors?: Record<string, string> } | undefined;
 
@@ -91,6 +103,79 @@ export async function updateSettingsAction(_prev: SettingsState, formData: FormD
   }
 }
 
+export async function updatePrayerTimesAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const user = await requireStaff();
+  assertCan(user.role, "settings:write");
+
+  const parsed = prayerTimesSchema.safeParse({
+    fajrTime: String(formData.get("fajrTime") ?? ""),
+    sunriseTime: String(formData.get("sunriseTime") ?? ""),
+    dhuhrTime: String(formData.get("dhuhrTime") ?? ""),
+    asrTime: String(formData.get("asrTime") ?? ""),
+    maghribTime: String(formData.get("maghribTime") ?? ""),
+    ishaTime: String(formData.get("ishaTime") ?? ""),
+    jummahTime: String(formData.get("jummahTime") ?? ""),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid prayer times" };
+
+  const input = parsed.data;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const before = await tx.masjid.findUnique({ where: { id: user.masjidId! } });
+
+      const prayerTimeFields = ["fajrTime", "sunriseTime", "dhuhrTime", "asrTime", "maghribTime", "ishaTime", "jummahTime"] as const;
+      const prayerTimesChanged = prayerTimeFields.some(
+        (field) => (input[field] ?? null) !== (before?.[field] ?? null)
+      );
+
+      const updateData: Record<string, unknown> = {
+        fajrTime: input.fajrTime ?? null,
+        sunriseTime: input.sunriseTime ?? null,
+        dhuhrTime: input.dhuhrTime ?? null,
+        asrTime: input.asrTime ?? null,
+        maghribTime: input.maghribTime ?? null,
+        ishaTime: input.ishaTime ?? null,
+        jummahTime: input.jummahTime ?? null,
+      };
+
+      if (prayerTimesChanged) {
+        updateData.prayerTimesUpdatedAt = new Date();
+      }
+
+      await tx.masjid.update({
+        where: { id: user.masjidId! },
+        data: updateData,
+      });
+
+      await writeAudit(tx, {
+        masjidId: user.masjidId,
+        actorUserId: user.id,
+        action: "prayerTimes.update",
+        entityType: "Masjid",
+        entityId: user.masjidId,
+        before: before ? {
+          fajrTime: before.fajrTime,
+          sunriseTime: before.sunriseTime,
+          dhuhrTime: before.dhuhrTime,
+          asrTime: before.asrTime,
+          maghribTime: before.maghribTime,
+          ishaTime: before.ishaTime,
+          jummahTime: before.jummahTime,
+        } : undefined,
+        after: input,
+      });
+    });
+
+    revalidatePath("/settings");
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (err) {
+    console.error("updatePrayerTimesAction failed", err);
+    return { error: "Could not save prayer times." };
+  }
+}
+
 export async function updateNotificationSettingsAction(
   _prev: SettingsState,
   formData: FormData
@@ -159,7 +244,6 @@ export async function sendAnnouncementAction(_prev: SettingsState, formData: For
   if (body.length > 2000) return { error: "Message must be 2000 characters or less." };
 
   try {
-    // Fetch all active members
     const members = await prisma.member.findMany({
       where: { masjidId: user.masjidId!, status: "ACTIVE" },
       select: { id: true, telegramChatId: true, user: { select: { email: true } }, phone: true },
@@ -169,12 +253,10 @@ export async function sendAnnouncementAction(_prev: SettingsState, formData: For
       return { error: "No active members found to send announcement." };
     }
 
-    // Import notifyAnnouncement dynamically to avoid circular imports
     const { notifyAnnouncement } = await import("@/lib/notifications");
     const { initNotifications } = await import("@/lib/notifications-init");
     initNotifications();
 
-    // Send to each member
     const results = await Promise.all(
       members.map((m) =>
         notifyAnnouncement({
@@ -187,7 +269,6 @@ export async function sendAnnouncementAction(_prev: SettingsState, formData: For
       )
     );
 
-    // If sendToTelegram and channel ID is configured, also send to channel
     let channelResult = null;
     if (sendToTelegram && process.env.TELEGRAM_CHANNEL_ID) {
       const { sendNotification } = await import("@/lib/notifications");
@@ -248,7 +329,6 @@ export async function createCategoryAction(_prev: SettingsState, formData: FormD
     });
     if (existing) return { error: "A category with this code already exists." };
 
-    // Check category limit before creating
     const currentCategoryCount = await prisma.contributionCategory.count({
       where: { masjidId: user.masjidId! },
     });
@@ -349,19 +429,16 @@ export async function updateCategoryAction(_prev: SettingsState, formData: FormD
   if (!/^[A-Z0-9_]+$/.test(code)) return { error: "Code must contain only capital letters, digits, and underscores." };
 
   try {
-    // Check if category exists and belongs to this masjid
     const existing = await prisma.contributionCategory.findFirst({
       where: { id: categoryId, masjidId: user.masjidId! },
     });
     if (!existing) return { error: "Category not found." };
 
-    // Check for duplicate name
     const duplicateName = await prisma.contributionCategory.findFirst({
       where: { masjidId: user.masjidId!, name, id: { not: categoryId } },
     });
     if (duplicateName) return { error: "A category with this name already exists." };
 
-    // Check for duplicate code (code can be changed, but must remain unique)
     if (code !== existing.code) {
       const duplicateCode = await prisma.contributionCategory.findFirst({
         where: { masjidId: user.masjidId!, code, id: { not: categoryId } },
@@ -434,13 +511,11 @@ export async function deleteCategoryAction(_prev: SettingsState, formData: FormD
   if (!categoryId) return { error: "Category ID is required." };
 
   try {
-    // Check if category exists and belongs to this masjid
     const existing = await prisma.contributionCategory.findFirst({
       where: { id: categoryId, masjidId: user.masjidId! },
     });
     if (!existing) return { error: "Category not found." };
 
-    // Check for dependencies - plans using this category
     const plansUsing = await prisma.contributionPlan.count({
       where: { categoryId, masjidId: user.masjidId! },
     });
@@ -484,13 +559,11 @@ export async function updateExpenseCategoryAction(_prev: SettingsState, formData
   const { name, active } = parsed.data;
 
   try {
-    // Check if category exists and belongs to this masjid
     const existing = await prisma.expenseCategory.findFirst({
       where: { id: categoryId, masjidId: user.masjidId! },
     });
     if (!existing) return { error: "Category not found." };
 
-    // Check for duplicate name
     const duplicate = await prisma.expenseCategory.findFirst({
       where: { masjidId: user.masjidId!, name, id: { not: categoryId } },
     });
@@ -529,13 +602,11 @@ export async function deleteExpenseCategoryAction(_prev: SettingsState, formData
   if (!categoryId) return { error: "Category ID is required." };
 
   try {
-    // Check if category exists and belongs to this masjid
     const existing = await prisma.expenseCategory.findFirst({
       where: { id: categoryId, masjidId: user.masjidId! },
     });
     if (!existing) return { error: "Category not found." };
 
-    // Check for dependencies - expenses using this category
     const expensesUsing = await prisma.expense.count({
       where: { categoryId, masjidId: user.masjidId! },
     });
@@ -594,8 +665,6 @@ export async function createStaffAction(_prev: SettingsState, formData: FormData
 
   const input = parsed.data;
 
-  // A mobile that already belongs to a member of this masjid must not become
-  // a staff login — the same person would then hold two identities.
   if (input.phone) {
     const digits = input.phone.replace(/^\+91/, "");
     const conflict = await prisma.member.findFirst({
@@ -617,7 +686,6 @@ export async function createStaffAction(_prev: SettingsState, formData: FormData
 
   try {
     await prisma.$transaction(async (tx) => {
-      // Check staff limit before creating
       const currentStaffCount = await tx.masjidUser.count({
         where: { masjidId: user.masjidId!, status: "ACTIVE" },
       });
@@ -639,7 +707,6 @@ export async function createStaffAction(_prev: SettingsState, formData: FormData
           },
         });
       } else {
-        // Update phone and UPI ID if provided for existing user
         await tx.user.update({
           where: { id: account.id },
           data: {
@@ -655,7 +722,7 @@ export async function createStaffAction(_prev: SettingsState, formData: FormData
       if (membership) throw new Error("ALREADY_STAFF");
 
       const created = await tx.masjidUser.create({
-        data: { masjidId: user.masjidId!, userId: account.id, role: input.role, joinedAt: new Date() },
+        data: { masjidId: user.masjidId!, userId: account.id, role: input.role as any, status: "ACTIVE", joinedAt: new Date() },
       });
 
       await writeAudit(tx, {
@@ -694,19 +761,14 @@ export async function updateStaffRoleAction(formData: FormData): Promise<void> {
   const role = String(formData.get("role") ?? "");
   if (!["ADMIN", "COLLECTOR", "AUDITOR"].includes(role)) return;
 
-  // Tenant-scoped: a membership from another masjid is simply not found.
   const membership = await prisma.masjidUser.findFirst({
     where: { id: membershipId, masjidId: user.masjidId! },
   });
   if (!membership) return;
 
-  // Guard 1 — nobody may change their own role.
   if (membership.userId === user.id) return;
-
-  // Guard 2 — a SUPER_ADMIN membership is only the platform owner's to touch.
   if (membership.role === "SUPER_ADMIN" && user.role !== "SUPER_ADMIN") return;
 
-  // Guard 3 — the last active administrator must not be demoted.
   if (
     membership.status === "ACTIVE" &&
     ["ADMIN", "SUPER_ADMIN"].includes(membership.role) &&
