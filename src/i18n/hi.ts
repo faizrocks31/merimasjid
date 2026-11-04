@@ -299,6 +299,7 @@ export const hi: Dictionary = {
   pm: "शाम",
   done: "पूर्ण",
   cancelPicker: "रद्द करें",
+  saveTime: "समय सहेजें",
 
   // Notification settings
   notifications: "सूचनाएं",

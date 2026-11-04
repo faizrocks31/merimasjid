@@ -299,6 +299,7 @@ export const ur: Dictionary = {
   pm: "شام",
   done: "مکمل",
   cancelPicker: "منسوخ کریں",
+  saveTime: "وقت محفوظ کریں",
 
   // Notification settings
   notifications: "اطلاعات",

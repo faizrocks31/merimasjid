@@ -264,6 +264,7 @@ export function PrayerTimesForm({
                   pm: labels.pm,
                   done: labels.done,
                   cancel: labels.cancelPicker,
+                  saveTime: labels.saveTime,
                 }}
               />
             </div>

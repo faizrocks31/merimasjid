@@ -300,6 +300,7 @@ export const en = {
   pm: "PM",
   done: "Done",
   cancelPicker: "Cancel",
+  saveTime: "Save Time",
 
   // Notification settings
   notifications: "Notifications",
