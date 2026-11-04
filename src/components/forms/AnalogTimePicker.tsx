@@ -173,7 +173,7 @@ export function AnalogTimePicker({
 
   // Content for both modal and bottom sheet (no duplicate heading inside)
   const content = (
-    <div className="space-y-3">
+    <div className="space-y-3 pb-12">
       {/* Time Input Section */}
       <div className="flex items-center justify-center gap-2">
         <div className="relative">
@@ -221,7 +221,7 @@ export function AnalogTimePicker({
             onClick={() => handleAmpmChange("AM")}
             disabled={disabled}
             className={cn(
-              "flex-1 h-11 rounded-lg text-sm font-medium transition-all duration-150 border",
+              "flex-1 h-11 rounded-lg text-base font-semibold transition-all duration-150 border",
               tempAmpm === "AM"
                 ? "bg-[var(--brand)] text-white border-transparent shadow-sm"
                 : "bg-white text-[var(--ink)] border-[var(--border-subtle)] hover:bg-[var(--surface)] hover:border-[var(--brand-muted)]",
@@ -235,7 +235,7 @@ export function AnalogTimePicker({
             onClick={() => handleAmpmChange("PM")}
             disabled={disabled}
             className={cn(
-              "flex-1 h-11 rounded-lg text-sm font-medium transition-all duration-150 border",
+              "flex-1 h-11 rounded-lg text-base font-semibold transition-all duration-150 border",
               tempAmpm === "PM"
                 ? "bg-[var(--brand)] text-white border-transparent shadow-sm"
                 : "bg-white text-[var(--ink)] border-[var(--border-subtle)] hover:bg-[var(--surface)] hover:border-[var(--brand-muted)]",
@@ -439,14 +439,14 @@ export function AnalogTimePicker({
           )}
         </svg>
 
-        {/* Mode toggle buttons */}
-        <div className="absolute bottom-[-36px] left-1/2 -translate-x-1/2 flex gap-2">
+        {/* Mode toggle buttons - positioned below clock with proper spacing */}
+        <div className="absolute bottom-[-44px] left-1/2 -translate-x-1/2 flex gap-2">
           <button
             type="button"
             onClick={() => setMode("hour")}
             disabled={disabled}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150",
+              "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
               mode === "hour"
                 ? "bg-[var(--brand)] text-white shadow-sm"
                 : "bg-white text-[var(--ink)] border-[var(--border-subtle)] hover:bg-[var(--surface)] hover:border-[var(--brand-muted)]",
@@ -459,7 +459,7 @@ export function AnalogTimePicker({
             onClick={() => setMode("minute")}
             disabled={disabled}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150",
+              "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
               mode === "minute"
                 ? "bg-[var(--brand)] text-white shadow-sm"
                 : "bg-white text-[var(--ink)] border-[var(--border-subtle)] hover:bg-[var(--surface)] hover:border-[var(--brand-muted)]",
@@ -471,7 +471,7 @@ export function AnalogTimePicker({
       </div>
 
       {/* Actions - Cancel and Save Time */}
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="flex justify-end gap-2 pt-6">
         <Button type="button" variant="ghost" size="sm" onClick={handleCancel} disabled={disabled}>
           {labels.cancel}
         </Button>
