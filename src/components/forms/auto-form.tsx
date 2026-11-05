@@ -528,7 +528,7 @@ export function SimpleForm({
 
         if (field.type === "date") {
           return (
-            <Field key={field.name} label={field.label} htmlFor={field.name} error={error}>
+            <Field key={field.name} label={field.label} htmlFor={field.name} hint={field.helpText} error={error}>
               <GenericInput
                 id={field.name} name={field.name} type="date"
                 value={uncontrolled ? undefined : value}

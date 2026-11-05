@@ -3,8 +3,8 @@
 Subscription-Based Multi-Masjid Collection Management SaaS
 
 **Roadmap source:** `PROJECT IMPLEMENTATION ROADMAP.md`
-**Last updated:** 2026-11-03
-**Current phase:** Phase 9 — Member Portal and Notifications (ready to start; Phases 8, 9a, 9b, 9c complete)
+**Last updated:** 2026-11-05
+**Current phase:** Collection Management Phase 1 complete; Phase 9 — Member Portal and Notifications ready to start
 
 ---
 
@@ -1138,3 +1138,59 @@ The following custom additions to Phase 9 were completed **in addition to** the 
 3. **Git commit** - Stage and commit all Phase 0b risk fix changes + Phase 8 two-step registration + Phase 9 custom additions
 4. **Apply pending migration** - Run `npx prisma migrate dev --name add-user-phone-unique`
 5. **Begin Phase 9 (Member Portal)** - Start with member portal authentication and notification wiring
+
+---
+
+## Collection Management Phase 1 — Walk-in Restrictions, FIFO Allocation & Single-Category Receipts
+
+**Status:** Complete
+**Priority:** High
+**Started:** 2026-11-05
+**Finished:** 2026-11-05
+**Roadmap source:** `FINAL_COLLECTION_IMPLEMENTATION_ROADMAP.md`
+
+### Requirements
+
+| # | Requirement | Status |
+| - | ----------- | ------ |
+| 1 | Walk-in donors restricted to Shab-e-Qadr, Milad-un-Nabi, General Donation only | ✅ Done |
+| 2 | Server-side automatic FIFO allocation (oldest dues first, no manual selection) | ✅ Done |
+| 3 | One category per receipt enforcement (backend validation) | ✅ Done |
+| 4 | Payment entry UI: category selector, FIFO preview, no manual allocation controls | ✅ Done |
+| 5 | Concurrency safety: FOR UPDATE locks prevent over-allocation | ✅ Done |
+| 6 | Idempotency: duplicate submissions return original payment | ✅ Done |
+| 7 | Jumma event-based workflow preserved for non-members | ✅ Done |
+| 8 | All user roles follow identical FIFO allocation rules | ✅ Done |
+
+### Files changed
+
+| File | Change type | Description |
+| ---- | ----------- | ----------- |
+| `src/modules/payments/actions.ts` | Modified | Rewrote `createPaymentAction` with server-side FIFO allocation, walk-in category restrictions, single-category enforcement, FOR UPDATE row locking, idempotency check, JUMMA event workflow preservation |
+| `src/lib/validation-registry.ts` | Modified | Added `collectionEventId` field to `paymentShape`; `categoryId` now required (`z.string().min(1)`) |
+| `src/app/(dashboard)/collections/new/collection-form.tsx` | Modified | Category selector buttons, `WALKIN_ALLOWED_CODES` filter, `FIFO_CATEGORIES` preview, form submits `categoryId` + empty `allocations` |
+| `tests/phase1-regression.test.ts` | Created | 25 tests across 5 describe blocks covering all Phase 1 requirements |
+
+### Test breakdown — `tests/phase1-regression.test.ts`
+
+| Describe block | Tests | Coverage |
+| -------------- | ----- | -------- |
+| Walk-in Donor Category Restrictions | 7 | Allows Shab-e-Qadr/Milad/General; rejects Monthly/Death/Bartan/Jumma with specific error messages |
+| One Category Per Receipt Enforcement | 13 | Multi-period Monthly FIFO, multi-year Milad FIFO, partial payments, FIFO across event periods, cross-category isolation, role-invariant allocation, client-allocation-ignored, concurrent submissions |
+| Financial Integrity | 5 | All allocations use selected category, payment amount = sum of allocations, partial balances preserved, reversal restores balances, idempotency |
+| Jumma Event Workflow | 1 | Non-member Jumma payment with `collectionEventId` works |
+
+### Verification results
+
+| Check | Result |
+| ----- | ------ |
+| `npx vitest run tests/phase1-regression.test.ts` | **PASS** — 25/25 tests pass (4.4s) |
+| `npx tsc --noEmit` | **PASS** — no type errors |
+
+### Key design decisions
+
+- **FIFO is computed server-side** — client-submitted allocations are parsed for backward compatibility but ignored for member dues; the server always recomputes from the selected category
+- **Row-level locking** — FOR UPDATE on DuesPeriod and CollectionEventAssignment rows in sorted ID order prevents deadlocks; remaining amounts computed only after locks are held
+- **Walk-in JUMMA** — allowed only when `collectionEventId` is provided (event-based workflow); generic walk-in JUMMA without an event is rejected with a specific error
+- **Excess handling** — MILAD/SHAB_E_QADR accept over-payment as "Additional Voluntary Contribution"; other FIFO categories reject amounts exceeding outstanding dues
+- **Event status reset** — `beforeEach` in tests resets `CollectionEvent.status` to OPEN to prevent pollution from `recomputeEventStatus` in prior tests

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useMemo, useRef } from "react";
-import { HandCoins, Check, Search, X, User, ChevronUp, ReceiptText, Plus } from "lucide-react";
+import { HandCoins, Check, Search, X, User, ChevronUp, ReceiptText, Plus, ArrowRight, Minus, AlertCircle, Info } from "lucide-react";
 import { getFormFields } from "@/lib/validation";
 import {
   Button,
@@ -51,7 +51,16 @@ type PeriodOrEventOption = PeriodOption & {
   applicableYear?: number | null;
 };
 
-type Allocation = { key: string; duesPeriodId?: string; collectionEventId?: string; categoryId: string; amount: string };
+// FIFO allocation preview item
+type FIFOPreviewItem = {
+  id: string;
+  label: string;
+  dueDate: string;
+  outstanding: number;
+  allocated: number;
+  remaining: number;
+  type: "duesPeriod" | "collectionEventAssignment";
+};
 
 function MemberSearch({
   members,
@@ -223,12 +232,8 @@ export function CollectionForm({
   const [paymentDate, setPaymentDate] = useState(todayInput());
   const [notes, setNotes] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
-  const [allocations, setAllocations] = useState<Allocation[]>([]);
-  const [selectedPurposeIds, setSelectedPurposeIds] = useState<string[]>([]);
-  const [showPurposeSelector, setShowPurposeSelector] = useState(false);
-  const addAllocationButtonRef = useRef<HTMLButtonElement>(null);
-
-  // A stable key per form session blocks accidental double submissions.
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedEventId, setSelectedEventId] = useState("");
   const [idempotencyKey] = useState(newIdempotencyKey);
 
   // Split periods into collection events and dues periods
@@ -241,121 +246,145 @@ export function CollectionForm({
     [periods]
   );
 
-  // For collection events, show all (not member-filtered)
-  const availableEvents = collectionEvents;
-  // For dues periods, filter by member
-  const memberPeriods = useMemo(
-    () => (memberId ? duesPeriods.filter((p) => p.memberId === memberId) : []),
-    [duesPeriods, memberId],
-  );
-
   const member = members.find((m) => m.id === memberId);
   const amountPaise = parseRupeesToPaise(amount) ?? 0;
-  const allocatedPaise = allocations.reduce((sum, a) => sum + (parseRupeesToPaise(a.amount) ?? 0), 0);
-  const remaining = amountPaise - allocatedPaise;
 
-  // Build purpose options from categories + collection events + dues periods
-  const purposeOptions = useMemo(() => {
-    const opts: { id: string; label: string; categoryId: string; type: "category" | "event" | "period"; eventId?: string; periodId?: string }[] = [];
+  // Walk-in allowed category codes
+  const WALKIN_ALLOWED_CODES = ["SHAB_E_QADR", "MILAD", "GENERAL", "GENERAL_DONATION"];
 
-    // Add categories
-    categories.forEach((c) => {
-      opts.push({ id: c.id, label: c.name, categoryId: c.id, type: "category" });
-    });
+  // FIFO categories (dues-based allocation)
+  const FIFO_CATEGORIES = ["MONTHLY", "MILAD", "SHAB_E_QADR", "DEATH", "ANNUAL"];
 
-    // Add collection events
-    availableEvents
-      .filter((e) => e.outstandingPaise > 0)
-      .forEach((e) => {
-        opts.push({
-          id: `event-${e.id}`,
-          label: `${e.name}${e.applicableMonth && e.applicableYear ? ` (${e.applicableMonth}/${e.applicableYear})` : ""}`,
-          categoryId: e.categoryId,
-          type: "event",
-          eventId: e.id,
-        });
+  // Filter categories based on donor mode
+  const availableCategories = useMemo(() => {
+    if (donorMode === "walkin") {
+      return categories.filter((c) => WALKIN_ALLOWED_CODES.includes(c.code));
+    }
+    return categories;
+  }, [categories, donorMode]);
+
+  // Selected category
+  const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
+
+  // For walk-in Milad/Shab-e-Qadr, show available events
+  const availableEventsForCategory = useMemo(() => {
+    if (!selectedCategoryId || !["MILAD", "SHAB_E_QADR"].includes(selectedCategory?.code || "")) {
+      return [];
+    }
+    return collectionEvents
+      .filter((e) => e.categoryId === selectedCategoryId && e.outstandingPaise > 0)
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [collectionEvents, selectedCategoryId, selectedCategory?.code]);
+
+  // Build FIFO preview for member payments in FIFO categories
+  const fifoPreview = useMemo((): FIFOPreviewItem[] => {
+    if (!memberId || !selectedCategoryId || !selectedCategory || !FIFO_CATEGORIES.includes(selectedCategory.code)) {
+      return [];
+    }
+
+    const preview: FIFOPreviewItem[] = [];
+
+    // Get outstanding dues periods for this member+category
+    const memberDuesPeriods = duesPeriods
+      .filter((p) => p.memberId === memberId && p.categoryId === selectedCategoryId && p.outstandingPaise > 0)
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+    for (const period of memberDuesPeriods) {
+      preview.push({
+        id: period.id,
+        label: `${formatDate(period.periodStart)} (${period.categoryName})`,
+        dueDate: period.dueDate,
+        outstanding: period.outstandingPaise,
+        allocated: 0, // Will be calculated below
+        remaining: period.outstandingPaise,
+        type: "duesPeriod",
+      });
+    }
+
+    // Get outstanding collection event assignments for this member+category
+    const memberAssignments = collectionEvents
+      .filter((e) => e.categoryId === selectedCategoryId && e.outstandingPaise > 0)
+      .flatMap((event) => {
+        // Check if member has assignment for this event
+        const assignment = periods.find(
+          (p) => p.type === "collectionEvent" && p.id === event.id && p.memberId === memberId
+        );
+        if (assignment && assignment.outstandingPaise > 0) {
+          return [{
+            id: assignment.id,
+            label: `${event.name}${event.applicableMonth && event.applicableYear ? ` (${event.applicableMonth}/${event.applicableYear})` : ""}`,
+            dueDate: event.dueDate,
+            outstanding: assignment.outstandingPaise,
+            allocated: 0,
+            remaining: assignment.outstandingPaise,
+            type: "collectionEventAssignment" as const,
+          }];
+        }
+        return [];
       });
 
-    // Add dues periods (member-specific)
-    if (memberId) {
-      memberPeriods
-        .filter((p) => p.outstandingPaise > 0)
-        .forEach((p) => {
-          opts.push({
-            id: `period-${p.id}`,
-            label: `${formatDate(p.periodStart)} (${formatPaise(p.outstandingPaise)})`,
-            categoryId: p.categoryId,
-            type: "period",
-            periodId: p.id,
-          });
-        });
-    }
+    // Combine and sort by due date
+    const allItems = [...preview, ...memberAssignments].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
-    return opts;
-  }, [categories, availableEvents, memberPeriods, memberId]);
+    // Calculate FIFO allocation preview
+    let remainingAmount = amountPaise;
+    return allItems.map((item) => {
+      const allocated = Math.min(remainingAmount, item.outstanding);
+      remainingAmount -= allocated;
+      return {
+        ...item,
+        allocated,
+        remaining: item.outstanding - allocated,
+      };
+    });
+  }, [memberId, selectedCategoryId, selectedCategory, duesPeriods, collectionEvents, periods, amountPaise]);
 
-  function addAllocation(purpose: typeof purposeOptions[0]) {
-    setAllocations((prev) => [
-      ...prev,
-      {
-        key: `a${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        duesPeriodId: purpose.type === "period" ? purpose.periodId : "",
-        collectionEventId: purpose.type === "event" ? purpose.eventId : "",
-        categoryId: purpose.categoryId,
-        amount: "",
-      },
-    ]);
-    setSelectedPurposeIds((prev) => [...prev, purpose.id]);
-    setShowPurposeSelector(false);
-  }
+  // Total outstanding for selected category
+  const totalOutstanding = useMemo(() => {
+    return fifoPreview.reduce((sum, item) => sum + item.outstanding, 0);
+  }, [fifoPreview]);
 
-  function removeAllocation(key: string) {
-    const alloc = allocations.find((a) => a.key === key);
-    if (alloc) {
-      const purposeId = alloc.duesPeriodId
-        ? `period-${alloc.duesPeriodId}`
-        : alloc.collectionEventId
-        ? `event-${alloc.collectionEventId}`
-        : alloc.categoryId;
-      setSelectedPurposeIds((prev) => prev.filter((id) => id !== purposeId));
-    }
-    setAllocations((prev) => prev.filter((a) => a.key !== key));
-  }
+  // Total allocated in preview
+  const totalAllocatedPreview = useMemo(() => {
+    return fifoPreview.reduce((sum, item) => sum + item.allocated, 0);
+  }, [fifoPreview]);
 
-  function updateAllocation(key: string, patch: Partial<Allocation>) {
-    setAllocations((prev) => prev.map((a) => (a.key === key ? { ...a, ...patch } : a)));
-  }
+  // Remaining after FIFO allocation
+  const remainingAfterFIFO = useMemo(() => {
+    return amountPaise - totalAllocatedPreview;
+  }, [amountPaise, totalAllocatedPreview]);
+
+  // Unallocated amount (for non-FIFO categories)
+  const unallocatedAmount = useMemo(() => {
+    if (fifoPreview.length > 0) return remainingAfterFIFO;
+    return amountPaise;
+  }, [fifoPreview.length, remainingAfterFIFO]);
 
   // Quick amount selection
   const handleQuickAmount = (paise: number) => {
     setAmount(formatPaisePlain(paise));
   };
 
-  // Keypad handlers removed - native keyboard used instead
-
   // Amount words for receipt preview
   const amountWords = amountPaise > 0 ? paiseToWords(amountPaise) : "";
 
   // Current selected category name for receipt preview
-  const selectedCategoryName = allocations.length > 0
-    ? categories.find((c) => c.id === allocations[0].categoryId)?.name
-    : purposeOptions.length > 0
-    ? purposeOptions[0].label
-    : "";
+  const selectedCategoryName = selectedCategory?.name || "";
 
   // Validate form
   const isFormValid = useMemo(() => {
     if (amountPaise <= 0) return false;
     if (donorMode === "member" && !memberId) return false;
     if (donorMode === "walkin" && !walkIn.trim()) return false;
-    if (allocatedPaise > amountPaise) return false;
-    if (allocations.length === 0) return false;
-    // Check all allocations have positive amounts
-    if (allocations.some((a) => (parseRupeesToPaise(a.amount) ?? 0) <= 0)) return false;
+    if (!selectedCategoryId) return false;
+    // For walk-in Milad/Shab-e-Qadr, event must be selected
+    if (donorMode === "walkin" && selectedCategory && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && !selectedEventId) {
+      return false;
+    }
     // Non-cash modes need reference
     if (mode !== "CASH" && !referenceNo.trim()) return false;
     return true;
-  }, [amountPaise, donorMode, memberId, walkIn, allocatedPaise, allocations, mode, referenceNo]);
+  }, [amountPaise, donorMode, memberId, walkIn, selectedCategoryId, selectedCategory?.code, selectedEventId, mode, referenceNo]);
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -373,31 +402,14 @@ export function CollectionForm({
       setError(labels.walkInDonor + ": " + labels.required);
       return;
     }
-    if (allocatedPaise > amountPaise) {
-      setError(`${labels.allocated} > ${labels.amount}`);
+    if (!selectedCategoryId) {
+      setError(labels.chooseCategory);
       return;
     }
-
-    const payload = allocations
-      .filter((a) => a.categoryId)
-      .map((a) => ({
-        duesPeriodId: a.duesPeriodId || "",
-        collectionEventId: a.collectionEventId || "",
-        categoryId: a.categoryId,
-        amountPaise: parseRupeesToPaise(a.amount) ?? 0,
-        purposeNote: "",
-      }))
-      .filter((a) => a.amountPaise > 0);
-
-    if (payload.length === 0) {
-      if (!memberId) {
-        setError(labels.addAllocation || labels.chooseCategory);
-      } else {
-        setError(labels.chooseCategory);
-      }
+    if (donorMode === "walkin" && selectedCategory && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && !selectedEventId) {
+      setError("Please select a collection event for this category.");
       return;
     }
-
     if (mode !== "CASH" && !referenceNo.trim()) {
       setError(labels.txnRefCheque + ": " + labels.required);
       return;
@@ -409,13 +421,19 @@ export function CollectionForm({
       const formData = new FormData();
       formData.set("memberId", memberId);
       formData.set("walkInName", walkIn);
+      formData.set("categoryId", selectedCategoryId);
       formData.set("paymentDate", paymentDate);
       formData.set("amountPaise", String(amountPaise));
       formData.set("mode", mode);
       formData.set("referenceNo", referenceNo);
       formData.set("notes", notes);
       formData.set("idempotencyKey", idempotencyKey);
-      formData.set("allocations", JSON.stringify(payload));
+      // For backward compatibility, include collectionEventId if selected
+      if (selectedEventId) {
+        formData.set("collectionEventId", selectedEventId);
+      }
+      // Empty allocations - server will calculate FIFO
+      formData.set("allocations", JSON.stringify([]));
 
       const response = await fetch("/api/payments/create", {
         method: "POST",
@@ -490,18 +508,6 @@ export function CollectionForm({
     [labels, idempotencyKey]
   );
 
-  // Compute popover position for desktop
-  const popoverStyle = useMemo(() => {
-    if (!addAllocationButtonRef.current) return {};
-    const rect = addAllocationButtonRef.current.getBoundingClientRect();
-    return {
-      left: `${rect.left}px`,
-      top: `${rect.bottom + 8}px`, // 8px gap
-    };
-  }, [showPurposeSelector]); // Recompute when shown
-
-  // const optionsFor = (name: string) => fields.find((f) => f.name === name)?.options ?? [];
-
   const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
 
   return (
@@ -526,13 +532,14 @@ export function CollectionForm({
                 if (v === "member") {
                   setDonorMode("member");
                   setWalkIn("");
-                  // Don't auto-select first member - let user search/choose
+                  setSelectedCategoryId("");
+                  setSelectedEventId("");
                 } else {
                   setDonorMode("walkin");
                   setMemberId("");
+                  setSelectedCategoryId("");
+                  setSelectedEventId("");
                 }
-                setAllocations([]);
-                setSelectedPurposeIds([]);
               }}
             />
             {donorMode === "member" ? (
@@ -542,8 +549,8 @@ export function CollectionForm({
                 onChange={(id) => {
                   setMemberId(id);
                   setWalkIn("");
-                  setAllocations([]);
-                  setSelectedPurposeIds([]);
+                  setSelectedCategoryId("");
+                  setSelectedEventId("");
                 }}
                 label={labels.chooseMember}
                 placeholder={labels.searchMember || "Search member..."}
@@ -586,9 +593,126 @@ export function CollectionForm({
           />
         </Card>
 
-        {/* Card 3: PAYMENT MODE + PURPOSE + DATE + NOTES */}
+        {/* Card 3: CATEGORY + PAYMENT MODE + DATE + NOTES */}
         <Card className="rounded-[var(--radius-card)] border-[var(--border-tile)] bg-[var(--surface-card)]">
           <CardBody className="space-y-5 pt-0">
+            {/* CATEGORY SELECTOR */}
+            <div>
+              <p className="mb-3 text-[12px] font-manrope font-extrabold uppercase tracking-[0.08em] text-[var(--ink-muted-new)]">
+                {labels.purpose}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {availableCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategoryId(cat.id);
+                      setSelectedEventId("");
+                    }}
+                    className={cn(
+                      "flex-1 min-w-[140px] rounded-[var(--radius-pill)] border-2 px-4 py-2.5 text-sm font-medium text-[var(--ink-primary)] transition-all",
+                      selectedCategoryId === cat.id
+                        ? "border-[var(--brand-primary)] bg-[var(--brand-soft)] text-[var(--brand-primary)] shadow-[0_0_0_2px_var(--brand-soft)]"
+                        : "border-[var(--border-tile)] bg-[var(--surface-card)] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-soft)]"
+                    )}
+                    disabled={isSubmitting}
+                  >
+                    {cat.name}
+                    {cat.restrictedPurpose && <span className="ml-1.5 text-[10px]">🔒</span>}
+                  </button>
+                ))}
+                {availableCategories.length === 0 && (
+                  <div className="text-sm text-[var(--ink-muted-new)] w-full py-2">
+                    {donorMode === "walkin"
+                      ? "Walk-in donors can only contribute to: Shab-e-Qadr, Milad-un-Nabi, General Donation"
+                      : "No categories available"}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* EVENT SELECTOR (for walk-in Milad/Shab-e-Qadr) */}
+            {donorMode === "walkin" && selectedCategory && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && (
+              <div>
+                <p className="mb-3 text-[12px] font-manrope font-extrabold uppercase tracking-[0.08em] text-[var(--ink-muted-new)]">
+                  {labels.purpose} Event
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {availableEventsForCategory.map((event) => (
+                    <button
+                      key={event.id}
+                      type="button"
+                      onClick={() => setSelectedEventId(event.id)}
+                      className={cn(
+                        "flex-1 min-w-[140px] rounded-[var(--radius-pill)] border-2 px-4 py-2.5 text-sm font-medium text-[var(--ink-primary)] transition-all text-left",
+                        selectedEventId === event.id
+                          ? "border-[var(--brand-primary)] bg-[var(--brand-soft)] text-[var(--brand-primary)] shadow-[0_0_0_2px_var(--brand-soft)]"
+                          : "border-[var(--border-tile)] bg-[var(--surface-card)] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-soft)]"
+                      )}
+                      disabled={isSubmitting}
+                    >
+                      <div className="font-medium">{event.name}</div>
+                      <div className="text-[11px] text-[var(--ink-muted-new)]">
+                        Outstanding: {formatPaise(event.outstandingPaise)}
+                      </div>
+                    </button>
+                  ))}
+                  {availableEventsForCategory.length === 0 && (
+                    <div className="text-sm text-[var(--ink-muted-new)] w-full py-2">
+                      No open collection events for this category.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* FIFO ALLOCATION PREVIEW (for member payments in FIFO categories) */}
+            {memberId && selectedCategory && FIFO_CATEGORIES.includes(selectedCategory.code) && fifoPreview.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-[12px] font-manrope font-extrabold uppercase tracking-[0.08em] text-[var(--ink-muted-new)]">
+                  {labels.purpose} - FIFO Allocation Preview (Informational)
+                </p>
+                <div className="rounded-lg border border-[var(--border-tile)] bg-[var(--surface-field)] p-3">
+                  <div className="flex items-center gap-2 text-[11px] text-[var(--ink-muted-new)] mb-2">
+                    <Info className="h-3.5 w-3.5 shrink-0" />
+                    <span>Allocations are calculated automatically (oldest dues first). This preview is informational only.</span>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {fifoPreview.map((item, index) => (
+                      <div key={item.id} className="flex items-center justify-between text-sm p-2 rounded bg-[var(--surface-card)]">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{item.label}</p>
+                          <p className="text-[11px] text-[var(--ink-muted-new)]">
+                            Due: {formatDate(item.dueDate)} · Outstanding: {formatPaise(item.outstanding)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 text-right ml-4">
+                          <div className="text-[var(--brand-primary)] font-medium">{formatPaise(item.allocated)}</div>
+                          <ArrowRight className="h-4 w-4 text-[var(--ink-muted-new)]" />
+                          <div className="text-[var(--ink-muted-new)]">{formatPaise(item.remaining)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between border-t border-[var(--border-tile)] pt-2 mt-2 text-sm">
+                    <span className="text-[var(--ink-muted-new)]">Total Outstanding</span>
+                    <span className="font-semibold text-[var(--ink-primary)]">{formatPaise(totalOutstanding)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[var(--ink-muted-new)]">Will Be Allocated</span>
+                    <span className="font-semibold text-[var(--brand-primary)]">{formatPaise(totalAllocatedPreview)}</span>
+                  </div>
+                  {remainingAfterFIFO > 0 && (
+                    <div className="flex items-center justify-between border-t border-[var(--danger-soft)] pt-2 mt-2 text-sm text-[var(--danger)]">
+                      <span>Excess (Cannot Allocate)</span>
+                      <span className="font-semibold">{formatPaise(remainingAfterFIFO)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* PAYMENT MODE */}
             <div>
               <p className="mb-3 text-[12px] font-manrope font-extrabold uppercase tracking-[0.08em] text-[var(--ink-muted-new)]">
@@ -626,128 +750,6 @@ export function CollectionForm({
               )}
             </div>
 
-            {/* PURPOSE - Allocation Chips */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[12px] font-manrope font-extrabold uppercase tracking-[0.08em] text-[var(--ink-muted-new)]">
-                  {labels.purpose}
-                </p>
-                <button
-                  ref={addAllocationButtonRef}
-                  type="button"
-                  onClick={() => setShowPurposeSelector(true)}
-                  disabled={allocations.length > 0}
-                  className="flex items-center gap-1.5 rounded-[var(--radius-pill)] border-2 border-dashed border-[var(--border-tile)] bg-transparent px-3 py-1.5 text-sm font-medium text-[var(--ink-muted-new)] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] hover:bg-[var(--brand-soft)] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {labels.addAllocation}
-                </button>
-              </div>
-
-              {allocations.length === 0 ? (
-                <p className="text-sm text-[var(--ink-muted-new)]">{labels.chooseCategory}</p>
-              ) : (
-                <div className="space-y-3">
-                  {allocations.map((alloc) => {
-                    const category = categories.find((c) => c.id === alloc.categoryId);
-                    const purposeLabel = category?.name || alloc.categoryId;
-                    const isFullyAllocated = alloc.duesPeriodId || alloc.collectionEventId;
-
-                    return (
-                      <div key={alloc.key} className="flex flex-wrap items-end gap-2 rounded-lg border border-[var(--border-tile)] p-3 bg-[var(--surface-field)]">
-                        <AllocationChip
-                          id={`purpose-${alloc.key}`}
-                          label={purposeLabel}
-                          selected={true}
-                          onClick={() => {}}
-                          disabled={true}
-                        />
-                        <div className="w-32 flex-1 min-w-[120px]">
-                          <label className="mb-1 block text-[10px] uppercase tracking-wide text-[var(--ink-muted-new)]">{labels.amount}</label>
-                          <Input
-                            value={alloc.amount}
-                            onChange={(e) => updateAllocation(alloc.key, { amount: e.target.value })}
-                            inputMode="decimal"
-                            className="rounded-[var(--radius-pill)] border-[var(--border-tile)] bg-[var(--surface-card)] h-11 text-base font-medium text-right"
-                            placeholder="0.00"
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeAllocation(alloc.key)}
-                          aria-label={labels.cancel}
-                          className="h-9 w-9 p-0"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Purpose Selector - Desktop Popover & Mobile Bottom Sheet */}
-              {showPurposeSelector && (
-                <>
-                  {/* Desktop: Popover near button */}
-                  <div className="hidden lg:block fixed inset-0 z-50" role="dialog" aria-modal="true">
-                    <div className="absolute inset-0 bg-transparent" onClick={() => setShowPurposeSelector(false)} />
-                    {Object.keys(popoverStyle).length > 0 && (
-                      <div className="fixed z-50" style={popoverStyle}>
-                        <div className="w-72 max-h-60 overflow-y-auto rounded-lg border border-[var(--border-tile)] bg-[var(--surface-card)] shadow-xl animate-slide-down">
-                          <div className="p-2">
-                            <div className="flex flex-wrap gap-2">
-                              {purposeOptions
-                                .filter((p) => !selectedPurposeIds.includes(p.id))
-                                .map((p) => (
-                                  <button
-                                    key={p.id}
-                                    type="button"
-                                    onClick={() => addAllocation(p)}
-                                    className="rounded-[var(--radius-pill)] border border-[var(--border-tile)] bg-[var(--surface-card)] px-4 py-2 text-sm font-medium text-[var(--ink-primary)] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-soft)] w-full text-left"
-                                  >
-                                    {p.label}
-                                  </button>
-                                ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Mobile: Bottom Sheet */}
-                  <div className="fixed inset-0 z-50 flex items-end lg:hidden" role="dialog" aria-modal="true">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setShowPurposeSelector(false)} />
-                    <div className="relative w-full rounded-t-[var(--radius-card)] bg-[var(--surface-card)] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl animate-slide-up">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-manrope font-semibold text-[var(--ink-primary)]">{labels.purpose}</h3>
-                        <button onClick={() => setShowPurposeSelector(false)} className="p-2 text-[var(--ink-muted-new)]" aria-label="Close">
-                          <X className="h-5 w-5" />
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto">
-                        {purposeOptions
-                          .filter((p) => !selectedPurposeIds.includes(p.id))
-                          .map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => addAllocation(p)}
-                              className="rounded-[var(--radius-pill)] border border-[var(--border-tile)] bg-[var(--surface-card)] px-4 py-2 text-sm font-medium text-[var(--ink-primary)] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-soft)]"
-                            >
-                              {p.label}
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
             {/* DATE */}
             <div>
               <Field label={labels.date} htmlFor="paymentDate">
@@ -779,8 +781,8 @@ export function CollectionForm({
         </Card>
       </div>
 
-      {/* Right Column - Sticky Receipt Preview */}
-      <div className={cn("space-y-4", isMobile ? "lg:hidden" : "hidden lg:block")}>
+      {/* Right Column - Sticky Receipt Preview (Desktop only) */}
+      <div className="hidden lg:block">
         <div className="sticky top-6 space-y-4">
           {/* Receipt Preview Card */}
           <ReceiptPreview
@@ -804,16 +806,40 @@ export function CollectionForm({
                 <span className="text-sm text-[var(--ink-muted-new)]">{labels.total}</span>
                 <span className="num text-lg font-semibold text-[var(--ink-primary)]">{formatPaise(amountPaise)}</span>
               </div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm text-[var(--ink-muted-new)]">{labels.allocated}</span>
-                <span className="num text-sm text-[var(--ink-primary)]">{formatPaise(allocatedPaise)}</span>
-              </div>
-              <div className="flex items-baseline justify-between border-t border-[var(--border-tile)] pt-2">
-                <span className="text-sm text-[var(--ink-muted-new)]">{labels.unallocated}</span>
-                <span className={cn("num text-sm font-medium", remaining < 0 ? "text-[var(--danger)]" : "text-[var(--ink-primary)]")}>
-                  {formatPaise(Math.abs(remaining))}
-                </span>
-              </div>
+
+              {fifoPreview.length > 0 ? (
+                <>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm text-[var(--ink-muted-new)]">{labels.allocated} (FIFO)</span>
+                    <span className="num text-sm text-[var(--brand-primary)]">{formatPaise(totalAllocatedPreview)}</span>
+                  </div>
+                  <div className="flex items-baseline justify-between border-t border-[var(--border-tile)] pt-2">
+                    <span className="text-sm text-[var(--ink-muted-new)]">Remaining Outstanding</span>
+                    <span className={cn("num text-sm font-medium", remainingAfterFIFO > 0 ? "text-[var(--danger)]" : "text-[var(--ink-primary)]")}>
+                      {formatPaise(Math.max(totalOutstanding - totalAllocatedPreview, 0))}
+                    </span>
+                  </div>
+                  {remainingAfterFIFO > 0 && (
+                    <div className="flex items-baseline justify-between text-sm text-[var(--danger)]">
+                      <span>Excess Amount</span>
+                      <span className="font-medium">{formatPaise(remainingAfterFIFO)}</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm text-[var(--ink-muted-new)]">{labels.allocated}</span>
+                    <span className="num text-sm text-[var(--ink-primary)]">{formatPaise(unallocatedAmount)}</span>
+                  </div>
+                  <div className="flex items-baseline justify-between border-t border-[var(--border-tile)] pt-2">
+                    <span className="text-sm text-[var(--ink-muted-new)]">{labels.unallocated}</span>
+                    <span className={cn("num text-sm font-medium", unallocatedAmount < 0 ? "text-[var(--danger)]" : "text-[var(--ink-primary)]")}>
+                      {formatPaise(Math.abs(unallocatedAmount))}
+                    </span>
+                  </div>
+                </>
+              )}
 
               {member && (
                 <div className="rounded-lg bg-[var(--brand-soft)] p-2.5 text-[11px] text-[var(--brand-primary)]">
@@ -883,65 +909,109 @@ export function CollectionForm({
         title={labels.details}
       >
         <div className="space-y-5">
-          {/* Purpose/Allocations */}
+          {/* Category Selection */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-manrope font-semibold text-[var(--ink-primary)]">{labels.purpose}</h3>
-              <button
-                type="button"
-                onClick={() => setShowPurposeSelector(true)}
-                className="flex items-center gap-1.5 rounded-[var(--radius-pill)] border-2 border-dashed border-[var(--border-tile)] bg-transparent px-3 py-1.5 text-sm font-medium text-[var(--ink-muted-new)] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] hover:bg-[var(--brand-soft)]"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {labels.addAllocation}
-              </button>
+            <h3 className="font-manrope font-semibold text-[var(--ink-primary)] mb-3">{labels.purpose}</h3>
+            <div className="flex flex-wrap gap-2">
+              {availableCategories.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategoryId(cat.id);
+                    setSelectedEventId("");
+                    setShowDetailsSheet(false);
+                  }}
+                  className={cn(
+                    "rounded-[var(--radius-pill)] border-2 px-4 py-2.5 text-sm font-medium text-[var(--ink-primary)] transition-all",
+                    selectedCategoryId === cat.id
+                      ? "border-[var(--brand-primary)] bg-[var(--brand-soft)] text-[var(--brand-primary)] shadow-[0_0_0_2px_var(--brand-soft)]"
+                      : "border-[var(--border-tile)] bg-[var(--surface-card)] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-soft)]"
+                  )}
+                  disabled={isSubmitting}
+                >
+                  {cat.name}
+                  {cat.restrictedPurpose && <span className="ml-1.5 text-[10px]">🔒</span>}
+                </button>
+              ))}
             </div>
-
-            {allocations.length === 0 ? (
-              <p className="text-sm text-[var(--ink-muted-new)]">{labels.chooseCategory}</p>
-            ) : (
-              <div className="space-y-3">
-                {allocations.map((alloc) => {
-                  const category = categories.find((c) => c.id === alloc.categoryId);
-                  const purposeLabel = category?.name || alloc.categoryId;
-
-                  return (
-                    <div key={alloc.key} className="flex flex-wrap items-end gap-2 rounded-lg border border-[var(--border-tile)] p-3 bg-[var(--surface-field)]">
-                      <AllocationChip
-                        id={`purpose-${alloc.key}`}
-                        label={purposeLabel}
-                        selected={true}
-                        onClick={() => {}}
-                        disabled={true}
-                      />
-                      <div className="w-32 flex-1 min-w-[120px]">
-                        <label className="mb-1 block text-[10px] uppercase tracking-wide text-[var(--ink-muted-new)]">{labels.amount}</label>
-                        <Input
-                          value={alloc.amount}
-                          onChange={(e) => updateAllocation(alloc.key, { amount: e.target.value })}
-                          inputMode="decimal"
-                          className="rounded-[var(--radius-pill)] border-[var(--border-tile)] bg-[var(--surface-card)] h-11 text-base font-medium text-right"
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeAllocation(alloc.key)}
-                        aria-label={labels.cancel}
-                        className="h-9 w-9 p-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
-          {/* Date */}
+          {/* Event Selection (for walk-in Milad/Shab-e-Qadr) */}
+          {donorMode === "walkin" && selectedCategory && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && (
+            <div>
+              <h3 className="font-manrope font-semibold text-[var(--ink-primary)] mb-3">Collection Event</h3>
+              <div className="flex flex-wrap gap-2">
+                {availableEventsForCategory.map((event) => (
+                  <button
+                    key={event.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedEventId(event.id);
+                      setShowDetailsSheet(false);
+                    }}
+                    className={cn(
+                      "rounded-[var(--radius-pill)] border-2 px-4 py-2.5 text-sm font-medium text-[var(--ink-primary)] transition-all text-left min-w-[200px]",
+                      selectedEventId === event.id
+                        ? "border-[var(--brand-primary)] bg-[var(--brand-soft)] text-[var(--brand-primary)] shadow-[0_0_0_2px_var(--brand-soft)]"
+                        : "border-[var(--border-tile)] bg-[var(--surface-card)] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-soft)]"
+                    )}
+                    disabled={isSubmitting}
+                  >
+                    <div className="font-medium">{event.name}</div>
+                    <div className="text-[11px] text-[var(--ink-muted-new)]">
+                      Outstanding: {formatPaise(event.outstandingPaise)}
+                    </div>
+                  </button>
+                ))}
+                {availableEventsForCategory.length === 0 && (
+                  <div className="text-sm text-[var(--ink-muted-new)] w-full py-2">
+                    No open collection events for this category.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* FIFO Preview in Sheet */}
+          {memberId && selectedCategory && FIFO_CATEGORIES.includes(selectedCategory.code) && fifoPreview.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="font-manrope font-semibold text-[var(--ink-primary)]">FIFO Allocation Preview</h3>
+              <div className="rounded-lg border border-[var(--border-tile)] bg-[var(--surface-field)] p-3 text-sm">
+                <div className="flex items-center gap-2 text-[11px] text-[var(--ink-muted-new)] mb-2">
+                  <Info className="h-3.5 w-3.5 shrink-0" />
+                  <span>Automatic oldest-first allocation. Informational only.</span>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {fifoPreview.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between p-2 rounded bg-[var(--surface-card)]">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{item.label}</p>
+                        <p className="text-[11px] text-[var(--ink-muted-new)]">
+                          Due: {formatDate(item.dueDate)} · Outstanding: {formatPaise(item.outstanding)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 text-right ml-4">
+                        <div className="text-[var(--brand-primary)] font-medium">{formatPaise(item.allocated)}</div>
+                        <ArrowRight className="h-4 w-4 text-[var(--ink-muted-new)]" />
+                        <div className="text-[var(--ink-muted-new)]">{formatPaise(item.remaining)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between border-t border-[var(--border-tile)] pt-2 mt-2 text-sm">
+                  <span className="text-[var(--ink-muted-new)]">Total Outstanding</span>
+                  <span className="font-semibold text-[var(--ink-primary)]">{formatPaise(totalOutstanding)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--ink-muted-new)]">Will Be Allocated</span>
+                  <span className="font-semibold text-[var(--brand-primary)]">{formatPaise(totalAllocatedPreview)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DATE */}
           <Field label={labels.date} htmlFor="paymentDate-mobile">
             <Input
               id="paymentDate-mobile"
@@ -953,7 +1023,7 @@ export function CollectionForm({
             />
           </Field>
 
-          {/* Notes */}
+          {/* NOTES */}
           <Field label={`${labels.notes} (${labels.optional})`} htmlFor="notes-mobile">
             <Textarea
               id="notes-mobile"
@@ -987,16 +1057,33 @@ export function CollectionForm({
                 <span className="text-sm text-[var(--ink-muted-new)]">{labels.total}</span>
                 <span className="num text-lg font-semibold text-[var(--ink-primary)]">{formatPaise(amountPaise)}</span>
               </div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm text-[var(--ink-muted-new)]">{labels.allocated}</span>
-                <span className="num text-sm text-[var(--ink-primary)]">{formatPaise(allocatedPaise)}</span>
-              </div>
-              <div className="flex items-baseline justify-between border-t border-[var(--border-tile)] pt-2">
-                <span className="text-sm text-[var(--ink-muted-new)]">{labels.unallocated}</span>
-                <span className={cn("num text-sm font-medium", remaining < 0 ? "text-[var(--danger)]" : "text-[var(--ink-primary)]")}>
-                  {formatPaise(Math.abs(remaining))}
-                </span>
-              </div>
+              {fifoPreview.length > 0 ? (
+                <>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm text-[var(--ink-muted-new)]">{labels.allocated} (FIFO)</span>
+                    <span className="num text-sm text-[var(--brand-primary)]">{formatPaise(totalAllocatedPreview)}</span>
+                  </div>
+                  <div className="flex items-baseline justify-between border-t border-[var(--border-tile)] pt-2">
+                    <span className="text-sm text-[var(--ink-muted-new)]">Remaining Outstanding</span>
+                    <span className={cn("num text-sm font-medium", remainingAfterFIFO > 0 ? "text-[var(--danger)]" : "text-[var(--ink-primary)]")}>
+                      {formatPaise(Math.max(totalOutstanding - totalAllocatedPreview, 0))}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm text-[var(--ink-muted-new)]">{labels.allocated}</span>
+                    <span className="num text-sm text-[var(--ink-primary)]">{formatPaise(unallocatedAmount)}</span>
+                  </div>
+                  <div className="flex items-baseline justify-between border-t border-[var(--border-tile)] pt-2">
+                    <span className="text-sm text-[var(--ink-muted-new)]">{labels.unallocated}</span>
+                    <span className={cn("num text-sm font-medium", unallocatedAmount < 0 ? "text-[var(--danger)]" : "text-[var(--ink-primary)]")}>
+                      {formatPaise(Math.abs(unallocatedAmount))}
+                    </span>
+                  </div>
+                </>
+              )}
             </CardBody>
           </Card>
         </div>

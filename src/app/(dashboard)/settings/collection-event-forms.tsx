@@ -147,6 +147,19 @@ export function CollectionEventForm({
           mapped.label = labels.eventExpectedAmount ?? f.label;
           mapped.helpText = undefined;
         }
+        // Give each date field a clear tag so it is obvious what it is for
+        if (f.name === "startDate") {
+          mapped.label = labels.eventStartDate ?? f.label;
+          mapped.helpText = labels.eventStartDateHint;
+        }
+        if (f.name === "endDate") {
+          mapped.label = labels.eventEndDate ?? f.label;
+          mapped.helpText = labels.eventEndDateHint;
+        }
+        if (f.name === "dueDate") {
+          mapped.label = labels.eventDueDate ?? f.label;
+          mapped.helpText = labels.eventDueDateHint;
+        }
         if (isEditing) {
           if (f.name === "name") mapped.defaultValue = editingEvent.name;
           if (f.name === "startDate") mapped.defaultValue = editingEvent.startDate.slice(0, 10);
@@ -570,8 +583,8 @@ export function CategoryEventsPanel({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-medium">{e.name}</p>
                   <p className="num text-[11px] text-[var(--ink-muted)]">
-                    {formatDate(e.startDate)}
-                    {e.endDate ? ` – ${formatDate(e.endDate)}` : ""} · {labels.eventDueDate}: {formatDate(e.dueDate)}
+                    {labels.eventStartDate}: {formatDate(e.startDate)}
+                    {e.endDate ? ` · ${labels.eventEndDate}: ${formatDate(e.endDate)}` : ""} · {labels.eventDueDate}: {formatDate(e.dueDate)}
                     {e.expectedAmountPaise ? ` · ${formatPaise(e.expectedAmountPaise)}` : ""}
                   </p>
                 </div>

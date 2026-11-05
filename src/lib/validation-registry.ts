@@ -94,6 +94,7 @@ export const VALIDATION_RULES = {
     payment: {
       memberId: { type: "ref", ref: "member", required: false, label: "Member" },
       walkInName: { rule: "name", required: false, max: 150 },
+      categoryId: { type: "ref", ref: "contributionCategory", required: true, label: "Category" },
       paymentDate: { rule: "date", required: true },
       amountPaise: { rule: "amount", required: true },
       mode: { type: "enum", values: [PAYMENT_MODES.CASH, PAYMENT_MODES.UPI, PAYMENT_MODES.BANK_TRANSFER, PAYMENT_MODES.OTHER], required: true },
@@ -361,6 +362,8 @@ const planShape = {
 const paymentShape = {
   memberId: z.string().optional().or(z.literal("")),
   walkInName: z.string().trim().max(150).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  categoryId: z.string().min(1, "Category required"),
+  collectionEventId: z.string().optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
   paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD format"),
   amountPaise: z.number().int().positive("Amount must be > 0"),
   mode: z.enum([PAYMENT_MODES.CASH, PAYMENT_MODES.UPI, PAYMENT_MODES.BANK_TRANSFER, PAYMENT_MODES.OTHER]),
