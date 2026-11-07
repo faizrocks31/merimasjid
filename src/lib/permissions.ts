@@ -18,7 +18,9 @@ export type Permission =
   | "audit:read"
   | "tenant:manage"
   | "subscription:read"
-  | "subscription:manage";
+  | "subscription:manage"
+  | "collection:write"
+  | "collection:read";
 
 const MATRIX: Record<Role, Permission[]> = {
   [ROLES.SUPER_ADMIN]: [

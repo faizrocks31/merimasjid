@@ -138,6 +138,10 @@ export function addDays(date: Date, days: number): Date {
   return d;
 }
 
+export function addWeeks(date: Date, weeks: number): Date {
+  return addDays(date, weeks * 7);
+}
+
 /** Financial year label for a date, given the starting month (1-12). e.g. "2026-27". */
 export function financialYearLabel(date: Date, startMonth: number): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -173,4 +177,18 @@ export function startOfToday(): Date {
 
 export function daysBetween(a: Date, b: Date): number {
   return Math.floor((b.getTime() - a.getTime()) / 86400000);
+}
+
+/** Returns a Date at 00:00:00 of the given date in the local timezone. */
+export function startOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Returns a Date at 23:59:59.999 of the given date in the local timezone. */
+export function endOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
 }

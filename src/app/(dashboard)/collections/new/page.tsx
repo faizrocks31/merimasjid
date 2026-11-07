@@ -18,7 +18,7 @@ export default async function NewCollectionPage({
   const { t } = await getDictionary();
   const params = await searchParams;
 
-  const [masjid, members, categories, collectionEvents, duesPeriods] = await Promise.all([
+  const [masjid, members, collectionDefinitions, collectionEvents, duesPeriods] = await Promise.all([
     prisma.masjid.findUnique({ where: { id: user.masjidId! } }),
     prisma.member.findMany({
       where: { masjidId: user.masjidId!, status: "ACTIVE" },
@@ -26,10 +26,10 @@ export default async function NewCollectionPage({
       select: { id: true, memberNo: true, fullName: true, phone: true },
       take: 2000,
     }),
-    prisma.contributionCategory.findMany({
+    prisma.collectionDefinition.findMany({
       where: { masjidId: user.masjidId!, active: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, code: true, restrictedPurpose: true, defaultAmountPaise: true },
+      select: { id: true, name: true, purposeCode: true, defaultAmountPaise: true, donorEligibility: true },
     }),
     // Collection events (category-level scheduling)
     prisma.collectionEvent.findMany({
@@ -37,7 +37,7 @@ export default async function NewCollectionPage({
       orderBy: { dueDate: "asc" },
       take: 3000,
       include: {
-        category: { select: { id: true, name: true } },
+        collectionDefinition: { select: { id: true, name: true } },
         assignments: {
           where: { status: { in: ["PENDING", "PARTIAL"] } },
           select: { expectedAmountPaise: true },
@@ -50,7 +50,7 @@ export default async function NewCollectionPage({
       orderBy: { dueDate: "asc" },
       take: 3000,
       include: {
-        plan: { include: { category: { select: { id: true, name: true } } } },
+        plan: { include: { collectionDefinition: { select: { id: true, name: true } } } },
         allocations: { where: { payment: { status: "SUCCESS" } }, select: { allocatedAmountPaise: true } },
       },
     }),
@@ -66,8 +66,8 @@ export default async function NewCollectionPage({
       type: "collectionEvent" as const,
       memberId: null, // Category-level, not member-specific
       planId: "",
-      categoryId: e.category.id,
-      categoryName: e.category.name,
+      categoryId: e.collectionDefinition.id,
+      categoryName: e.collectionDefinition.name,
       name: e.name,
       periodStart: e.startDate.toISOString(),
       periodEnd: e.endDate?.toISOString() ?? null,
@@ -88,9 +88,9 @@ export default async function NewCollectionPage({
         id: p.id,
         type: "duesPeriod" as const,
         memberId: p.memberId,
-        planId: p.planId,
-        categoryId: p.plan.category.id,
-        categoryName: p.plan.category.name,
+        planId: p.planId ?? "",
+        categoryId: p.plan?.collectionDefinition.id ?? "",
+        categoryName: p.plan?.collectionDefinition.name ?? "",
         periodStart: p.periodStart.toISOString(),
         periodEnd: p.periodEnd?.toISOString() ?? null,
         dueDate: p.dueDate.toISOString(),
@@ -105,7 +105,7 @@ export default async function NewCollectionPage({
   const allocationTargets = [...eventOptions, ...periodOptions];
 
   // Quick amounts from category defaults or fallback
-  const quickAmounts = categories
+  const quickAmounts = collectionDefinitions
     .filter((c) => c.defaultAmountPaise && c.defaultAmountPaise > 0)
     .map((c) => c.defaultAmountPaise!);
   const defaultQuickAmounts = quickAmounts.length > 0 ? quickAmounts : [50000, 100000, 210000, 500000]; // ₹500, ₹1000, ₹2100, ₹5000
@@ -159,7 +159,7 @@ export default async function NewCollectionPage({
         masjidAddress={masjid.address}
         masjidPhone={masjid.phone}
         members={members}
-        categories={categories}
+        categories={collectionDefinitions}
         periods={allocationTargets}
         initialMemberId={params.memberId}
         quickAmounts={defaultQuickAmounts}

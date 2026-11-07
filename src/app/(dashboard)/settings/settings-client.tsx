@@ -5,19 +5,19 @@ import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, PageHeader } from "@/components/ui";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
 import {
-  ContributionCategoriesPanel,
   ExpenseCategoriesPanel,
   MasjidSettingsForm,
   NotificationSettingsForm,
   PrayerTimesForm,
 } from "./settings-forms";
 import { StaffList } from "../staff/staff-list";
-import { Building2, Gift, CreditCard, Bell, UserCheck, Clock } from "lucide-react";
-import { deleteCategoryAction, deleteExpenseCategoryAction } from "@/modules/settings/actions";
+import { CollectionsTab } from "./collections-tab";
+import { Building2, CreditCard, Bell, UserCheck, Clock, Layers, Calendar, Users } from "lucide-react";
+import { deleteExpenseCategoryAction, deleteCollectionDefinitionAction } from "@/modules/settings/actions";
 
 const SETTINGS_TABS = [
   { key: "masjid", label: "Masjid Details", icon: Building2, tooltip: "Masjid Details" },
-  { key: "contributionCategories", label: "Contribution Categories", icon: Gift, tooltip: "Contribution Categories" },
+  { key: "collections", label: "Collections", icon: Layers, tooltip: "Collections" },
   { key: "expenseCategories", label: "Expense Categories", icon: CreditCard, tooltip: "Expense Categories" },
   { key: "notifications", label: "Notifications", icon: Bell, tooltip: "Notifications" },
   { key: "staff", label: "Staff", icon: UserCheck, tooltip: "Staff" },
@@ -55,6 +55,37 @@ interface CollectionEventItem {
   notes: string | null;
 }
 
+interface CollectionDefinitionListItem {
+  id: string;
+  name: string;
+  code?: string;
+  description?: string | null;
+  active: boolean;
+  showInPaymentReceived: boolean;
+  frequency: string | null;
+  amountType: string | null;
+  defaultAmountPaise: number | null;
+  donorEligibility: string | null;
+  memberAssignment: string | null;
+  dueGeneration: string | null;
+  settlementPolicy: string | null;
+  baseCategoryName: string;
+  subcategoryName: string;
+  meta: string;
+}
+
+interface BaseCategoryItem {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface SubcategoryItem {
+  id: string;
+  name: string;
+  code: string;
+}
+
 interface SettingsPageClientProps {
   labels: Record<string, string>;
   initialTab: string;
@@ -76,22 +107,6 @@ interface SettingsPageClientProps {
     jummahTime: string | null;
     prayerTimesUpdatedAt: Date | string | null;
   };
-  contributionCategoryItems: {
-    id: string;
-    name: string;
-    code: string;
-    restrictedPurpose: boolean;
-    reportingGroup: string | null;
-    description: string | null;
-    defaultAmountPaise: number | null;
-    frequency: string | null;
-    collectionMode: string | null;
-    defaultDueDay: number | null;
-    defaultGraceDays: number | null;
-    meta: string;
-    restricted: boolean;
-    active: boolean;
-  }[];
   collectionEventItems: CollectionEventItem[];
   memberOptions: MemberOption[];
   assignmentItems: AssignmentItem[];
@@ -100,6 +115,9 @@ interface SettingsPageClientProps {
     name: string;
     active: boolean;
   }[];
+  collectionDefinitionItems: CollectionDefinitionListItem[];
+  baseCategories: BaseCategoryItem[];
+  subcategories: SubcategoryItem[];
   staffMembers: {
     id: string;
     user: { id: string; name: string; email: string; lastLoginAt: string | null };
@@ -121,11 +139,13 @@ export function SettingsPageClient({
   labels,
   initialTab,
   masjid,
-  contributionCategoryItems,
   collectionEventItems,
   memberOptions,
   assignmentItems,
   expenseCategoryItems,
+  collectionDefinitionItems,
+  baseCategories,
+  subcategories,
   staffMembers,
   staffLabels,
   roleLabels,
@@ -134,20 +154,6 @@ export function SettingsPageClient({
 }: SettingsPageClientProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-
-  const handleDeleteContributionCategory = (item: { id: string; name: string }) => {
-    if (!window.confirm(`${labels.confirmDelete} "${item.name}"?`)) return;
-    const formData = new FormData();
-    formData.set("categoryId", item.id);
-    startTransition(async () => {
-      const result = await deleteCategoryAction(undefined, formData);
-      if (result?.ok) {
-        window.location.reload();
-      } else {
-        alert(result?.error || "Failed to delete category");
-      }
-    });
-  };
 
   const handleDeleteExpenseCategory = (item: { id: string; name: string }) => {
     if (!window.confirm(`${labels.confirmDelete} "${item.name}"?`)) return;
@@ -159,6 +165,20 @@ export function SettingsPageClient({
         window.location.reload();
       } else {
         alert(result?.error || "Failed to delete category");
+      }
+    });
+  };
+
+  const handleDeleteCollectionDefinition = (item: { id: string; name: string }) => {
+    if (!window.confirm(`${labels.confirmDelete} "${item.name}"?`)) return;
+    const formData = new FormData();
+    formData.set("definitionId", item.id);
+    startTransition(async () => {
+      const result = await deleteCollectionDefinitionAction(undefined, formData);
+      if (result?.ok) {
+        window.location.reload();
+      } else {
+        alert(result?.error || "Failed to delete collection definition");
       }
     });
   };
@@ -221,6 +241,19 @@ export function SettingsPageClient({
           </Card>
         </TabsContent>
 
+        <TabsContent value="collections" className="mt-5">
+          <CollectionsTab
+            labels={labels}
+            collectionDefinitionItems={collectionDefinitionItems}
+            baseCategories={baseCategories}
+            subcategories={subcategories}
+            collectionEventItems={collectionEventItems}
+            memberOptions={memberOptions}
+            assignmentItems={assignmentItems}
+            onDeleteCollectionDefinition={handleDeleteCollectionDefinition}
+          />
+        </TabsContent>
+
         <TabsContent value="prayerTimes" className="mt-5">
           <Card>
             <CardHeader><CardTitle>{labels.prayerTimes}</CardTitle></CardHeader>
@@ -238,17 +271,6 @@ export function SettingsPageClient({
               prayerTimesUpdatedAt={masjid.prayerTimesUpdatedAt}
             />
           </Card>
-        </TabsContent>
-
-        <TabsContent value="contributionCategories" className="mt-5">
-          <ContributionCategoriesPanel
-            items={contributionCategoryItems}
-            labels={labels}
-            onDelete={handleDeleteContributionCategory}
-            events={collectionEventItems}
-            members={memberOptions}
-            assignments={assignmentItems}
-          />
         </TabsContent>
 
         <TabsContent value="expenseCategories" className="mt-5">

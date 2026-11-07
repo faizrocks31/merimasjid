@@ -4,23 +4,274 @@
 
 ▲ Next.js 16.4.2 (Turbopack)
 - Environments: .env
-✓ Running next.config.ts took 39ms
+✓ Running next.config.ts took 46ms
 
   Creating an optimized production build ...
-✓ Compiled successfully in 1305ms
+✓ Compiled successfully in 2.0s
   Running TypeScript ...
-  Finished TypeScript in 6.9s ...
+  Finished TypeScript in 16.3s ...
   Collecting page data using 3 workers ...
-  Generating static pages using 3 workers (0/10) ...
-  Generating static pages using 3 workers (2/10) 
-  Generating static pages using 3 workers (4/10) 
-  Generating static pages using 3 workers (7/10) 
-✓ Generating static pages using 3 workers (10/10) in 319ms
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+[DEBUG db.ts] Creating new PrismaClient, DATABASE_URL: postgresql://masjid_app:xNyfsjngYpP9TiJgIQa75rVi1rvnHLVWUFEN
+[DEBUG db.ts] Prisma client exported, isNew: true
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+[DEBUG db.ts] Creating new PrismaClient, DATABASE_URL: postgresql://masjid_app:xNyfsjngYpP9TiJgIQa75rVi1rvnHLVWUFEN
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+[DEBUG db.ts] Prisma client exported, isNew: true
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+[DEBUG db.ts] Creating new PrismaClient, DATABASE_URL: postgresql://masjid_app:xNyfsjngYpP9TiJgIQa75rVi1rvnHLVWUFEN
+[DEBUG db.ts] Prisma client exported, isNew: true
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+[DEBUG db.ts] Creating new PrismaClient, DATABASE_URL: postgresql://masjid_app:xNyfsjngYpP9TiJgIQa75rVi1rvnHLVWUFEN
+[DEBUG db.ts] Prisma client exported, isNew: true
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+[DEBUG db.ts] Creating new PrismaClient, DATABASE_URL: postgresql://masjid_app:xNyfsjngYpP9TiJgIQa75rVi1rvnHLVWUFEN
+[DEBUG db.ts] Prisma client exported, isNew: true
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+  Generating static pages using 3 workers (0/12) ...
+  Generating static pages using 3 workers (3/12) 
+  Generating static pages using 3 workers (6/12) 
+  Generating static pages using 3 workers (9/12) 
+✓ Generating static pages using 3 workers (12/12) in 527ms
   Finalizing page optimization ...
 
 Route (app)
 ┌ ƒ /
 ├ ƒ /_not-found
+├ ƒ /api/cron/dues-reminders
 ├ ƒ /api/cron/subscription-sync
 ├ ƒ /api/exports/transactions
 ├ ƒ /api/payments/create
@@ -44,8 +295,11 @@ Route (app)
 ├ ƒ /platform/masjids/[id]
 ├ ƒ /platform/masjids/[id]/edit
 ├ ƒ /platform/masjids/new
+├ ƒ /platform/masjids/new/step2
 ├ ƒ /portal
 ├ ƒ /portal/dues
+├ ƒ /portal/login
+├ ƒ /portal/notifications
 ├ ƒ /portal/profile
 ├ ƒ /portal/receipts
 ├ ƒ /receipts/[id]

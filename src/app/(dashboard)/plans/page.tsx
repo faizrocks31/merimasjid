@@ -22,7 +22,7 @@ export default async function PlansPage() {
     take: 200,
     include: {
       member: { select: { id: true, fullName: true, memberNo: true } },
-      category: { select: { name: true } },
+      collectionDefinition: { select: { name: true } },
       duesPeriods: {
         select: {
           status: true,
@@ -105,7 +105,7 @@ export default async function PlansPage() {
                         </Link>
                         <p className="num text-[11px] text-[var(--ink-muted)]">{plan.member.memberNo}</p>
                       </td>
-                      <td className="px-3 py-2.5">{plan.category.name}</td>
+                      <td className="px-3 py-2.5">{plan.collectionDefinition?.name ?? "—"}</td>
                       <td className="px-3 py-2.5 text-[var(--ink-muted)]">
                         {FREQUENCY_LABELS[plan.frequency]}
                         <p className="num text-[11px]">{formatDate(plan.startDate)}{plan.endDate ? ` – ${formatDate(plan.endDate)}` : ""}</p>

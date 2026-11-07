@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { ROLES } from "@/lib/constants";
+import { DEFAULT_EXPENSE_CATEGORIES } from "@/lib/constants";
 import { writeAudit } from "@/modules/audit/write";
 import { assertCan } from "@/lib/permissions";
 import { SUBSCRIPTION_PLANS, type SubscriptionPlanCode, getPlanOrThrow } from "@/lib/subscription-plans";
@@ -24,12 +25,6 @@ const DEFAULT_CATEGORIES = [
   { name: "Iftar/Suhur", code: "IFT", restrictedPurpose: true, reportingGroup: "Events" },
   { name: "Eid Fund", code: "EID", restrictedPurpose: true, reportingGroup: "Events" },
   { name: "Other", code: "OTH", restrictedPurpose: false, reportingGroup: "Donations" },
-];
-
-const DEFAULT_EXPENSE_CATEGORIES = [
-  "Electricity", "Water", "Maintenance", "Salaries", "Rent",
-  "Cleaning", "Security", "Internet/Phone", "Stationery", "Events",
-  "Madrasa Expenses", "Construction", "Zakat Distribution", "Other",
 ];
 
 /** The platform owner: a SUPER_ADMIN membership on any masjid. */
@@ -137,7 +132,7 @@ export async function deleteMasjidAction(formData: FormData): Promise<MasjidActi
 }
 
 /**
- * Creates a new masjid together with the default contribution and expense
+ * Creates a new masjid together with the default collection definitions and expense
  * categories, so the masjid is usable straight away.
  */
 export async function createMasjidAction(
@@ -178,9 +173,158 @@ export async function createMasjidAction(
         },
       });
 
-      for (const c of DEFAULT_CATEGORIES) {
-        await tx.contributionCategory.create({ data: { masjidId: masjid.id, ...c } });
+      // Create default collection definitions
+      const baseCategories = await tx.baseCategory.findMany();
+      const subcategories = await tx.subcategory.findMany();
+
+      const baseCategoryMap = new Map(baseCategories.map(bc => [bc.code, bc.id]));
+      const subcategoryMap = new Map(subcategories.map(sc => [sc.code, sc.id]));
+
+      const defaultCollectionDefinitions = [
+        {
+          name: "Monthly Chanda",
+          purposeCode: "MONTHLY_CHANDA",
+          baseCategoryCode: "MONTHLY",
+          subcategoryCode: "RECURRING_DONATION",
+          description: "Regular monthly contribution from members",
+          frequency: "MONTHLY" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "MEMBERS_ONLY" as const,
+          memberAssignment: "ALL_ELIGIBLE" as const,
+          dueGeneration: "AUTOMATIC" as const,
+          settlementPolicy: "OLDEST_FIRST" as const,
+        },
+        {
+          name: "Annual Chanda",
+          purposeCode: "ANNUAL_CHANDA",
+          baseCategoryCode: "ANNUAL",
+          subcategoryCode: "RECURRING_DONATION",
+          description: "Annual contribution from members",
+          frequency: "ANNUAL" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "MEMBERS_ONLY" as const,
+          memberAssignment: "ALL_ELIGIBLE" as const,
+          dueGeneration: "AUTOMATIC" as const,
+          settlementPolicy: "OLDEST_FIRST" as const,
+        },
+        {
+          name: "General Donation",
+          purposeCode: "GENERAL_DONATION",
+          baseCategoryCode: "GENERAL",
+          subcategoryCode: "GENERAL",
+          description: "General purpose donations from members and walk-ins",
+          frequency: "ONE_TIME" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "BOTH" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+        {
+          name: "Zakat",
+          purposeCode: "ZAKAT",
+          baseCategoryCode: "ZAKAT",
+          subcategoryCode: "RESTRICTED",
+          description: "Obligatory Zakat collections (restricted purpose)",
+          frequency: "ANNUAL" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "MEMBERS_ONLY" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+        {
+          name: "Construction Fund",
+          purposeCode: "CONSTRUCTION_FUND",
+          baseCategoryCode: "CONSTRUCTION",
+          subcategoryCode: "RESTRICTED",
+          description: "Building and infrastructure fund (restricted purpose)",
+          frequency: "EVENT_BASED" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "BOTH" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+        {
+          name: "Jumma Collection",
+          purposeCode: "JUMMA_COLLECTION",
+          baseCategoryCode: "JUMMA",
+          subcategoryCode: "RECURRING_DONATION",
+          description: "Friday congregation collection",
+          frequency: "WEEKLY" as const,
+          amountType: "FIXED" as const,
+          defaultAmountPaise: 1000,
+          donorEligibility: "BOTH" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+        {
+          name: "Milad-un-Nabi",
+          purposeCode: "MILAD_UN_NABI",
+          baseCategoryCode: "ANNUAL",
+          subcategoryCode: "GENERAL",
+          description: "Annual Milad-un-Nabi celebration collection",
+          frequency: "ANNUAL" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "BOTH" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+        {
+          name: "Shab-e-Qadr",
+          purposeCode: "SHAB_E_QADR",
+          baseCategoryCode: "ANNUAL",
+          subcategoryCode: "GENERAL",
+          description: "Shab-e-Qadr night collection",
+          frequency: "EVENT_BASED" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "BOTH" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+      ];
+
+      for (const def of defaultCollectionDefinitions) {
+        const baseCategoryId = baseCategoryMap.get(def.baseCategoryCode);
+        const subcategoryId = subcategoryMap.get(def.subcategoryCode);
+
+        if (!baseCategoryId || !subcategoryId) {
+          console.log(`⚠ Skipping ${def.name} (missing taxonomy: ${def.baseCategoryCode} / ${def.subcategoryCode})`);
+          continue;
+        }
+
+        await tx.collectionDefinition.create({
+          data: {
+            masjidId: masjid.id,
+            name: def.name,
+            purposeCode: def.purposeCode,
+            baseCategoryId,
+            subcategoryId,
+            description: def.description,
+            active: true,
+            showInPaymentReceived: true,
+            frequency: def.frequency,
+            amountType: def.amountType,
+            defaultAmountPaise: def.defaultAmountPaise,
+            donorEligibility: def.donorEligibility,
+            memberAssignment: def.memberAssignment,
+            dueGeneration: def.dueGeneration,
+            settlementPolicy: def.settlementPolicy,
+          },
+        });
       }
+
       for (const catName of DEFAULT_EXPENSE_CATEGORIES) {
         await tx.expenseCategory.create({ data: { masjidId: masjid.id, name: catName } });
       }
@@ -291,9 +435,158 @@ export async function createMasjidStep1Action(
         },
       });
 
-      for (const c of DEFAULT_CATEGORIES) {
-        await tx.contributionCategory.create({ data: { masjidId: created.id, ...c } });
+      // Create default collection definitions
+      const baseCategories = await tx.baseCategory.findMany();
+      const subcategories = await tx.subcategory.findMany();
+
+      const baseCategoryMap = new Map(baseCategories.map(bc => [bc.code, bc.id]));
+      const subcategoryMap = new Map(subcategories.map(sc => [sc.code, sc.id]));
+
+      const defaultCollectionDefinitions = [
+        {
+          name: "Monthly Chanda",
+          purposeCode: "MONTHLY_CHANDA",
+          baseCategoryCode: "MONTHLY",
+          subcategoryCode: "RECURRING_DONATION",
+          description: "Regular monthly contribution from members",
+          frequency: "MONTHLY" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "MEMBERS_ONLY" as const,
+          memberAssignment: "ALL_ELIGIBLE" as const,
+          dueGeneration: "AUTOMATIC" as const,
+          settlementPolicy: "OLDEST_FIRST" as const,
+        },
+        {
+          name: "Annual Chanda",
+          purposeCode: "ANNUAL_CHANDA",
+          baseCategoryCode: "ANNUAL",
+          subcategoryCode: "RECURRING_DONATION",
+          description: "Annual contribution from members",
+          frequency: "ANNUAL" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "MEMBERS_ONLY" as const,
+          memberAssignment: "ALL_ELIGIBLE" as const,
+          dueGeneration: "AUTOMATIC" as const,
+          settlementPolicy: "OLDEST_FIRST" as const,
+        },
+        {
+          name: "General Donation",
+          purposeCode: "GENERAL_DONATION",
+          baseCategoryCode: "GENERAL",
+          subcategoryCode: "GENERAL",
+          description: "General purpose donations from members and walk-ins",
+          frequency: "ONE_TIME" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "BOTH" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+        {
+          name: "Zakat",
+          purposeCode: "ZAKAT",
+          baseCategoryCode: "ZAKAT",
+          subcategoryCode: "RESTRICTED",
+          description: "Obligatory Zakat collections (restricted purpose)",
+          frequency: "ANNUAL" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "MEMBERS_ONLY" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+        {
+          name: "Construction Fund",
+          purposeCode: "CONSTRUCTION_FUND",
+          baseCategoryCode: "CONSTRUCTION",
+          subcategoryCode: "RESTRICTED",
+          description: "Building and infrastructure fund (restricted purpose)",
+          frequency: "EVENT_BASED" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "BOTH" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+        {
+          name: "Jumma Collection",
+          purposeCode: "JUMMA_COLLECTION",
+          baseCategoryCode: "JUMMA",
+          subcategoryCode: "RECURRING_DONATION",
+          description: "Friday congregation collection",
+          frequency: "WEEKLY" as const,
+          amountType: "FIXED" as const,
+          defaultAmountPaise: 1000,
+          donorEligibility: "BOTH" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+        {
+          name: "Milad-un-Nabi",
+          purposeCode: "MILAD_UN_NABI",
+          baseCategoryCode: "ANNUAL",
+          subcategoryCode: "GENERAL",
+          description: "Annual Milad-un-Nabi celebration collection",
+          frequency: "ANNUAL" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "BOTH" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+        {
+          name: "Shab-e-Qadr",
+          purposeCode: "SHAB_E_QADR",
+          baseCategoryCode: "ANNUAL",
+          subcategoryCode: "GENERAL",
+          description: "Shab-e-Qadr night collection",
+          frequency: "EVENT_BASED" as const,
+          amountType: "VARIABLE" as const,
+          defaultAmountPaise: null,
+          donorEligibility: "BOTH" as const,
+          memberAssignment: "SELECTED" as const,
+          dueGeneration: "ADMIN" as const,
+          settlementPolicy: "ANY_PENDING_PERIOD" as const,
+        },
+      ];
+
+      for (const def of defaultCollectionDefinitions) {
+        const baseCategoryId = baseCategoryMap.get(def.baseCategoryCode);
+        const subcategoryId = subcategoryMap.get(def.subcategoryCode);
+
+        if (!baseCategoryId || !subcategoryId) {
+          console.log(`⚠ Skipping ${def.name} (missing taxonomy: ${def.baseCategoryCode} / ${def.subcategoryCode})`);
+          continue;
+        }
+
+        await tx.collectionDefinition.create({
+          data: {
+            masjidId: created.id,
+            name: def.name,
+            purposeCode: def.purposeCode,
+            baseCategoryId,
+            subcategoryId,
+            description: def.description,
+            active: true,
+            showInPaymentReceived: true,
+            frequency: def.frequency,
+            amountType: def.amountType,
+            defaultAmountPaise: def.defaultAmountPaise,
+            donorEligibility: def.donorEligibility,
+            memberAssignment: def.memberAssignment,
+            dueGeneration: def.dueGeneration,
+            settlementPolicy: def.settlementPolicy,
+          },
+        });
       }
+
       for (const catName of DEFAULT_EXPENSE_CATEGORIES) {
         await tx.expenseCategory.create({ data: { masjidId: created.id, name: catName } });
       }

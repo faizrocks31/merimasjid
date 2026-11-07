@@ -6,16 +6,10 @@ test('Generate receipt via payment creation', async ({ page }) => {
   // Use mobile viewport since purpose selector is mobile-only
   await page.setViewportSize({ width: 375, height: 667 });
 
-  // Login first
-  await page.goto(`${BASE_URL}/login`);
-  await page.fill('input[name="email"]', 'localadmin@gmail.com');
-  await page.fill('input[name="password"]', 'admin123');
-  await page.click('button[type="submit"]');
-  await page.waitForURL('**/dashboard');
-  console.log('✅ Logged in successfully');
-
-  // Go to new collection page
+  // Go directly to new collection page (already authenticated via auth-state.json)
   await page.goto(`${BASE_URL}/collections/new`);
+  await page.waitForLoadState('networkidle');
+  console.log('✅ On collections/new page (authenticated)');
   await page.waitForTimeout(1000);
   console.log('✅ On collections/new page');
 
@@ -50,22 +44,15 @@ test('Generate receipt via payment creation', async ({ page }) => {
   await page.waitForTimeout(300);
   console.log('✅ Payment mode: Cash');
 
-  // Select purpose/category
-  await page.click('button:has-text("Add Allocation")');
-  await page.waitForTimeout(1000); // Wait for modal/sheet to open
-
-  // Click on first available category (mobile sheet buttons don't have w-full class)
-  await page.locator('button:has-text("Monthly Chanda"):not([class*="w-full"]), button:has-text("General Donation"):not([class*="w-full"]), button:has-text("Construction Fund"):not([class*="w-full"])').first().click();
-  await page.waitForTimeout(300);
+  // Select purpose/category directly (buttons are rendered directly on mobile view)
+  // Use "General Donation" which has ANY_PENDING_PERIOD settlement policy (no FIFO allocation required)
+  await page.click('button:has-text("General Donation")');
+  await page.waitForTimeout(500);
   console.log('✅ Purpose selected');
 
-  // Fill allocation amount (required for form validation)
+  // General Donation has ANY_PENDING_PERIOD settlement - no allocation input needed
   await page.waitForTimeout(500);
-  // Only fill the allocation input (has placeholder "0.00"), not the main amount input (placeholder "0")
-  const allocationInput = page.locator('input[placeholder="0.00"]').first();
-  await allocationInput.fill('500');
-  await page.waitForTimeout(300);
-  console.log('✅ Allocation amount set');
+  console.log('✅ General Donation category selected (no FIFO allocation required)');
 
   // Set date to today
   const today = new Date().toISOString().split('T')[0];
@@ -81,18 +68,36 @@ test('Generate receipt via payment creation', async ({ page }) => {
     console.log('Error message:', errorMsg);
   }
 
-  // Click submit - try both buttons if one is disabled
-  const submitBtn = page.locator('button:has-text("Confirm and issue receipt")').first();
-  const submitBtnHasDisabled = await submitBtn.evaluate(el => (el as HTMLButtonElement).disabled);
+  // Click submit - use mobile bottom bar submit button (the one in the sticky footer)
+  const mobileSubmitBtn = page.locator('button:has-text("Confirm and issue receipt")').last();
+  await mobileSubmitBtn.waitFor({ state: 'visible', timeout: 10000 });
 
-  if (submitBtnHasDisabled) {
-    console.log('Trying mobile bottom bar submit button...');
-    await page.locator('button:has-text("Confirm and issue receipt")').nth(1).click();
-  } else {
-    await submitBtn.click();
+  // Check for validation errors before clicking
+  const validationError = await page.locator('p[role="alert"]').textContent().catch(() => null);
+  if (validationError) {
+    console.log('Form validation error:', validationError);
   }
-  await page.waitForTimeout(5000);
-  console.log('✅ Payment submitted');
+
+  // Wait for navigation to receipt page after click
+  const navigationPromise = page.waitForURL('**/receipts/**', { timeout: 30000 });
+  await mobileSubmitBtn.click();
+
+  // Wait for either navigation or error
+  try {
+    await navigationPromise;
+    await page.waitForLoadState('networkidle');
+    console.log('✅ Payment submitted and navigated to receipt page');
+  } catch (navError) {
+    // Check if still on collections/new page with error
+    const currentUrl = page.url();
+    console.log('Current URL after click:', currentUrl);
+
+    const errorAfterClick = await page.locator('p[role="alert"]').textContent().catch(() => null);
+    if (errorAfterClick) {
+      console.log('Form error after submit:', errorAfterClick);
+    }
+    throw navError;
+  }
 
   // Check current URL - should redirect to receipt page
   const currentUrl = page.url();

@@ -55,13 +55,13 @@ function hour12To24(hour12: number, ampm: "AM" | "PM"): number {
 
 function getHourPositions(hour: number): { x: number; y: number } {
   const angle = ((hour % 12) * 30 - 90) * (Math.PI / 180);
-  const radius = 0.78;
+  const radius = 0.75;
   return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
 }
 
 function getMinutePositions(minute: number): { x: number; y: number } {
   const angle = (minute * 6 - 90) * (Math.PI / 180);
-  const radius = 0.92;
+  const radius = 0.88;
   return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
 }
 
@@ -114,7 +114,6 @@ export function AnalogTimePicker({
   }, [tempHour, tempMinute, tempAmpm, onChange]);
 
   const handleCancel = useCallback(() => {
-    // Reset to original value
     const parsed = parseTime24(value);
     if (parsed) {
       const { hour12, ampm } = hour24To12(parsed.hour);
@@ -159,7 +158,6 @@ export function AnalogTimePicker({
     setTempAmpm(ampm);
   }, []);
 
-  // For display value in input
   const displayValue = useMemo(() => {
     if (!value) return "";
     const parsed = parseTime24(value);
@@ -171,60 +169,56 @@ export function AnalogTimePicker({
     return `${hour12.toString().padStart(2, "0")}:${parsed.minute.toString().padStart(2, "0")} ${ampm}`;
   }, [value, format]);
 
-  // Content for both modal and bottom sheet (no duplicate heading inside)
+  // Clean, well-spaced UI without overlaps
   const content = (
-    <div className="space-y-3 pb-12">
-      {/* Time Input Section */}
-      <div className="flex items-center justify-center gap-2">
-        <div className="relative">
-          <input
-            type="text"
-            inputMode="numeric"
-            maxLength={2}
-            placeholder="HH"
-            value={tempHour?.toString().padStart(2, "0") || ""}
-            onChange={handleHourInputChange}
-            onClick={() => setMode("hour")}
-            disabled={disabled}
-            className={cn(
-              "w-14 h-11 text-center text-lg font-mono rounded-lg border bg-white transition-colors",
-              mode === "hour"
-                ? "border-[var(--brand)] bg-[var(--brand-soft)]"
-                : "border-[var(--border-subtle)] hover:border-[var(--brand-muted)]",
-            )}
-            aria-label={labels.hour}
-          />
-        </div>
-        <span className="text-lg font-mono text-[var(--ink)]">:</span>
-        <div className="relative">
-          <input
-            type="text"
-            inputMode="numeric"
-            maxLength={2}
-            placeholder="MM"
-            value={tempMinute?.toString().padStart(2, "0") || ""}
-            onChange={handleMinuteInputChange}
-            onClick={() => setMode("minute")}
-            disabled={disabled}
-            className={cn(
-              "w-14 h-11 text-center text-lg font-mono rounded-lg border bg-white transition-colors",
-              mode === "minute"
-                ? "border-[var(--brand)] bg-[var(--brand-soft)]"
-                : "border-[var(--border-subtle)] hover:border-[var(--brand-muted)]",
-            )}
-            aria-label={labels.minute}
-          />
-        </div>
-        <div className="flex gap-1" role="group" aria-label="AM/PM">
+    <div className="flex flex-col gap-4 w-full max-w-[320px] mx-auto py-2">
+      {/* 1. Time Input Section & AM/PM Selector in clean horizontal bar */}
+      <div className="flex items-center justify-center gap-2 bg-[var(--surface)] p-2 rounded-xl border border-[var(--border-subtle)]">
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={2}
+          placeholder="HH"
+          value={tempHour?.toString().padStart(2, "0") || ""}
+          onChange={handleHourInputChange}
+          onClick={() => setMode("hour")}
+          disabled={disabled}
+          className={cn(
+            "w-12 h-10 text-center text-base font-mono font-bold rounded-lg border bg-white transition-all shadow-sm",
+            mode === "hour"
+              ? "border-[var(--brand)] ring-2 ring-[var(--brand-soft)] text-[var(--brand)]"
+              : "border-[var(--border-subtle)] text-[var(--ink)]",
+          )}
+          aria-label={labels.hour}
+        />
+        <span className="text-lg font-bold text-[var(--ink)]">:</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={2}
+          placeholder="MM"
+          value={tempMinute?.toString().padStart(2, "0") || ""}
+          onChange={handleMinuteInputChange}
+          onClick={() => setMode("minute")}
+          disabled={disabled}
+          className={cn(
+            "w-12 h-10 text-center text-base font-mono font-bold rounded-lg border bg-white transition-all shadow-sm",
+            mode === "minute"
+              ? "border-[var(--brand)] ring-2 ring-[var(--brand-soft)] text-[var(--brand)]"
+              : "border-[var(--border-subtle)] text-[var(--ink)]",
+          )}
+          aria-label={labels.minute}
+        />
+        <div className="flex bg-white rounded-lg border-2 border-[var(--border-subtle)] p-0.5 ml-2 shadow-sm" role="group" aria-label="AM/PM">
           <button
             type="button"
             onClick={() => handleAmpmChange("AM")}
             disabled={disabled}
             className={cn(
-              "flex-1 h-11 rounded-lg text-base font-semibold transition-all duration-150 border",
+              "px-4 h-10 rounded-md text-base font-bold transition-all",
               tempAmpm === "AM"
-                ? "bg-[var(--brand)] text-white border-transparent shadow-sm"
-                : "bg-white text-[var(--ink)] border-[var(--border-subtle)] hover:bg-[var(--surface)] hover:border-[var(--brand-muted)]",
+                ? "bg-[var(--brand)] text-white shadow-lg"
+                : "bg-white text-black border-2 border-[var(--brand)] hover:bg-[var(--brand-soft)] hover:shadow",
             )}
             aria-pressed={tempAmpm === "AM"}
           >
@@ -235,10 +229,10 @@ export function AnalogTimePicker({
             onClick={() => handleAmpmChange("PM")}
             disabled={disabled}
             className={cn(
-              "flex-1 h-11 rounded-lg text-base font-semibold transition-all duration-150 border",
+              "px-4 h-10 rounded-md text-base font-bold transition-all",
               tempAmpm === "PM"
-                ? "bg-[var(--brand)] text-white border-transparent shadow-sm"
-                : "bg-white text-[var(--ink)] border-[var(--border-subtle)] hover:bg-[var(--surface)] hover:border-[var(--brand-muted)]",
+                ? "bg-[var(--brand)] text-white shadow-lg"
+                : "bg-white text-black border-2 border-[var(--brand)] hover:bg-[var(--brand-soft)] hover:shadow",
             )}
             aria-pressed={tempAmpm === "PM"}
           >
@@ -247,174 +241,150 @@ export function AnalogTimePicker({
         </div>
       </div>
 
-      {/* Clock Dial */}
-      <div className="relative" style={{ width: "280px", height: "280px", margin: "0 auto" }}>
+      {/* 2. Mode Selector Tabs (Hour / Minute) */}
+      <div className="flex justify-center gap-2">
+        <button
+          type="button"
+          onClick={() => setMode("hour")}
+          disabled={disabled}
+          className={cn(
+            "px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all",
+            mode === "hour"
+              ? "bg-[var(--brand)] text-white shadow"
+              : "bg-[var(--surface)] text-[var(--ink-muted)] hover:bg-[var(--border-subtle)]",
+          )}
+        >
+          {labels.hour}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("minute")}
+          disabled={disabled}
+          className={cn(
+            "px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all",
+            mode === "minute"
+              ? "bg-[var(--brand)] text-white shadow"
+              : "bg-[var(--surface)] text-[var(--ink-muted)] hover:bg-[var(--border-subtle)]",
+          )}
+        >
+          {labels.minute}
+        </button>
+      </div>
+
+      {/* 3. Clock Dial */}
+      <div className="relative flex items-center justify-center" style={{ width: "260px", height: "260px", margin: "0 auto" }}>
         <svg
           viewBox="-120 -120 240 240"
-          className="w-full h-full"
+          className="w-full h-full drop-shadow-sm"
           role="img"
           aria-label="Analog clock for time selection"
         >
-          {/* Clock face */}
-          <circle cx="0" cy="0" r="110" fill="none" stroke="var(--border-subtle)" strokeWidth="2" />
+          {/* Clock face background */}
+          <circle cx="0" cy="0" r="112" fill="var(--surface)" stroke="var(--border-subtle)" strokeWidth="2" />
+          <circle cx="0" cy="0" r="106" fill="white" />
 
           {/* Center pivot */}
-          <circle cx="0" cy="0" r="6" fill="var(--ink)" />
+          <circle cx="0" cy="0" r="5" fill="var(--brand)" />
 
           {/* Hour/Minute marks and numbers */}
           {mode === "hour" ? (
             <>
-              {/* Hour marks */}
               {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => {
                 const pos = getHourPositions(h);
                 const isSelected = tempHour === h;
                 return (
-                  <g key={h}>
-                    {/* Tick mark */}
-                    <line
-                      x1={pos.x * 92}
-                      y1={pos.y * 92}
-                      x2={pos.x * 105}
-                      y2={pos.y * 105}
-                      stroke={isSelected ? "var(--brand)" : "var(--ink-muted)"}
-                      strokeWidth={isSelected ? 3 : 2}
-                    />
-                    {/* Number with circular highlight when selected */}
-                    <g>
-                      {isSelected && (
-                        <circle
-                          cx={pos.x * 78}
-                          cy={pos.y * 78}
-                          r={20}
-                          fill="var(--brand)"
-                          opacity={0.15}
-                        />
-                      )}
-                      <text
-                        x={pos.x * 78}
-                        y={pos.y * 78 + 6}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fontSize="16"
-                        fontWeight={isSelected ? "bold" : "normal"}
-                        fill={isSelected ? "var(--brand)" : "var(--ink)"}
-                        className="select-none"
-                      >
-                        {h.toString().padStart(2, "0")}
-                      </text>
-                    </g>
+                  <g key={h} className="cursor-pointer" onClick={() => !disabled && selectHour(h)}>
+                    {isSelected && (
+                      <circle
+                        cx={pos.x * 82}
+                        cy={pos.y * 82}
+                        r={18}
+                        fill="var(--brand)"
+                      />
+                    )}
+                    <text
+                      x={pos.x * 82}
+                      y={pos.y * 82 + 1}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontSize="15"
+                      fontWeight={isSelected ? "bold" : "600"}
+                      fill={isSelected ? "white" : "var(--ink)"}
+                      className="select-none"
+                    >
+                      {h}
+                    </text>
                   </g>
                 );
               })}
               {/* Hour hand */}
               {tempHour !== null && (
-                <>
-                  <line
-                    x1={0}
-                    y1={0}
-                    x2={getHourPositions(tempHour).x * 55}
-                    y2={getHourPositions(tempHour).y * 55}
-                    stroke="var(--brand)"
-                    strokeWidth={5}
-                    strokeLinecap="round"
-                  />
-                  {/* Hand tail */}
-                  <line
-                    x1={0}
-                    y1={0}
-                    x2={getHourPositions(tempHour).x * -15}
-                    y2={getHourPositions(tempHour).y * -15}
-                    stroke="var(--brand)"
-                    strokeWidth={5}
-                    strokeLinecap="round"
-                    opacity={0.4}
-                  />
-                </>
+                <line
+                  x1={0}
+                  y1={0}
+                  x2={getHourPositions(tempHour).x * 60}
+                  y2={getHourPositions(tempHour).y * 60}
+                  stroke="var(--brand)"
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                />
               )}
             </>
           ) : (
             <>
-              {/* Minute marks (all 60, 5-min intervals highlighted) */}
-              {Array.from({ length: 60 }, (_, i) => i).map((m) => {
+              {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => {
                 const pos = getMinutePositions(m);
-                const isFiveMin = m % 5 === 0;
                 const isSelected = tempMinute === m;
                 return (
-                  <g key={m}>
-                    <line
-                      x1={pos.x * (isFiveMin ? 90 : 100)}
-                      y1={pos.y * (isFiveMin ? 90 : 100)}
-                      x2={pos.x * 108}
-                      y2={pos.y * 108}
-                      stroke={isSelected ? "var(--brand)" : isFiveMin ? "var(--ink-muted)" : "var(--border-subtle)"}
-                      strokeWidth={isSelected ? 2.5 : isFiveMin ? 1.5 : 0.8}
-                    />
-                    {isFiveMin && (
-                      <g>
-                        {isSelected && (
-                          <circle
-                            cx={pos.x * 78}
-                            cy={pos.y * 78}
-                            r={18}
-                            fill="var(--brand)"
-                            opacity={0.15}
-                          />
-                        )}
-                        <text
-                          x={pos.x * 78}
-                          y={pos.y * 78 + 5}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                          fontSize="11"
-                          fontWeight={isSelected ? "bold" : "normal"}
-                          fill={isSelected ? "var(--brand)" : "var(--ink-muted)"}
-                          className="select-none"
-                        >
-                          {m.toString().padStart(2, "0")}
-                        </text>
-                      </g>
+                  <g key={m} className="cursor-pointer" onClick={() => !disabled && selectMinute(m)}>
+                    {isSelected && (
+                      <circle
+                        cx={pos.x * 86}
+                        cy={pos.y * 86}
+                        r={16}
+                        fill="var(--brand)"
+                      />
                     )}
+                    <text
+                      x={pos.x * 86}
+                      y={pos.y * 86 + 1}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontSize="13"
+                      fontWeight={isSelected ? "bold" : "500"}
+                      fill={isSelected ? "white" : "var(--ink-muted)"}
+                      className="select-none"
+                    >
+                      {m.toString().padStart(2, "0")}
+                    </text>
                   </g>
                 );
               })}
               {/* Minute hand */}
               {tempMinute !== null && (
-                <>
-                  <line
-                    x1={0}
-                    y1={0}
-                    x2={getMinutePositions(tempMinute).x * 80}
-                    y2={getMinutePositions(tempMinute).y * 80}
-                    stroke="var(--brand)"
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                  />
-                  {/* Hand tail */}
-                  <line
-                    x1={0}
-                    y1={0}
-                    x2={getMinutePositions(tempMinute).x * -20}
-                    y2={getMinutePositions(tempMinute).y * -20}
-                    stroke="var(--brand)"
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                    opacity={0.3}
-                  />
-                </>
+                <line
+                  x1={0}
+                  y1={0}
+                  x2={getMinutePositions(tempMinute).x * 75}
+                  y2={getMinutePositions(tempMinute).y * 75}
+                  stroke="var(--brand)"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                />
               )}
             </>
           )}
 
-          {/* Clickable areas - invisible circles over numbers */}
+          {/* Larger invisible touch targets for clock numbers */}
           {mode === "hour" ? (
             Array.from({ length: 12 }, (_, i) => i + 1).map((h) => {
               const pos = getHourPositions(h);
               return (
                 <circle
                   key={h}
-                  cx={pos.x * 78}
-                  cy={pos.y * 78}
-                  r={24}
+                  cx={pos.x * 82}
+                  cy={pos.y * 82}
+                  r={22}
                   fill="transparent"
                   onClick={() => !disabled && selectHour(h)}
                   style={{ cursor: disabled ? "not-allowed" : "pointer" }}
@@ -427,9 +397,9 @@ export function AnalogTimePicker({
               return (
                 <circle
                   key={m}
-                  cx={pos.x * 78}
-                  cy={pos.y * 78}
-                  r={20}
+                  cx={pos.x * 86}
+                  cy={pos.y * 86}
+                  r={14}
                   fill="transparent"
                   onClick={() => !disabled && selectMinute(m)}
                   style={{ cursor: disabled ? "not-allowed" : "pointer" }}
@@ -438,40 +408,10 @@ export function AnalogTimePicker({
             })
           )}
         </svg>
-
-        {/* Mode toggle buttons - positioned below clock with proper spacing */}
-        <div className="absolute bottom-[-44px] left-1/2 -translate-x-1/2 flex gap-2">
-          <button
-            type="button"
-            onClick={() => setMode("hour")}
-            disabled={disabled}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
-              mode === "hour"
-                ? "bg-[var(--brand)] text-white shadow-sm"
-                : "bg-white text-[var(--ink)] border-[var(--border-subtle)] hover:bg-[var(--surface)] hover:border-[var(--brand-muted)]",
-            )}
-          >
-            {labels.hour}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("minute")}
-            disabled={disabled}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
-              mode === "minute"
-                ? "bg-[var(--brand)] text-white shadow-sm"
-                : "bg-white text-[var(--ink)] border-[var(--border-subtle)] hover:bg-[var(--surface)] hover:border-[var(--brand-muted)]",
-            )}
-          >
-            {labels.minute}
-          </button>
-        </div>
       </div>
 
-      {/* Actions - Cancel and Save Time */}
-      <div className="flex justify-end gap-2 pt-6">
+      {/* 4. Actions Footer - Distinct [Cancel] [Save Time] Buttons */}
+      <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border-subtle)]">
         <Button type="button" variant="ghost" size="sm" onClick={handleCancel} disabled={disabled}>
           {labels.cancel}
         </Button>
@@ -522,7 +462,7 @@ export function AnalogTimePicker({
           type="button"
           variant="secondary"
           size="sm"
-          className={cn("w-full justify-start gap-2", error && "border-[var(--danger)]")}
+            className={cn("w-full justify-start gap-2", error && "border-[var(--danger)]")}
           onClick={() => !disabled && setIsOpen(true)}
           disabled={disabled}
           aria-haspopup="dialog"
@@ -547,9 +487,9 @@ export function AnalogTimePicker({
             onClick={handleCancel}
             aria-hidden="true"
           />
-          <div className="relative z-10 w-full max-w-sm rounded-xl bg-[var(--surface-card)] shadow-xl p-5 animate-fade-in">
-            <div className="flex items-center justify-between mb-2">
-              <h3 id="time-picker-title" className="font-semibold text-[var(--ink)]">
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-[var(--surface-card)] shadow-2xl border border-[var(--border-subtle)] p-5 animate-fade-in">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)] mb-3">
+              <h3 id="time-picker-title" className="font-bold text-base text-[var(--ink)]">
                 {label || labels.selectTime}
               </h3>
               <button

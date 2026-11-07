@@ -140,14 +140,95 @@ export const MASJID_STATUS = {
   SUSPENDED: "SUSPENDED",
 } as const;
 
-export const DEFAULT_CATEGORIES = [
-  { name: "Monthly Chanda", code: "MONTHLY", reportingGroup: "Recurring", restrictedPurpose: false },
-  { name: "Annual Chanda", code: "ANNUAL", reportingGroup: "Recurring", restrictedPurpose: false },
-  { name: "General Donation", code: "GENERAL", reportingGroup: "General", restrictedPurpose: false },
-  { name: "Zakat", code: "ZAKAT", reportingGroup: "Restricted", restrictedPurpose: true },
-  { name: "Sadaqah", code: "SADAQAH", reportingGroup: "General", restrictedPurpose: false },
-  { name: "Construction Fund", code: "CONSTRUCTION", reportingGroup: "Restricted", restrictedPurpose: true },
-];
+/** CollectionDefinition frequency enum */
+export const COLLECTION_FREQUENCY = {
+  WEEKLY: "WEEKLY",
+  MONTHLY: "MONTHLY",
+  QUARTERLY: "QUARTERLY",
+  SEMI_ANNUAL: "SEMI_ANNUAL",
+  ANNUAL: "ANNUAL",
+  EVENT_BASED: "EVENT_BASED",
+  ONE_TIME: "ONE_TIME",
+} as const;
+
+export type CollectionFrequency = (typeof COLLECTION_FREQUENCY)[keyof typeof COLLECTION_FREQUENCY];
+
+export const COLLECTION_FREQUENCY_LABELS: Record<string, string> = {
+  WEEKLY: "Weekly",
+  MONTHLY: "Monthly",
+  QUARTERLY: "Quarterly",
+  SEMI_ANNUAL: "Semi-annual",
+  ANNUAL: "Annual",
+  EVENT_BASED: "Event-based",
+  ONE_TIME: "One-time",
+};
+
+/** CollectionDefinition amount type enum */
+export const AMOUNT_TYPE = {
+  FIXED: "FIXED",
+  VARIABLE: "VARIABLE",
+} as const;
+
+export type AmountType = (typeof AMOUNT_TYPE)[keyof typeof AMOUNT_TYPE];
+
+export const AMOUNT_TYPE_LABELS: Record<string, string> = {
+  FIXED: "Fixed amount",
+  VARIABLE: "Variable amount",
+};
+
+/** CollectionDefinition donor eligibility enum */
+export const DONOR_ELIGIBILITY = {
+  MEMBERS_ONLY: "MEMBERS_ONLY",
+  WALKIN_ONLY: "WALKIN_ONLY",
+  BOTH: "BOTH",
+} as const;
+
+export type DonorEligibility = (typeof DONOR_ELIGIBILITY)[keyof typeof DONOR_ELIGIBILITY];
+
+export const DONOR_ELIGIBILITY_LABELS: Record<string, string> = {
+  MEMBERS_ONLY: "Members only",
+  WALKIN_ONLY: "Walk-ins only",
+  BOTH: "Members & walk-ins",
+};
+
+/** CollectionDefinition member assignment enum */
+export const MEMBER_ASSIGNMENT = {
+  ALL_ELIGIBLE: "ALL_ELIGIBLE",
+  SELECTED: "SELECTED",
+} as const;
+
+export type MemberAssignment = (typeof MEMBER_ASSIGNMENT)[keyof typeof MEMBER_ASSIGNMENT];
+
+export const MEMBER_ASSIGNMENT_LABELS: Record<string, string> = {
+  ALL_ELIGIBLE: "All eligible members",
+  SELECTED: "Selected members only",
+};
+
+/** CollectionDefinition due generation enum */
+export const DUE_GENERATION = {
+  ADMIN: "ADMIN",
+  AUTOMATIC: "AUTOMATIC",
+} as const;
+
+export type DueGeneration = (typeof DUE_GENERATION)[keyof typeof DUE_GENERATION];
+
+export const DUE_GENERATION_LABELS: Record<string, string> = {
+  ADMIN: "Admin creates dues",
+  AUTOMATIC: "Auto-generate dues",
+};
+
+/** CollectionDefinition settlement policy enum */
+export const SETTLEMENT_POLICY = {
+  OLDEST_FIRST: "OLDEST_FIRST",
+  ANY_PENDING_PERIOD: "ANY_PENDING_PERIOD",
+} as const;
+
+export type SettlementPolicy = (typeof SETTLEMENT_POLICY)[keyof typeof SETTLEMENT_POLICY];
+
+export const SETTLEMENT_POLICY_LABELS: Record<string, string> = {
+  OLDEST_FIRST: "Oldest due first (FIFO)",
+  ANY_PENDING_PERIOD: "Any pending period",
+};
 
 export const DEFAULT_EXPENSE_CATEGORIES = [
   "Utilities",

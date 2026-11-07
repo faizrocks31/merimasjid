@@ -14,14 +14,14 @@ export default async function NewPlanPage({ searchParams }: { searchParams: Prom
   const { t } = await getDictionary();
   const params = await searchParams;
 
-  const [members, categories] = await Promise.all([
+  const [members, collectionDefinitions] = await Promise.all([
     prisma.member.findMany({
       where: { masjidId: user.masjidId!, status: "ACTIVE" },
       orderBy: { fullName: "asc" },
       select: { id: true, memberNo: true, fullName: true, phone: true },
       take: 2000,
     }),
-    prisma.contributionCategory.findMany({
+    prisma.collectionDefinition.findMany({
       where: { masjidId: user.masjidId!, active: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
@@ -34,10 +34,10 @@ export default async function NewPlanPage({ searchParams }: { searchParams: Prom
     searchMember: t("searchMember"),
     category: t("category"),
     frequency: t("frequency"),
-    monthly: t("monthly"),
-    semiAnnual: t("semiAnnual"),
-    annual: t("annual"),
-    oneTime: t("oneTime"),
+    monthly: t("monthlyFreq"),
+    semiAnnual: t("semiAnnualFreq"),
+    annual: t("annualFreq"),
+    oneTime: t("oneTimeFreq"),
     planAmount: t("planAmount"),
     startDate: t("startDate"),
     dueDate: t("dueDate"),
@@ -53,7 +53,7 @@ export default async function NewPlanPage({ searchParams }: { searchParams: Prom
     <>
       <PageHeader title={t("plans")} />
       <div className="max-w-3xl">
-        <PlanForm labels={labels} members={members} categories={categories} initialMemberId={params.memberId} />
+        <PlanForm labels={labels} members={members} categories={collectionDefinitions} initialMemberId={params.memberId} />
       </div>
     </>
   );

@@ -13,7 +13,7 @@ import { initNotifications } from "@/lib/notifications-init";
  * Backups are taken with `pg_dump` (see scripts/backup.mjs) — the database is
  * no longer a single file that can be copied while the server is running.
  */
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient; prismaUrl?: string };
 
 function connectionString(): string {
   const url = process.env.DATABASE_URL;
@@ -31,15 +31,25 @@ function connectionString(): string {
 }
 
 function createClient(): PrismaClient {
-  console.log('[DEBUG db.ts] Creating new PrismaClient, DATABASE_URL:', process.env.DATABASE_URL?.substring(0, 60));
-  const adapter = new PrismaPg({ connectionString: connectionString() });
+  const url = connectionString();
+  console.log('[DEBUG db.ts] Creating new PrismaClient, DATABASE_URL:', url.substring(0, 60));
+  const adapter = new PrismaPg({ connectionString: url });
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["warn", "error", "query"] : ["error"],
   });
 }
 
+// Re-create client if DATABASE_URL has changed (important for tests)
+const currentUrl = process.env.DATABASE_URL;
+if (globalForPrisma.prisma && globalForPrisma.prismaUrl !== currentUrl) {
+  console.log('[DEBUG db.ts] DATABASE_URL changed, recreating PrismaClient');
+  globalForPrisma.prisma = undefined;
+  globalForPrisma.prismaUrl = undefined;
+}
+
 export const prisma = globalForPrisma.prisma ?? createClient();
+globalForPrisma.prismaUrl = currentUrl;
 console.log('[DEBUG db.ts] Prisma client exported, isNew:', !globalForPrisma.prisma);
 
 // Initialize notifications on server startup

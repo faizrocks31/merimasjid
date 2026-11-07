@@ -17,7 +17,7 @@ export async function createPlanAction(_prev: PlanState, formData: FormData): Pr
 
   const parsed = planSchema.safeParse({
     memberId: String(formData.get("memberId") ?? ""),
-    categoryId: String(formData.get("categoryId") ?? ""),
+    collectionDefinitionId: String(formData.get("collectionDefinitionId") ?? ""),
     frequency: String(formData.get("frequency") ?? "MONTHLY"),
     amountPaise: Number(formData.get("amountPaise") ?? 0),
     startDate: String(formData.get("startDate") ?? ""),
@@ -37,10 +37,10 @@ export async function createPlanAction(_prev: PlanState, formData: FormData): Pr
   const member = await prisma.member.findFirst({ where: { id: input.memberId, masjidId: user.masjidId! } });
   if (!member) return { error: "Member not found in this Masjid." };
 
-  const category = await prisma.contributionCategory.findFirst({
-    where: { id: input.categoryId, masjidId: user.masjidId! },
+  const collectionDefinition = await prisma.collectionDefinition.findFirst({
+    where: { id: input.collectionDefinitionId, masjidId: user.masjidId! },
   });
-  if (!category) return { error: "Category not found in this Masjid." };
+  if (!collectionDefinition) return { error: "Collection definition not found in this Masjid." };
 
   try {
     const plan = await prisma.$transaction(async (tx) => {
@@ -53,12 +53,12 @@ export async function createPlanAction(_prev: PlanState, formData: FormData): Pr
         return { id: existing.id, duplicate: true };
       }
 
-      // Check for duplicate active plan for same member+category
+      // Check for duplicate active plan for same member+collectionDefinition
       const duplicateActive = await tx.contributionPlan.findFirst({
         where: {
           masjidId: user.masjidId!,
           memberId: member.id,
-          categoryId: category.id,
+          collectionDefinitionId: collectionDefinition.id,
           status: "ACTIVE",
         },
         select: { id: true },
@@ -71,7 +71,7 @@ export async function createPlanAction(_prev: PlanState, formData: FormData): Pr
         data: {
           masjidId: user.masjidId!,
           memberId: member.id,
-          categoryId: category.id,
+          collectionDefinitionId: collectionDefinition.id,
           frequency: input.frequency,
           amountPaise: input.amountPaise,
           startDate,
@@ -92,7 +92,7 @@ export async function createPlanAction(_prev: PlanState, formData: FormData): Pr
         action: "plan.create",
         entityType: "ContributionPlan",
         entityId: created.id,
-        after: { frequency: input.frequency, amountPaise: input.amountPaise },
+        after: { frequency: input.frequency, amountPaise: input.amountPaise, collectionDefinitionId: collectionDefinition.id },
       });
 
       return created;

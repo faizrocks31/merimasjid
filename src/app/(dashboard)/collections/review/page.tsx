@@ -12,17 +12,17 @@ export default async function ReviewPage() {
   if (!can(user.role, "payment:create")) redirect("/transactions");
   const { t } = await getDictionary();
 
-  const [members, categories, staffUpiData] = await Promise.all([
+  const [members, collectionDefinitions, staffUpiData] = await Promise.all([
     prisma.member.findMany({
       where: { masjidId: user.masjidId!, status: "ACTIVE" },
       orderBy: { fullName: "asc" },
       select: { id: true, memberNo: true, fullName: true, phone: true },
       take: 2000,
     }),
-    prisma.contributionCategory.findMany({
+    prisma.collectionDefinition.findMany({
       where: { masjidId: user.masjidId!, active: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, code: true, restrictedPurpose: true },
+      select: { id: true, name: true, purposeCode: true },
     }),
     prisma.masjidUser.findFirst({
       where: {
@@ -87,7 +87,7 @@ export default async function ReviewPage() {
     <PaymentReviewPage
       labels={labels}
       members={members}
-      categories={categories}
+      categories={collectionDefinitions}
       staffUpiId={staffUpiData?.user.upiId ?? null}
       staffName={staffUpiData?.user.name ?? ""}
     />

@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
+import "dotenv/config";
 
 export default defineConfig({
   test: {
@@ -9,6 +10,9 @@ export default defineConfig({
     // The DB tests share one isolated PostgreSQL test database; run them
     // serially so receipt numbering and period generation are not interleaved.
     fileParallelism: false,
+    env: {
+      DATABASE_URL: process.env.TEST_DATABASE_URL,
+    },
   },
   resolve: {
     alias: {

@@ -29,11 +29,11 @@ import { newIdempotencyKey } from "./collection-form-helpers";
 type Labels = Record<string, string>;
 
 type MemberOption = { id: string; memberNo: string; fullName: string; phone: string | null };
-type CategoryOption = { id: string; name: string; code: string; restrictedPurpose: boolean; defaultAmountPaise: number | null };
+type CategoryOption = { id: string; name: string; code?: string; restrictedPurpose?: boolean; defaultAmountPaise: number | null; purposeCode?: string | null };
 type PeriodOption = {
   id: string;
   memberId: string | null;
-  planId: string;
+  planId: string | null;
   categoryId: string;
   categoryName: string;
   periodStart: string;
@@ -258,7 +258,7 @@ export function CollectionForm({
   // Filter categories based on donor mode
   const availableCategories = useMemo(() => {
     if (donorMode === "walkin") {
-      return categories.filter((c) => WALKIN_ALLOWED_CODES.includes(c.code));
+      return categories.filter((c) => c.code && WALKIN_ALLOWED_CODES.includes(c.code));
     }
     return categories;
   }, [categories, donorMode]);
@@ -268,7 +268,7 @@ export function CollectionForm({
 
   // For walk-in Milad/Shab-e-Qadr, show available events
   const availableEventsForCategory = useMemo(() => {
-    if (!selectedCategoryId || !["MILAD", "SHAB_E_QADR"].includes(selectedCategory?.code || "")) {
+    if (!selectedCategoryId || !selectedCategory?.code || !["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code)) {
       return [];
     }
     return collectionEvents
@@ -278,7 +278,7 @@ export function CollectionForm({
 
   // Build FIFO preview for member payments in FIFO categories
   const fifoPreview = useMemo((): FIFOPreviewItem[] => {
-    if (!memberId || !selectedCategoryId || !selectedCategory || !FIFO_CATEGORIES.includes(selectedCategory.code)) {
+    if (!memberId || !selectedCategoryId || !selectedCategory || !selectedCategory.code || !FIFO_CATEGORIES.includes(selectedCategory.code)) {
       return [];
     }
 
@@ -378,7 +378,7 @@ export function CollectionForm({
     if (donorMode === "walkin" && !walkIn.trim()) return false;
     if (!selectedCategoryId) return false;
     // For walk-in Milad/Shab-e-Qadr, event must be selected
-    if (donorMode === "walkin" && selectedCategory && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && !selectedEventId) {
+    if (donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && !selectedEventId) {
       return false;
     }
     // Non-cash modes need reference
@@ -406,7 +406,7 @@ export function CollectionForm({
       setError(labels.chooseCategory);
       return;
     }
-    if (donorMode === "walkin" && selectedCategory && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && !selectedEventId) {
+    if (donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && !selectedEventId) {
       setError("Please select a collection event for this category.");
       return;
     }
@@ -421,7 +421,7 @@ export function CollectionForm({
       const formData = new FormData();
       formData.set("memberId", memberId);
       formData.set("walkInName", walkIn);
-      formData.set("categoryId", selectedCategoryId);
+      formData.set("collectionDefinitionId", selectedCategoryId);
       formData.set("paymentDate", paymentDate);
       formData.set("amountPaise", String(amountPaise));
       formData.set("mode", mode);
@@ -633,7 +633,7 @@ export function CollectionForm({
             </div>
 
             {/* EVENT SELECTOR (for walk-in Milad/Shab-e-Qadr) */}
-            {donorMode === "walkin" && selectedCategory && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && (
+            {donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && (
               <div>
                 <p className="mb-3 text-[12px] font-manrope font-extrabold uppercase tracking-[0.08em] text-[var(--ink-muted-new)]">
                   {labels.purpose} Event
@@ -668,7 +668,7 @@ export function CollectionForm({
             )}
 
             {/* FIFO ALLOCATION PREVIEW (for member payments in FIFO categories) */}
-            {memberId && selectedCategory && FIFO_CATEGORIES.includes(selectedCategory.code) && fifoPreview.length > 0 && (
+            {memberId && selectedCategory && selectedCategory.code && FIFO_CATEGORIES.includes(selectedCategory.code) && fifoPreview.length > 0 && (
               <div className="space-y-3">
                 <p className="text-[12px] font-manrope font-extrabold uppercase tracking-[0.08em] text-[var(--ink-muted-new)]">
                   {labels.purpose} - FIFO Allocation Preview (Informational)
@@ -938,7 +938,7 @@ export function CollectionForm({
           </div>
 
           {/* Event Selection (for walk-in Milad/Shab-e-Qadr) */}
-          {donorMode === "walkin" && selectedCategory && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && (
+          {donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && (
             <div>
               <h3 className="font-manrope font-semibold text-[var(--ink-primary)] mb-3">Collection Event</h3>
               <div className="flex flex-wrap gap-2">
@@ -974,7 +974,7 @@ export function CollectionForm({
           )}
 
           {/* FIFO Preview in Sheet */}
-          {memberId && selectedCategory && FIFO_CATEGORIES.includes(selectedCategory.code) && fifoPreview.length > 0 && (
+          {memberId && selectedCategory && selectedCategory.code && FIFO_CATEGORIES.includes(selectedCategory.code) && fifoPreview.length > 0 && (
             <div className="space-y-3">
               <h3 className="font-manrope font-semibold text-[var(--ink-primary)]">FIFO Allocation Preview</h3>
               <div className="rounded-lg border border-[var(--border-tile)] bg-[var(--surface-field)] p-3 text-sm">

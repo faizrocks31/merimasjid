@@ -1,0 +1,46 @@
+Global setup complete - auth state saved
+
+Running 1 test using 1 worker
+
+  x  1 [e2e] › e2e\generate-receipt.spec.ts:5:5 › Generate receipt via payment creation (16.9s)
+  x  2 [e2e] › e2e\generate-receipt.spec.ts:5:5 › Generate receipt via payment creation (retry #1) (17.6s)
+
+
+  1) [e2e] › e2e\generate-receipt.spec.ts:5:5 › Generate receipt via payment creation ──────────────
+
+    TimeoutError: page.fill: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('input[name="email"]')
+
+
+       9 |   // Login first
+      10 |   await page.goto(`${BASE_URL}/login`);
+    > 11 |   await page.fill('input[name="email"]', 'localadmin@gmail.com');
+         |              ^
+      12 |   await page.fill('input[name="password"]', 'admin123');
+      13 |   await page.click('button[type="submit"]');
+      14 |   await page.waitForURL('**/dashboard');
+        at C:\Users\hp\Documents\Claude Project\Masjid Collection\e2e\generate-receipt.spec.ts:11:14
+
+    Error Context: test-results\generate-receipt-Generate-receipt-via-payment-creation-e2e\error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    TimeoutError: page.fill: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('input[name="email"]')
+
+
+       9 |   // Login first
+      10 |   await page.goto(`${BASE_URL}/login`);
+    > 11 |   await page.fill('input[name="email"]', 'localadmin@gmail.com');
+         |              ^
+      12 |   await page.fill('input[name="password"]', 'admin123');
+      13 |   await page.click('button[type="submit"]');
+      14 |   await page.waitForURL('**/dashboard');
+        at C:\Users\hp\Documents\Claude Project\Masjid Collection\e2e\generate-receipt.spec.ts:11:14
+
+    Error Context: test-results\generate-receipt-Generate-receipt-via-payment-creation-e2e-retry1\error-context.md
+
+  1 failed
+    [e2e] › e2e\generate-receipt.spec.ts:5:5 › Generate receipt via payment creation ───────────────

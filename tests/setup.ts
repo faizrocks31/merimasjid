@@ -18,7 +18,8 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
-import { DEFAULT_CATEGORIES, DEFAULT_EXPENSE_CATEGORIES } from "../src/lib/constants";
+import { DEFAULT_EXPENSE_CATEGORIES } from "../src/lib/constants";
+import { createDefaultCollectionDefinitions } from "./helpers";
 
 /**
  * Refuses to touch a database that does not look like a test database.
@@ -94,23 +95,11 @@ async function seedTestFixture(): Promise<void> {
       })
     ).id;
 
-  for (const c of DEFAULT_CATEGORIES) {
-    const exists = await prisma.contributionCategory.findUnique({
-      where: { masjidId_code: { masjidId, code: c.code } },
-    });
-    if (!exists) {
-      await prisma.contributionCategory.create({
-        data: {
-          masjidId,
-          name: c.name,
-          code: c.code,
-          restrictedPurpose: c.restrictedPurpose,
-          reportingGroup: c.reportingGroup,
-          defaultGraceDays: 0,
-        },
-      });
-    }
-  }
+  // Create default collection definitions (Phase 2A taxonomy)
+  await createDefaultCollectionDefinitions(masjidId);
+
+  // Structural taxonomy (BaseCategory, Subcategory) is assumed to be
+  // handled by prisma migrate/db push since they are non-tenant tables.
 
   for (const name of DEFAULT_EXPENSE_CATEGORIES) {
     const exists = await prisma.expenseCategory.findUnique({
@@ -136,6 +125,10 @@ async function seedTestFixture(): Promise<void> {
 
 // Vitest loads this file once per test file, so guard the one-time setup.
 const globalForTests = globalThis as unknown as { __masjidTestDbReady?: Promise<void> };
+
+// Clear any cached Prisma client from the app's db.ts module so it picks up the test DATABASE_URL
+const globalForPrisma = globalThis as unknown as { prisma?: import("@prisma/client").PrismaClient };
+delete globalForPrisma.prisma;
 
 if (!globalForTests.__masjidTestDbReady) {
   globalForTests.__masjidTestDbReady = (async () => {

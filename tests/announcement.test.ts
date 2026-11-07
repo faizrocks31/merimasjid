@@ -81,7 +81,6 @@ type Fixture = {
   masjidA: string;
   masjidB: string;
   localAdminUserId: string;
-  categoryA: string;
   memberA1: string; // ACTIVE
   memberA2: string; // ACTIVE
   memberA3: string; // INACTIVE
@@ -133,12 +132,6 @@ beforeAll(async () => {
 
   const masjidA = await createMasjid("Announcement Masjid A", `ann-a-${suffix}`);
   const masjidB = await createMasjid("Announcement Masjid B", `ann-b-${suffix}`);
-
-  const categoryA = (
-    await prisma.contributionCategory.create({
-      data: { masjidId: masjidA, name: "General A", code: "GENA" },
-    })
-  ).id;
 
   const localAdminUserId = await createUser(`local-${suffix}@example.invalid`, "Local Admin");
   await prisma.masjidUser.create({
@@ -193,7 +186,6 @@ beforeAll(async () => {
     masjidA,
     masjidB,
     localAdminUserId,
-    categoryA,
     memberA1,
     memberA2,
     memberA3,
@@ -216,7 +208,7 @@ afterAll(async () => {
   await prisma.expense.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
   await prisma.expenseCategory.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
   await prisma.member.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
-  await prisma.contributionCategory.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
+  await prisma.collectionDefinition.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
   await prisma.masjidUser.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
   // Delete only fixture users; other test suites may share the isolated DB.
   await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });

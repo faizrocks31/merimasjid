@@ -119,7 +119,7 @@ export default async function ReportsPage({
             <SimpleTable
               headers={[t("category"), t("total")]}
               rows={categories.map((c) => [
-                <span key="n" className="flex items-center gap-2">{c.name}{c.restricted ? <span className="text-[10px] text-[var(--gold)]">restricted</span> : null}</span>,
+                <span key="n" className="flex items-center gap-2">{c.name}</span>,
                 <span key="v" className="num">{formatPaise(c.totalPaise)}</span>,
               ])}
             />
@@ -150,7 +150,7 @@ export default async function ReportsPage({
                           {e.startDate && e.endDate ? ` · ${formatDate(e.startDate)}–${formatDate(e.endDate)}` : ""}
                         </p>
                       </td>
-                      <td className="px-3 py-2">{e.categoryName}</td>
+                      <td className="px-3 py-2">{e.collectionDefinitionName}</td>
                       <td className="px-3 py-2">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
                           e.status === "COMPLETED" ? "bg-[var(--success-soft)] text-[var(--success)]" :

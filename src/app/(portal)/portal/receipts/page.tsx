@@ -35,7 +35,7 @@ export default async function PortalReceiptsPage() {
                   </div>
                   <p className="num text-[11px] text-[var(--ink-muted)]">
                     {formatDate(p.paymentDate)} · {PAYMENT_MODE_LABELS[p.mode] ?? p.mode}
-                    {p.allocations.length > 0 ? ` · ${p.allocations.map((a) => a.category.name).join(", ")}` : ""}
+                    {p.allocations.length > 0 ? ` · ${p.allocations.map((a) => a.collectionDefinition.name).join(", ")}` : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">

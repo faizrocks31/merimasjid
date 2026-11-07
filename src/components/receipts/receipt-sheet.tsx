@@ -2,7 +2,7 @@
 
 import type { ReceiptView } from "@/modules/receipts/view";
 
-/** The receipt sheet. Matches the new PDF design (A5 landscape, Mint Green). */
+/** The receipt sheet. A5 Portrait (148mm x 210mm), Mint Green design. */
 export function ReceiptSheet({ view, taxNote }: { view: ReceiptView; taxNote: string }) {
   const isCancelled = view.status === "REVERSED";
   const isDuplicate = view.isDuplicate;
@@ -29,14 +29,14 @@ export function ReceiptSheet({ view, taxNote }: { view: ReceiptView; taxNote: st
   const footerText = view.footer || taxNote;
 
   return (
-    <div className="relative w-full overflow-x-auto no-print" style={{ maxWidth: '100%' }}>
+    <div className="relative w-full no-print" style={{ maxWidth: '100%' }}>
       <article
-        className="print-sheet relative mx-auto rounded-[24px] border-2 border-[var(--brand-primary)] bg-[var(--receipt-cream)] p-[18mm_20mm] shadow-sm"
+        className="print-sheet relative mx-auto rounded-[24px] border-2 border-[var(--brand-primary)] bg-[var(--receipt-cream)] p-[15mm_12mm] shadow-sm"
         aria-label={`Receipt ${view.receiptNo}`}
         style={{
-          width: '210mm',
-          height: '148.5mm',
-          minWidth: '210mm',
+          width: '148mm',
+          height: '210mm',
+          minWidth: '148mm',
           boxSizing: 'border-box',
           flexShrink: 0,
         }}
@@ -70,11 +70,11 @@ export function ReceiptSheet({ view, taxNote }: { view: ReceiptView; taxNote: st
       <div className="double-border-inner absolute inset-[3px] border border-[var(--gold-accent)] rounded-[20px] pointer-events-none" />
 
       {/* Header band */}
-      <div className="header-band relative -mx-[20px] mb-6 px-[20px] py-[18px] rounded-t-[22px] bg-[var(--brand-hero)] border-b-2 border-[var(--brand-primary)]">
-        <div className="corner-icon absolute top-1/2 -translate-y-1/2 left-[20px] text-[var(--gold-accent)]">
+      <div className="header-band relative -mx-[12px] mb-5 px-[12px] py-[16px] rounded-t-[22px] bg-[var(--brand-hero)] border-b-2 border-[var(--brand-primary)]">
+        <div className="corner-icon absolute top-1/2 -translate-y-1/2 left-[12px] text-[var(--gold-accent)]">
           <svg viewBox="0 0 24 24" fill="currentColor" width="32" height="32"><path d="M12 2C6.48 2 2 6.48 2 12c0 3.74 2.17 6.95 5.2 8.6L12 22l4.8-1.4C19.83 18.95 22 15.74 22 12S17.52 2 12 2zm0 2c3.53 0 6.43 2.61 6.92 6H21.17C20.63 5.02 15.84 2 12 2zm7 13.78C17.2 15.3 14.26 16 12 16c-2.26 0-5.2-.7-7.17-2.22L12 4.4l7.17 11.38z"/></svg>
         </div>
-        <div className="corner-icon absolute top-1/2 -translate-y-1/2 right-[20px] text-[var(--gold-accent)]">
+        <div className="corner-icon absolute top-1/2 -translate-y-1/2 right-[12px] text-[var(--gold-accent)]">
           <svg viewBox="0 0 24 24" fill="currentColor" width="32" height="32"><path d="M12 2C6.48 2 2 6.48 2 12c0 3.74 2.17 6.95 5.2 8.6L12 22l4.8-1.4C19.83 18.95 22 15.74 22 12S17.52 2 12 2zm0 2c3.53 0 6.43 2.61 6.92 6H21.17C20.63 5.02 15.84 2 12 2zm7 13.78C17.2 15.3 14.26 16 12 16c-2.26 0-5.2-.7-7.17-2.22L12 4.4l7.17 11.38z"/></svg>
         </div>
         <h1 className="text-white font-poppins font-bold text-[38px] text-center leading-[1.2]">
@@ -85,6 +85,18 @@ export function ReceiptSheet({ view, taxNote }: { view: ReceiptView; taxNote: st
             {view.masjid.address}{view.masjid.address && view.masjid.phone ? "  |  " : ""}{view.masjid.phone}
           </div>
         )}
+
+        {/* Receipt No (Left) and Date (Right) under header */}
+        <div className="mt-4 flex justify-between items-center px-2">
+          <div className="text-left">
+            <label className="block font-poppins font-bold text-[13px] text-[var(--gold-accent)] uppercase tracking-[0.05em] mb-1">रसीद संख्या</label>
+            <div className="font-poppins font-medium text-[16px] text-white">{view.receiptNo}</div>
+          </div>
+          <div className="text-right">
+            <label className="block font-poppins font-bold text-[13px] text-[var(--gold-accent)] uppercase tracking-[0.05em] mb-1">दिनांक</label>
+            <div className="font-poppins font-medium text-[16px] text-white">{view.paymentDate}</div>
+          </div>
+        </div>
       </div>
 
       {/* Ribbon */}
@@ -94,32 +106,10 @@ export function ReceiptSheet({ view, taxNote }: { view: ReceiptView; taxNote: st
         </span>
       </div>
 
-      {/* Fields */}
+      {/* Fields - without numbered badges */}
       <div className="fields flex flex-col gap-4">
         <div className="field-row flex flex-col sm:flex-row gap-3">
           <div className="field flex flex-1 items-baseline gap-3">
-            <span className="field-badge w-[28px] h-[28px] flex-shrink-0 flex items-center justify-center rounded-full bg-[var(--brand-primary)] text-white font-poppins font-bold text-[11px]">1</span>
-            <div className="field-content flex-1">
-              <label className="field-label block font-poppins font-bold text-[15px] text-[var(--brand-primary)] mb-1">रसीद संख्या</label>
-              <div className="field-value-line border-b-2 border-dotted border-[var(--brand-primary)] min-h-[28px] flex items-end">
-                <span className="field-value font-poppins font-medium text-[14px] text-[var(--ink-primary)]">{view.receiptNo}</span>
-              </div>
-            </div>
-          </div>
-          <div className="field flex flex-1 items-baseline gap-3">
-            <span className="field-badge w-[28px] h-[28px] flex-shrink-0 flex items-center justify-center rounded-full bg-[var(--brand-primary)] text-white font-poppins font-bold text-[11px]">2</span>
-            <div className="field-content flex-1">
-              <label className="field-label block font-poppins font-bold text-[15px] text-[var(--brand-primary)] mb-1">दिनांक</label>
-              <div className="field-value-line border-b-2 border-dotted border-[var(--brand-primary)] min-h-[28px] flex items-end">
-                <span className="field-value font-poppins font-medium text-[14px] text-[var(--ink-primary)]">{view.paymentDate}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="field-row flex flex-col sm:flex-row gap-3">
-          <div className="field flex flex-1 items-baseline gap-3">
-            <span className="field-badge w-[28px] h-[28px] flex-shrink-0 flex items-center justify-center rounded-full bg-[var(--brand-primary)] text-white font-poppins font-bold text-[11px]">3</span>
             <div className="field-content flex-1">
               <label className="field-label block font-poppins font-bold text-[15px] text-[var(--brand-primary)] mb-1">मोहतरम जनाब</label>
               <div className="field-value-line border-b-2 border-dotted border-[var(--brand-primary)] min-h-[28px] flex items-end">
@@ -131,7 +121,6 @@ export function ReceiptSheet({ view, taxNote }: { view: ReceiptView; taxNote: st
 
         <div className="field-row flex flex-col sm:flex-row gap-3">
           <div className="field flex flex-1 items-baseline gap-3">
-            <span className="field-badge w-[28px] h-[28px] flex-shrink-0 flex items-center justify-center rounded-full bg-[var(--brand-primary)] text-white font-poppins font-bold text-[11px]">4</span>
             <div className="field-content flex-1">
               <label className="field-label block font-poppins font-bold text-[15px] text-[var(--brand-primary)] mb-1">रुपये शब्दों में</label>
               <div className="field-value-line border-b-2 border-dotted border-[var(--brand-primary)] min-h-[28px] flex items-end">
@@ -143,7 +132,6 @@ export function ReceiptSheet({ view, taxNote }: { view: ReceiptView; taxNote: st
 
         <div className="field-row flex flex-col sm:flex-row gap-3">
           <div className="field flex flex-1 items-baseline gap-3">
-            <span className="field-badge w-[28px] h-[28px] flex-shrink-0 flex items-center justify-center rounded-full bg-[var(--brand-primary)] text-white font-poppins font-bold text-[11px]">5</span>
             <div className="field-content flex-1">
               <label className="field-label block font-poppins font-bold text-[15px] text-[var(--brand-primary)] mb-1">आवंटन श्रेणी</label>
               <div className="field-value-line border-b-2 border-dotted border-[var(--brand-primary)] min-h-[28px] flex items-end">
@@ -152,7 +140,6 @@ export function ReceiptSheet({ view, taxNote }: { view: ReceiptView; taxNote: st
             </div>
           </div>
           <div className="field flex flex-1 items-baseline gap-3">
-            <span className="field-badge w-[28px] h-[28px] flex-shrink-0 flex items-center justify-center rounded-full bg-[var(--brand-primary)] text-white font-poppins font-bold text-[11px]">6</span>
             <div className="field-content flex-1">
               <label className="field-label block font-poppins font-bold text-[15px] text-[var(--brand-primary)] mb-1">भुगतान का तरीका</label>
               <div className="payment-modes flex flex-wrap gap-3 mt-1">
@@ -185,7 +172,7 @@ export function ReceiptSheet({ view, taxNote }: { view: ReceiptView; taxNote: st
       </div>
 
       {/* Footer band */}
-      <div className="footer-band mx-[-20px] mt-6 mb-[-20px] -ml-[20px] -mr-[20px] px-[20px] py-[16px] rounded-b-[22px] bg-[var(--brand-hero)] border-t-2 border-[var(--brand-primary)]">
+      <div className="footer-band mx-[-12px] mt-5 mb-[-12px] -ml-[12px] -mr-[12px] px-[12px] py-[14px] rounded-b-[22px] bg-[var(--brand-hero)] border-t-2 border-[var(--brand-primary)]">
         <p className="text-white text-center font-poppins text-[12.5px] leading-[1.6]">{footerText}</p>
       </div>
     </article>

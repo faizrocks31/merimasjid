@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { ROLES } from "@/lib/constants";
 import { createPaymentAction } from "@/modules/payments/actions";
+import { getCollectionDefinitionByPurposeCode, createDefaultCollectionDefinitions } from "./helpers";
 
 const COOKIE_NAME = "masjid_session";
 
@@ -57,12 +58,12 @@ async function signIn(caller: Caller): Promise<void> {
 
 let masjidId = "";
 let userId = "";
-let jummaCategoryId = "";
+let jummaCollectionDefinitionId = "";
 
 function buildFormData(data: {
   memberId?: string;
   walkInName?: string;
-  categoryId: string;
+  collectionDefinitionId: string;
   amountPaise: number;
   collectionEventId?: string;
   mode?: string;
@@ -74,7 +75,7 @@ function buildFormData(data: {
   const fd = new FormData();
   fd.set("memberId", data.memberId || "");
   fd.set("walkInName", data.walkInName || "");
-  fd.set("categoryId", data.categoryId);
+  fd.set("collectionDefinitionId", data.collectionDefinitionId);
   fd.set("paymentDate", data.paymentDate || "2094-01-15");
   fd.set("amountPaise", String(data.amountPaise));
   fd.set("mode", data.mode || "CASH");
@@ -92,23 +93,6 @@ function slugify(str: string) {
   return str.toLowerCase().replace(/[^a-z0-9]/g, "-");
 }
 
-async function createCategory(code: string, name: string, frequency?: string) {
-  return prisma.contributionCategory.create({
-    data: {
-      masjidId,
-      name,
-      code,
-      restrictedPurpose: false,
-      reportingGroup: "Test",
-      frequency: frequency || null,
-      defaultAmountPaise: 100000,
-      collectionMode: "HOUSEHOLD_WISE",
-      defaultDueDay: 10,
-      defaultGraceDays: 0,
-    },
-  });
-}
-
 beforeAll(async () => {
   const suffix = `debug-${Date.now().toString(36)}`;
   const masjid = await prisma.masjid.create({
@@ -122,8 +106,11 @@ beforeAll(async () => {
   });
   masjidId = masjid.id;
 
-  // Create JUMMA category
-  jummaCategoryId = (await createCategory("JUMMA", "Jumma Collection", "WEEKLY")).id;
+  // Create default collection definitions
+  await createDefaultCollectionDefinitions(masjidId);
+  const jummaCollectionDefinition = await getCollectionDefinitionByPurposeCode(masjidId, "JUMMA_COLLECTION");
+  if (!jummaCollectionDefinition) throw new Error("JUMMA_COLLECTION collection definition not created");
+  jummaCollectionDefinitionId = jummaCollectionDefinition.id;
 
   const user = await prisma.user.create({
     data: {
@@ -151,7 +138,7 @@ afterAll(async () => {
   await prisma.paymentAllocation.deleteMany({ where: { masjidId } });
   await prisma.payment.deleteMany({ where: { masjidId } });
   await prisma.collectionEvent.deleteMany({ where: { masjidId } });
-  await prisma.contributionCategory.deleteMany({ where: { masjidId } });
+  await prisma.collectionDefinition.deleteMany({ where: { masjidId } });
   await prisma.masjidUser.deleteMany({ where: { masjidId } });
   await prisma.auditLog.deleteMany({ where: { masjidId } });
   await prisma.user.delete({ where: { id: userId } });
@@ -170,7 +157,7 @@ describe("Debug Jumma Event Workflow", () => {
     const jummaEvent = await prisma.collectionEvent.create({
       data: {
         masjidId,
-        categoryId: jummaCategoryId,
+        collectionDefinitionId: jummaCollectionDefinitionId,
         name: "Jumma Collection 2094-01-12",
         startDate: new Date("2094-01-12T00:00:00+05:30"),
         dueDate: new Date("2094-01-12T13:00:00+05:30"),
@@ -184,7 +171,7 @@ describe("Debug Jumma Event Workflow", () => {
     // Walk-in payment to Jumma event (using collectionEventId)
     const form = new FormData();
     form.set("walkInName", "Jumma Donor");
-    form.set("categoryId", jummaCategoryId);
+    form.set("collectionDefinitionId", jummaCollectionDefinitionId);
     form.set("collectionEventId", jummaEvent.id);
     form.set("paymentDate", "2094-01-12");
     form.set("amountPaise", "5000");
@@ -194,7 +181,7 @@ describe("Debug Jumma Event Workflow", () => {
 
     console.log("Submitting payment with:", {
       walkInName: form.get("walkInName"),
-      categoryId: form.get("categoryId"),
+      collectionDefinitionId: form.get("collectionDefinitionId"),
       collectionEventId: form.get("collectionEventId"),
       amountPaise: form.get("amountPaise"),
     });

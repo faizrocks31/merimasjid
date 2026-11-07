@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 const SETTINGS_TAB_KEYS = [
   "masjid",
+  "collectionDefinitions",
   "contributionCategories",
   "expenseCategories",
   "notifications",
@@ -33,7 +34,7 @@ export default async function SettingsPage({
     ? (tab as (typeof SETTINGS_TAB_KEYS)[number])
     : "masjid";
 
-  const [masjid, categories, expenseCategories, memberships, notificationSettings, collectionEvents, members, assignments] = await Promise.all([
+  const [masjid, expenseCategories, memberships, notificationSettings, collectionEvents, members, assignments, collectionDefinitions, baseCategories, subcategories] = await Promise.all([
     prisma.masjid.findUnique({
       where: { id: masjidId },
       select: {
@@ -55,7 +56,6 @@ export default async function SettingsPage({
         prayerTimesUpdatedAt: true,
       }
     }),
-    prisma.contributionCategory.findMany({ where: { masjidId }, orderBy: { name: "asc" } }),
     prisma.expenseCategory.findMany({ where: { masjidId }, orderBy: { name: "asc" } }),
     prisma.masjidUser.findMany({
       where: { masjidId },
@@ -65,7 +65,7 @@ export default async function SettingsPage({
     prisma.masjidNotificationSettings.findUnique({ where: { masjidId } }),
     prisma.collectionEvent.findMany({
       where: { masjidId },
-      include: { category: true },
+      include: { collectionDefinition: true },
       orderBy: { dueDate: "desc" },
     }),
     prisma.member.findMany({
@@ -78,6 +78,13 @@ export default async function SettingsPage({
       include: { member: { select: { id: true, memberNo: true, fullName: true } }, event: { select: { id: true } } },
       orderBy: { createdAt: "asc" },
     }),
+    prisma.collectionDefinition.findMany({
+      where: { masjidId },
+      include: { baseCategory: true, subcategory: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.baseCategory.findMany({ orderBy: { name: "asc" } }),
+    prisma.subcategory.findMany({ orderBy: { name: "asc" } }),
   ]);
   if (!masjid) redirect("/dashboard");
 
@@ -186,9 +193,9 @@ export default async function SettingsPage({
     defaultGraceDays: t("defaultGraceDays"),
     frequency: t("frequency"),
     weekly: t("weekly"),
-    monthly: t("monthly"),
-    semiAnnual: t("semiAnnual"),
-    annual: t("annual"),
+    monthly: t("monthlyFreq"),
+    semiAnnual: t("semiAnnualFreq"),
+    annual: t("annualFreq"),
     yearly: t("yearly"),
     eventBased: t("eventBased"),
     occasional: t("occasional"),
@@ -235,23 +242,93 @@ export default async function SettingsPage({
     assignmentExpected: t("assignmentExpected"),
     assignmentReceived: t("assignmentReceived"),
     assignmentOutstanding: t("assignmentOutstanding"),
+    // Collection Definitions (Phase 2A)
+    collectionDefinitions: t("collectionDefinitions"),
+    addCollectionDefinition: t("addCollectionDefinition"),
+    baseCategory: t("baseCategory"),
+    subcategory: t("subcategory"),
+    amountType: t("amountType"),
+    fixedAmount: t("fixedAmount"),
+    variableAmount: t("variableAmount"),
+    donorEligibility: t("donorEligibility"),
+    membersOnly: t("membersOnly"),
+    walkinOnly: t("walkinOnly"),
+    both: t("both"),
+    memberAssignment: t("memberAssignment"),
+    allEligible: t("allEligible"),
+    selectedMembers: t("selectedMembers"),
+    dueGeneration: t("dueGeneration"),
+    adminGenerated: t("adminGenerated"),
+    automaticGenerated: t("automaticGenerated"),
+    settlementPolicy: t("settlementPolicy"),
+    oldestFirst: t("oldestFirst"),
+    anyPendingPeriod: t("anyPendingPeriod"),
+    showInPaymentReceived: t("showInPaymentReceived"),
+    hiddenInPaymentReceived: t("hiddenInPaymentReceived"),
+    // Base Category labels
+    zakat: t("zakat"),
+    sadaqah: t("sadaqah"),
+    infaq: t("infaq"),
+    chanda: t("chanda"),
+    fundraising: t("fundraising"),
+    communityEvent: t("communityEvent"),
+    generalDonation: t("generalDonation"),
+    // Subcategory labels
+    zakatFitr: t("zakatFitr"),
+    zakatMaal: t("zakatMaal"),
+    general: t("general"),
+    fidyah: t("fidyah"),
+    kaffarah: t("kaffarah"),
+    construction: t("construction"),
+    maintenance: t("maintenance"),
+    operations: t("operations"),
+    monthlySub: t("monthlySub"),
+    annualSub: t("annualSub"),
+    campaign: t("campaign"),
+    project: t("project"),
+    emergency: t("emergency"),
+    eid: t("eid"),
+    milad: t("milad"),
+    israMiraj: t("israMiraj"),
+    shabEQadr: t("shabEQadr"),
+    ramadan: t("ramadan"),
+    jumma: t("jumma"),
+    unrestricted: t("unrestricted"),
+    quarterlySub: t("quarterlySub"),
+    semiAnnualSub: t("semiAnnualSub"),
+    eventBasedSub: t("eventBasedSub"),
+    oneTimeSub: t("oneTimeSub"),
   };
 
-  const contributionCategoryItems = categories.map((c) => ({
+  const collectionDefinitionItems = collectionDefinitions.map((c) => ({
     id: c.id,
     name: c.name,
-    code: c.code,
-    restrictedPurpose: c.restrictedPurpose,
-    reportingGroup: c.reportingGroup,
+    code: c.purposeCode ?? undefined,
     description: c.description,
-    defaultAmountPaise: c.defaultAmountPaise,
-    frequency: c.frequency,
-    collectionMode: c.collectionMode,
-    defaultDueDay: c.defaultDueDay,
-    defaultGraceDays: c.defaultGraceDays,
-    meta: [c.code, c.reportingGroup].filter(Boolean).join(" · "),
-    restricted: c.restrictedPurpose,
     active: c.active,
+    showInPaymentReceived: c.showInPaymentReceived,
+    frequency: c.frequency,
+    amountType: c.amountType,
+    defaultAmountPaise: c.defaultAmountPaise,
+    donorEligibility: c.donorEligibility,
+    memberAssignment: c.memberAssignment,
+    dueGeneration: c.dueGeneration,
+    settlementPolicy: c.settlementPolicy,
+    baseCategoryName: c.baseCategory?.name ?? "",
+    subcategoryName: c.subcategory?.name ?? "",
+    meta: [c.baseCategory?.code, c.subcategory?.code].filter(Boolean).join(" · "),
+  }));
+
+  const baseCategoryItems = baseCategories.map((bc) => ({
+    id: bc.id,
+    name: bc.name,
+    code: bc.code,
+  }));
+
+  const subcategoryItems = subcategories.map((sc) => ({
+    id: sc.id,
+    name: sc.name,
+    code: sc.code,
   }));
 
   const expenseCategoryItems = expenseCategories.map((c) => ({
@@ -262,8 +339,8 @@ export default async function SettingsPage({
 
   const collectionEventItems = collectionEvents.map((e) => ({
     id: e.id,
-    categoryId: e.categoryId,
-    categoryName: e.category.name,
+    categoryId: e.collectionDefinitionId,
+    categoryName: e.collectionDefinition.name,
     name: e.name,
     startDate: e.startDate.toISOString(),
     endDate: e.endDate?.toISOString() ?? null,
@@ -351,11 +428,13 @@ export default async function SettingsPage({
       labels={labels}
       initialTab={initialTab}
       masjid={masjid}
-      contributionCategoryItems={contributionCategoryItems}
       collectionEventItems={collectionEventItems}
       memberOptions={memberOptions}
       assignmentItems={assignmentItems}
       expenseCategoryItems={expenseCategoryItems}
+      collectionDefinitionItems={collectionDefinitionItems}
+      baseCategories={baseCategoryItems}
+      subcategories={subcategoryItems}
       staffMembers={staffMembers}
       staffLabels={staffLabels}
       roleLabels={roleLabels}

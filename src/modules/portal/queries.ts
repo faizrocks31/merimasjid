@@ -42,7 +42,7 @@ export async function portalSummary(memberId: string, masjidId: string) {
     prisma.duesPeriod.findMany({
       where: { memberId, masjidId },
       include: {
-        plan: { include: { category: { select: { name: true } } } },
+        plan: { include: { collectionDefinition: { select: { name: true } } } },
         allocations: { where: { payment: { status: "SUCCESS" } }, select: { allocatedAmountPaise: true } },
       },
       orderBy: { dueDate: "asc" },
@@ -51,7 +51,7 @@ export async function portalSummary(memberId: string, masjidId: string) {
       where: { donorMemberId: memberId, masjidId },
       orderBy: { paymentDate: "desc" },
       take: 100,
-      include: { allocations: { include: { category: { select: { name: true } } } } },
+      include: { allocations: { include: { collectionDefinition: { select: { name: true } } } } },
     }),
   ]);
 

@@ -42,7 +42,7 @@ export default async function PortalDuesPage() {
                   return (
                     <tr key={p.id} className="border-b border-[var(--border-subtle)] last:border-0">
                       <td className="px-4 py-2">
-                        <p className="text-sm">{p.plan.category.name}</p>
+                        <p className="text-sm">{p.plan?.collectionDefinition?.name ?? "—"}</p>
                         <p className="num text-[11px] text-[var(--ink-muted)]">{formatDate(p.periodStart)} – {formatDate(p.periodEnd)}</p>
                       </td>
                       <td className="num px-3 py-2 text-[var(--ink-muted)]">{formatDate(p.dueDate)}</td>

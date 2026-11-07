@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
+import { getFirstCollectionDefinition } from "./helpers";
 
 let masjidId = "";
 let memberId = "";
-let categoryId = "";
+let collectionDefinitionId = "";
 let userId = "";
 let planId = "";
 
@@ -21,6 +22,7 @@ async function makePeriod(expected: number, dayOffset = 0) {
   return prisma.duesPeriod.create({
     data: {
       masjidId,
+      collectionDefinitionId,
       planId,
       memberId,
       periodStart,
@@ -57,28 +59,17 @@ beforeAll(async () => {
   userId = user.id;
   const member = await prisma.member.create({ data: { masjidId, memberNo: `M-${Date.now()}`, fullName: "Test Member" } });
   memberId = member.id;
-  let category = await prisma.contributionCategory.findFirst({ where: { masjidId } });
-  if (!category) {
-    // Fallback: create a minimal default category for this masjid
-    category = await prisma.contributionCategory.create({
-      data: {
-        masjid: { connect: { id: masjidId } },
-        name: "Default",
-        code: "DEF",
-        restrictedPurpose: false,
-        reportingGroup: null,
-        defaultGraceDays: 0,
-      },
-    });
-  }
-  categoryId = category.id;
+
+  const collectionDefinition = await getFirstCollectionDefinition(masjidId);
+  if (!collectionDefinition) throw new Error("Collection definitions not seeded");
+  collectionDefinitionId = collectionDefinition.id;
 
   // Create a contribution plan for the member
   const plan = await prisma.contributionPlan.create({
     data: {
       masjidId,
       memberId,
-      categoryId,
+      collectionDefinitionId,
       frequency: "MONTHLY",
       amountPaise: 100000,
       startDate: new Date("2094-01-01T00:00:00+05:30"),
@@ -159,7 +150,7 @@ describe("Payment Allocation Concurrency (Direct DB Simulation)", () => {
             masjidId,
             paymentId: payment.id,
             duesPeriodId: period.id,
-            categoryId,
+            collectionDefinitionId,
             allocatedAmountPaise: allocationAmount,
           },
         });
@@ -243,7 +234,7 @@ describe("Payment Allocation Concurrency (Direct DB Simulation)", () => {
             masjidId,
             paymentId: payment.id,
             duesPeriodId: periodId,
-            categoryId,
+            collectionDefinitionId,
             allocatedAmountPaise: allocationAmount,
           },
         });
@@ -285,7 +276,7 @@ describe("Payment Allocation Concurrency (Direct DB Simulation)", () => {
     const event = await prisma.collectionEvent.create({
       data: {
         masjidId,
-        categoryId,
+        collectionDefinitionId,
         name: "Test Event",
         startDate: new Date("2094-01-01T00:00:00+05:30"),
         dueDate: new Date("2094-02-10T00:00:00+05:30"),
@@ -363,7 +354,7 @@ describe("Payment Allocation Concurrency (Direct DB Simulation)", () => {
             masjidId,
             paymentId: payment.id,
             collectionEventId: event.id,
-            categoryId,
+            collectionDefinitionId,
             allocatedAmountPaise: allocationAmount,
           },
         });
@@ -403,7 +394,7 @@ describe("Payment Allocation Concurrency (Direct DB Simulation)", () => {
     const event = await prisma.collectionEvent.create({
       data: {
         masjidId,
-        categoryId,
+        collectionDefinitionId,
         name: "Walk-in Event",
         startDate: new Date("2094-01-01T00:00:00+05:30"),
         dueDate: new Date("2094-02-10T00:00:00+05:30"),
@@ -462,7 +453,7 @@ describe("Payment Allocation Concurrency (Direct DB Simulation)", () => {
             masjidId,
             paymentId: payment.id,
             collectionEventId: event.id,
-            categoryId,
+            collectionDefinitionId,
             allocatedAmountPaise: allocationAmount,
           },
         });

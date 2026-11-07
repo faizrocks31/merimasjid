@@ -7,8 +7,17 @@ import { assertCan } from "@/lib/permissions";
 import { collectionEventSchema, collectionEventAssignmentSchema } from "@/lib/validation";
 import { writeAudit } from "@/modules/audit/write";
 import { recomputeEventStatus } from "@/lib/dues";
+import { generateDuesForCategory, generateAllAutomaticDues, assignMembersToCategory, previewDuesGeneration } from "@/lib/dues-generation";
 
-export type CollectionState = { error?: string; ok?: boolean; fieldErrors?: Record<string, string> } | undefined;
+export type CollectionState = {
+  error?: string;
+  ok?: boolean;
+  fieldErrors?: Record<string, string>;
+  message?: string;
+  created?: number;
+  skipped?: number;
+  errors?: string[];
+} | undefined;
 
 export async function createCollectionEventAction(
   _prev: CollectionState,
@@ -18,7 +27,7 @@ export async function createCollectionEventAction(
   assertCan(user.role, "settings:write");
 
   const parsed = collectionEventSchema.safeParse({
-    categoryId: String(formData.get("categoryId") ?? ""),
+    collectionDefinitionId: String(formData.get("collectionDefinitionId") ?? ""),
     name: String(formData.get("name") ?? ""),
     startDate: String(formData.get("startDate") ?? ""),
     endDate: String(formData.get("endDate") ?? "") || undefined,
@@ -35,17 +44,17 @@ export async function createCollectionEventAction(
   const input = parsed.data;
 
   try {
-    // Verify category belongs to this masjid
-    const category = await prisma.contributionCategory.findFirst({
-      where: { id: input.categoryId, masjidId: user.masjidId! },
+    // Verify collection definition belongs to this masjid
+    const definition = await prisma.collectionDefinition.findFirst({
+      where: { id: input.collectionDefinitionId, masjidId: user.masjidId! },
     });
-    if (!category) return { error: "Category not found." };
+    if (!definition) return { error: "Collection definition not found." };
 
     await prisma.$transaction(async (tx) => {
       const created = await tx.collectionEvent.create({
         data: {
           masjidId: user.masjidId!,
-          categoryId: input.categoryId,
+          collectionDefinitionId: input.collectionDefinitionId,
           name: input.name,
           startDate: new Date(input.startDate),
           endDate: input.endDate ? new Date(input.endDate) : null,
@@ -65,7 +74,7 @@ export async function createCollectionEventAction(
         action: "collectionEvent.create",
         entityType: "CollectionEvent",
         entityId: created.id,
-        after: { name: input.name, categoryId: input.categoryId, dueDate: input.dueDate },
+        after: { name: input.name, collectionDefinitionId: input.collectionDefinitionId, dueDate: input.dueDate },
       });
     });
 
@@ -88,7 +97,7 @@ export async function updateCollectionEventAction(
   if (!eventId) return { error: "Event ID is required." };
 
   const parsed = collectionEventSchema.safeParse({
-    categoryId: String(formData.get("categoryId") ?? ""),
+    collectionDefinitionId: String(formData.get("collectionDefinitionId") ?? ""),
     name: String(formData.get("name") ?? ""),
     startDate: String(formData.get("startDate") ?? ""),
     endDate: String(formData.get("endDate") ?? "") || undefined,
@@ -108,23 +117,23 @@ export async function updateCollectionEventAction(
     // Check if event exists and belongs to this masjid
     const existing = await prisma.collectionEvent.findFirst({
       where: { id: eventId, masjidId: user.masjidId! },
-      include: { category: true },
+      include: { collectionDefinition: true },
     });
     if (!existing) return { error: "Collection event not found." };
 
-    // Verify category belongs to this masjid
-    if (input.categoryId !== existing.categoryId) {
-      const category = await prisma.contributionCategory.findFirst({
-        where: { id: input.categoryId, masjidId: user.masjidId! },
+    // Verify collection definition belongs to this masjid
+    if (input.collectionDefinitionId !== existing.collectionDefinitionId) {
+      const definition = await prisma.collectionDefinition.findFirst({
+        where: { id: input.collectionDefinitionId, masjidId: user.masjidId! },
       });
-      if (!category) return { error: "Category not found." };
+      if (!definition) return { error: "Collection definition not found." };
     }
 
     await prisma.$transaction(async (tx) => {
       const updated = await tx.collectionEvent.update({
         where: { id: eventId },
         data: {
-          categoryId: input.categoryId,
+          collectionDefinitionId: input.collectionDefinitionId,
           name: input.name,
           startDate: new Date(input.startDate),
           endDate: input.endDate ? new Date(input.endDate) : null,
@@ -145,7 +154,7 @@ export async function updateCollectionEventAction(
         entityId: eventId,
         before: {
           name: existing.name,
-          categoryId: existing.categoryId,
+          collectionDefinitionId: existing.collectionDefinitionId,
           startDate: existing.startDate.toISOString(),
           endDate: existing.endDate?.toISOString() ?? null,
           dueDate: existing.dueDate.toISOString(),
@@ -153,7 +162,7 @@ export async function updateCollectionEventAction(
         },
         after: {
           name: updated.name,
-          categoryId: updated.categoryId,
+          collectionDefinitionId: updated.collectionDefinitionId,
           startDate: updated.startDate.toISOString(),
           endDate: updated.endDate?.toISOString() ?? null,
           dueDate: updated.dueDate.toISOString(),
@@ -211,7 +220,7 @@ export async function deleteCollectionEventAction(
         action: "collectionEvent.delete",
         entityType: "CollectionEvent",
         entityId: eventId,
-        before: { name: existing.name, categoryId: existing.categoryId },
+        before: { name: existing.name, collectionDefinitionId: existing.collectionDefinitionId },
       });
     });
 
@@ -298,32 +307,32 @@ export async function generateEventsFromCategoryAction(
   const user = await requireStaff();
   assertCan(user.role, "settings:write");
 
-  const categoryId = String(formData.get("categoryId") ?? "");
+  const collectionDefinitionId = String(formData.get("collectionDefinitionId") ?? "");
   const startDate = String(formData.get("startDate") ?? "");
   const endDate = String(formData.get("endDate") ?? "");
 
-  if (!categoryId) return { error: "Category ID is required." };
+  if (!collectionDefinitionId) return { error: "Collection Definition ID is required." };
   if (!startDate || !endDate) return { error: "Start and end dates are required." };
 
   try {
-    const category = await prisma.contributionCategory.findFirst({
-      where: { id: categoryId, masjidId: user.masjidId! },
+    const definition = await prisma.collectionDefinition.findFirst({
+      where: { id: collectionDefinitionId, masjidId: user.masjidId! },
     });
-    if (!category) return { error: "Category not found." };
+    if (!definition) return { error: "Collection definition not found." };
 
-    if (!category.frequency || !category.defaultAmountPaise) {
-      return { error: "Category must have frequency and default amount configured." };
+    if (!definition.frequency || !definition.defaultAmountPaise) {
+      return { error: "Collection definition must have frequency and default amount configured." };
     }
 
-    const frequency = category.frequency;
-    const defaultAmount = category.defaultAmountPaise;
-    const defaultDueDay = category.defaultDueDay ?? 10;
-    const defaultGraceDays = category.defaultGraceDays ?? 0;
+    const frequency = definition.frequency;
+    const defaultAmount = definition.defaultAmountPaise;
+    const defaultDueDay = 10; // TODO: get from definition or use a sensible default
+    const defaultGraceDays = 0;
     const start = new Date(startDate);
     const end = new Date(endDate);
 
     const eventsToCreate: Array<{
-      categoryId: string;
+      collectionDefinitionId: string;
       name: string;
       startDate: Date;
       endDate: Date | null;
@@ -357,7 +366,7 @@ export async function generateEventsFromCategoryAction(
           periodEnd.setDate(periodEnd.getDate() + 6); // End of week
           dueDate = new Date(current);
           dueDate.setDate(dueDate.getDate() + defaultDueDay);
-          name = `${category.name} - Week ${eventNumber}`;
+          name = `${definition.name} - Week ${eventNumber}`;
           applicableMonth = current.getMonth() + 1;
           applicableYear = current.getFullYear();
           current.setDate(current.getDate() + 7);
@@ -367,7 +376,7 @@ export async function generateEventsFromCategoryAction(
           periodStart = new Date(current.getFullYear(), current.getMonth(), 1);
           periodEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
           dueDate = new Date(current.getFullYear(), current.getMonth(), defaultDueDay);
-          name = `${category.name} - ${periodStart.toLocaleString("default", { month: "long", year: "numeric" })}`;
+          name = `${definition.name} - ${periodStart.toLocaleString("default", { month: "long", year: "numeric" })}`;
           applicableMonth = current.getMonth() + 1;
           applicableYear = current.getFullYear();
           current.setMonth(current.getMonth() + 1);
@@ -377,32 +386,31 @@ export async function generateEventsFromCategoryAction(
           periodStart = new Date(current.getFullYear(), current.getMonth(), 1);
           periodEnd = new Date(current.getFullYear(), current.getMonth() + 5, 0);
           dueDate = new Date(current.getFullYear(), current.getMonth(), defaultDueDay);
-          name = `${category.name} - H${Math.floor(current.getMonth() / 6) + 1} ${current.getFullYear()}`;
+          name = `${definition.name} - H${Math.floor(current.getMonth() / 6) + 1} ${current.getFullYear()}`;
           applicableMonth = current.getMonth() + 1;
           applicableYear = current.getFullYear();
           current.setMonth(current.getMonth() + 6);
           break;
         }
-        case "ANNUAL":
-        case "YEARLY": {
+        case "ANNUAL": {
           periodStart = new Date(current.getFullYear(), 0, 1);
           periodEnd = new Date(current.getFullYear(), 11, 31);
           dueDate = new Date(current.getFullYear(), 3, defaultDueDay); // Default April 10
-          name = `${category.name} - ${current.getFullYear()}`;
+          name = `${definition.name} - ${current.getFullYear()}`;
           applicableMonth = 1;
           applicableYear = current.getFullYear();
           current.setFullYear(current.getFullYear() + 1);
           break;
         }
         default:
-          // EVENT_BASED and OCCASIONAL don't auto-generate
+          // EVENT_BASED and ONE_TIME don't auto-generate
           return { error: `Frequency "${frequency}" does not support auto-generation.` };
       }
 
       if (periodStart > end) break;
 
       eventsToCreate.push({
-        categoryId,
+        collectionDefinitionId,
         name,
         startDate: periodStart,
         endDate: periodEnd,
@@ -411,7 +419,7 @@ export async function generateEventsFromCategoryAction(
         status: "SCHEDULED",
         applicableMonth,
         applicableYear,
-        notes: `Auto-generated from category ${category.name}`,
+        notes: `Auto-generated from collection definition ${definition.name}`,
         createdBy: user.id,
       });
 
@@ -426,7 +434,7 @@ export async function generateEventsFromCategoryAction(
       // Check for existing events in the same range to avoid duplicates
       const existingEvents = await tx.collectionEvent.findMany({
         where: {
-          categoryId,
+          collectionDefinitionId,
           startDate: { gte: start },
           endDate: { lte: end },
         },
@@ -459,8 +467,8 @@ export async function generateEventsFromCategoryAction(
         actorUserId: user.id,
         action: "collectionEvent.generate",
         entityType: "CollectionEvent",
-        entityId: categoryId,
-        after: { categoryId, generatedCount: toCreate.length, dateRange: { start, end } },
+        entityId: collectionDefinitionId,
+        after: { collectionDefinitionId, generatedCount: toCreate.length, dateRange: { start, end } },
       });
     });
 
@@ -513,5 +521,160 @@ export async function removeHouseholdAssignmentAction(
   } catch (err) {
     console.error("removeHouseholdAssignmentAction failed", err);
     return { error: "Could not remove assignment." };
+  }
+}
+
+/**
+ * Generates dues periods for a specific collection definition.
+ */
+export async function generateDuesForCategoryAction(
+  _prev: CollectionState,
+  formData: FormData
+): Promise<CollectionState> {
+  const user = await requireStaff();
+  assertCan(user.role, "settings:write");
+
+  const categoryId = String(formData.get("categoryId") ?? "");
+  const startDate = String(formData.get("startDate") ?? "");
+  const endDate = String(formData.get("endDate") ?? "");
+  const memberIdsRaw = String(formData.get("memberIds") ?? "[]");
+  const forceRegenerate = String(formData.get("forceRegenerate") ?? "false") === "true";
+
+  if (!categoryId) return { error: "Category ID is required." };
+  if (!startDate || !endDate) return { error: "Start and end dates are required." };
+
+  let memberIds: string[] = [];
+  try {
+    memberIds = JSON.parse(memberIdsRaw);
+  } catch {
+    memberIds = [];
+  }
+
+  try {
+    const result = await generateDuesForCategory(user.masjidId!, categoryId, {
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      memberIds: memberIds.length > 0 ? memberIds : undefined,
+      forceRegenerate,
+    });
+
+    revalidatePath("/settings");
+    revalidatePath("/collections");
+
+    if (result.errors.length > 0) {
+      return { error: result.errors.join("; "), ok: result.created > 0 };
+    }
+    return { ok: true, message: `Created ${result.created} dues periods, skipped ${result.skipped} existing.` };
+  } catch (err) {
+    console.error("generateDuesForCategoryAction failed", err);
+    return { error: "Could not generate dues periods." };
+  }
+}
+
+/**
+ * Generates dues for all categories with AUTOMATIC dueGeneration mode.
+ * Called by cron job.
+ */
+export async function generateAllDuesAction(
+  _prev: CollectionState,
+  formData: FormData
+): Promise<CollectionState> {
+  const user = await requireStaff();
+  assertCan(user.role, "settings:write");
+
+  try {
+    const result = await generateAllAutomaticDues(user.masjidId!);
+
+    revalidatePath("/settings");
+    revalidatePath("/collections");
+    revalidatePath("/dashboard");
+
+    if (result.totalErrors > 0) {
+      return { error: `Errors encountered: ${result.totalErrors}`, ok: result.totalCreated > 0 };
+    }
+    return { ok: true, message: `Created ${result.totalCreated} dues periods, skipped ${result.totalSkipped} existing.` };
+  } catch (err) {
+    console.error("generateAllDuesAction failed", err);
+    return { error: "Could not generate dues periods." };
+  }
+}
+
+/**
+ * Preview dues generation for a category.
+ */
+export async function previewDuesGenerationAction(
+  categoryId: string,
+  startDate: string,
+  endDate: string,
+  memberIds?: string[]
+): Promise<{ error?: string; totalPeriods?: number; totalMembers?: number; preview?: any }> {
+  const user = await requireStaff();
+  assertCan(user.role, "settings:write");
+
+  if (!categoryId || !startDate || !endDate) {
+    return { error: "Missing required parameters." };
+  }
+
+  try {
+    const preview = await previewDuesGeneration(
+      user.masjidId!,
+      categoryId,
+      new Date(startDate),
+      new Date(endDate),
+      memberIds
+    );
+    return {
+      totalPeriods: preview.totalPeriods,
+      totalMembers: preview.totalMembers,
+      preview: {
+        periodsCount: preview.periods.length,
+        membersCount: preview.members.length,
+        samplePeriods: preview.periods.slice(0, 3).map(p => ({
+          start: p.periodStart.toISOString().split("T")[0],
+          end: p.periodEnd.toISOString().split("T")[0],
+          due: p.dueDate.toISOString().split("T")[0],
+          amount: p.expectedAmountPaise,
+        })),
+      },
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to preview dues generation" };
+  }
+}
+
+/**
+ * Assigns members to a collection definition (for SELECTED memberAssignment mode).
+ */
+export async function assignMembersToCategoryAction(
+  _prev: CollectionState,
+  formData: FormData
+): Promise<CollectionState> {
+  const user = await requireStaff();
+  assertCan(user.role, "settings:write");
+
+  const categoryId = String(formData.get("categoryId") ?? "");
+  const memberIdsRaw = String(formData.get("memberIds") ?? "[]");
+  const expectedAmountPaise = Number(formData.get("expectedAmountPaise") ?? 0);
+
+  if (!categoryId) return { error: "Category ID is required." };
+  if (expectedAmountPaise < 1) return { error: "Expected amount must be positive." };
+
+  let memberIds: string[] = [];
+  try {
+    memberIds = JSON.parse(memberIdsRaw);
+  } catch {
+    return { error: "Invalid member IDs format." };
+  }
+
+  if (!memberIds.length) return { error: "At least one member is required." };
+
+  try {
+    const count = await assignMembersToCategory(user.masjidId!, categoryId, memberIds, expectedAmountPaise);
+
+    revalidatePath("/settings");
+    return { ok: true, message: `Assigned ${count} members successfully.` };
+  } catch (err) {
+    console.error("assignMembersToCategoryAction failed", err);
+    return { error: err instanceof Error ? err.message : "Could not assign members." };
   }
 }

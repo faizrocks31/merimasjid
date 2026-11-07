@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { ROLES } from "@/lib/constants";
 import { createPaymentAction } from "@/modules/payments/actions";
+import { getFirstCollectionDefinition, createDefaultCollectionDefinitions } from "./helpers";
 
 const COOKIE_NAME = "masjid_session";
 
@@ -58,13 +59,13 @@ async function signIn(caller: Caller): Promise<void> {
 let masjidId = "";
 let userId = "";
 let memberId = "";
-let monthlyCategoryId = "";
+let collectionDefinitionId = "";
 let monthlyPlanId = "";
 
 function buildFormData(data: {
   memberId?: string;
   walkInName?: string;
-  categoryId: string;
+  collectionDefinitionId: string;
   amountPaise: number;
   collectionEventId?: string;
   mode?: string;
@@ -76,7 +77,7 @@ function buildFormData(data: {
   const fd = new FormData();
   fd.set("memberId", data.memberId || "");
   fd.set("walkInName", data.walkInName || "");
-  fd.set("categoryId", data.categoryId);
+  fd.set("collectionDefinitionId", data.collectionDefinitionId);
   fd.set("paymentDate", data.paymentDate || "2094-01-15");
   fd.set("amountPaise", String(data.amountPaise));
   fd.set("mode", data.mode || "CASH");
@@ -94,23 +95,6 @@ function slugify(str: string) {
   return str.toLowerCase().replace(/[^a-z0-9]/g, "-");
 }
 
-async function createCategory(code: string, name: string, frequency?: string) {
-  return prisma.contributionCategory.create({
-    data: {
-      masjidId,
-      name,
-      code,
-      restrictedPurpose: false,
-      reportingGroup: "Test",
-      frequency: frequency || null,
-      defaultAmountPaise: 100000,
-      collectionMode: "HOUSEHOLD_WISE",
-      defaultDueDay: 10,
-      defaultGraceDays: 0,
-    },
-  });
-}
-
 beforeAll(async () => {
   const suffix = `debug-${Date.now().toString(36)}`;
   const masjid = await prisma.masjid.create({
@@ -124,8 +108,11 @@ beforeAll(async () => {
   });
   masjidId = masjid.id;
 
-  // Create categories
-  monthlyCategoryId = (await createCategory("MONTHLY", "Monthly Collection", "MONTHLY")).id;
+  // Create default collection definitions
+  await createDefaultCollectionDefinitions(masjidId);
+  const collectionDefinition = await getFirstCollectionDefinition(masjidId);
+  if (!collectionDefinition) throw new Error("Collection definitions not created");
+  collectionDefinitionId = collectionDefinition.id;
 
   const user = await prisma.user.create({
     data: {
@@ -151,7 +138,7 @@ beforeAll(async () => {
     data: {
       masjidId,
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId,
       frequency: "MONTHLY",
       amountPaise: 15000, // ₹150
       startDate: new Date("2094-01-01T00:00:00+05:30"),
@@ -164,6 +151,7 @@ beforeAll(async () => {
   await prisma.duesPeriod.create({
     data: {
       masjidId,
+      collectionDefinitionId,
       planId: monthlyPlanId,
       memberId,
       periodStart: new Date("2094-01-01T00:00:00+05:30"),
@@ -176,6 +164,7 @@ beforeAll(async () => {
   await prisma.duesPeriod.create({
     data: {
       masjidId,
+      collectionDefinitionId,
       planId: monthlyPlanId,
       memberId,
       periodStart: new Date("2094-02-01T00:00:00+05:30"),
@@ -188,6 +177,7 @@ beforeAll(async () => {
   await prisma.duesPeriod.create({
     data: {
       masjidId,
+      collectionDefinitionId,
       planId: monthlyPlanId,
       memberId,
       periodStart: new Date("2094-03-01T00:00:00+05:30"),
@@ -212,7 +202,7 @@ afterAll(async () => {
   await prisma.duesPeriod.deleteMany({ where: { masjidId } });
   await prisma.contributionPlan.deleteMany({ where: { id: monthlyPlanId } });
   await prisma.member.deleteMany({ where: { masjidId } });
-  await prisma.contributionCategory.deleteMany({ where: { masjidId } });
+  await prisma.collectionDefinition.deleteMany({ where: { masjidId } });
   await prisma.masjidUser.deleteMany({ where: { masjidId } });
   await prisma.auditLog.deleteMany({ where: { masjidId } });
   await prisma.user.delete({ where: { id: userId } });
@@ -233,13 +223,13 @@ describe("Debug Concurrent Submissions", () => {
   it("concurrent submissions cannot over-allocate dues", async () => {
     const form1 = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId,
       amountPaise: 8000,
       idempotencyKey: `conc-1-${Date.now()}`,
     });
     const form2 = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId,
       amountPaise: 8000,
       idempotencyKey: `conc-2-${Date.now()}`,
     });
@@ -259,7 +249,7 @@ describe("Debug Concurrent Submissions", () => {
     console.log("Failed:", failed.length);
 
     const totalAllocated = await prisma.paymentAllocation.aggregate({
-      where: { masjidId, categoryId: monthlyCategoryId },
+      where: { masjidId, collectionDefinitionId },
       _sum: { allocatedAmountPaise: true },
     });
     console.log("Total allocated:", totalAllocated._sum.allocatedAmountPaise);

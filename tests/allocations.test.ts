@@ -1,20 +1,21 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
 import { recomputePeriodStatus, recomputeAssignmentStatus, recomputeEventStatus } from "@/lib/dues";
-import { createMasjidWithDefaults } from "./helpers";
+import { createMasjidWithDefaults, getCollectionDefinitionByPurposeCode, getFirstCollectionDefinition } from "./helpers";
 
 let masjidId = "";
 let masjidId2 = "";
 let memberId = "";
 let memberId2 = "";
 let planId = "";
-let categoryId = "";
+let collectionDefinitionId = "";
 let userId = "";
 
 async function makePeriod(expected: number, startDay: number) {
   return prisma.duesPeriod.create({
     data: {
       masjidId,
+      collectionDefinitionId,
       planId,
       memberId,
       periodStart: new Date(`2094-01-${String(startDay).padStart(2, "0")}T00:00:00+05:30`),
@@ -29,7 +30,7 @@ async function makeEvent(expected: number, startDay: number) {
   return prisma.collectionEvent.create({
     data: {
       masjidId,
-      categoryId,
+      collectionDefinitionId,
       name: `Event ${startDay}`,
       startDate: new Date(`2094-01-${String(startDay).padStart(2, "0")}T00:00:00+05:30`),
       dueDate: new Date(`2094-02-${String(startDay).padStart(2, "0")}T00:00:00+05:30`),
@@ -69,9 +70,11 @@ async function makePayment(amount: number, status: "SUCCESS" | "REVERSED" = "SUC
 }
 
 beforeAll(async () => {
-  const masjid = await prisma.masjid.findFirst({ where: { slug: "test-masjid" } });
-  if (!masjid) throw new Error("Seed the database first (npm run seed).");
-  masjidId = masjid.id;
+  const masjid = await createMasjidWithDefaults(
+    "Test Masjid",
+    `test-masjid-${Date.now()}`,
+  );
+  masjidId = masjid;
 
   // Create a second masjid for cross-masjid tests
   const masjid2 = await createMasjidWithDefaults(
@@ -94,15 +97,15 @@ beforeAll(async () => {
   });
   memberId2 = member2.id;
 
-  const category = await prisma.contributionCategory.findFirst({ where: { masjidId } });
-  if (!category) throw new Error("Seed the database first (npm run seed).");
-  categoryId = category.id;
+  const collectionDefinition = await getCollectionDefinitionByPurposeCode(masjidId, "MONTHLY_CHANDA");
+  if (!collectionDefinition) throw new Error("MONTHLY_CHANDA collection definitions not seeded.");
+  collectionDefinitionId = collectionDefinition.id;
 
   const plan = await prisma.contributionPlan.create({
     data: {
       masjidId,
       memberId,
-      categoryId,
+      collectionDefinitionId,
       frequency: "MONTHLY",
       amountPaise: 100000,
       startDate: new Date("2094-01-01T00:00:00+05:30"),
@@ -124,7 +127,7 @@ afterAll(async () => {
   }
   await prisma.contributionPlan.deleteMany({ where: { id: planId } });
   await prisma.member.deleteMany({ where: { id: { in: [memberId, memberId2] } } });
-  await prisma.masjid.deleteMany({ where: { id: masjidId2 } });
+  await prisma.masjid.deleteMany({ where: { id: { in: [masjidId, masjidId2] } } });
   await prisma.$disconnect();
 });
 
@@ -146,7 +149,7 @@ describe("dues allocation status (legacy direct DB tests)", () => {
     const period = await makePeriod(100000, 4);
     const payment = await makePayment(40000);
     await prisma.paymentAllocation.create({
-      data: { masjidId, paymentId: payment.id, duesPeriodId: period.id, categoryId, allocatedAmountPaise: 40000 },
+      data: { masjidId, paymentId: payment.id, duesPeriodId: period.id, collectionDefinitionId, allocatedAmountPaise: 40000 },
     });
 
     await prisma.$transaction((tx) => recomputePeriodStatus(tx, period.id));
@@ -158,7 +161,7 @@ describe("dues allocation status (legacy direct DB tests)", () => {
     for (const amount of [60000, 40000]) {
       const payment = await makePayment(amount);
       await prisma.paymentAllocation.create({
-        data: { masjidId, paymentId: payment.id, duesPeriodId: period.id, categoryId, allocatedAmountPaise: amount },
+        data: { masjidId, paymentId: payment.id, duesPeriodId: period.id, collectionDefinitionId, allocatedAmountPaise: amount },
       });
     }
 
@@ -173,7 +176,7 @@ describe("dues allocation status (legacy direct DB tests)", () => {
 
     for (const [payment, amount] of [[good, 50000], [reversed, 50000]] as const) {
       await prisma.paymentAllocation.create({
-        data: { masjidId, paymentId: payment.id, duesPeriodId: period.id, categoryId, allocatedAmountPaise: amount },
+        data: { masjidId, paymentId: payment.id, duesPeriodId: period.id, collectionDefinitionId, allocatedAmountPaise: amount },
       });
     }
 
@@ -192,10 +195,10 @@ describe("dues allocation status (legacy direct DB tests)", () => {
     const period = await makePeriod(50000, 12);
     const payment = await makePayment(120000);
     await prisma.paymentAllocation.create({
-      data: { masjidId, paymentId: payment.id, duesPeriodId: period.id, categoryId, allocatedAmountPaise: 50000 },
+      data: { masjidId, paymentId: payment.id, duesPeriodId: period.id, collectionDefinitionId, allocatedAmountPaise: 50000 },
     });
     await prisma.paymentAllocation.create({
-      data: { masjidId, paymentId: payment.id, categoryId, allocatedAmountPaise: 70000, purposeNote: "Advance" },
+      data: { masjidId, paymentId: payment.id, collectionDefinitionId, allocatedAmountPaise: 70000, purposeNote: "Advance" },
     });
 
     await prisma.$transaction((tx) => recomputePeriodStatus(tx, period.id));
@@ -238,7 +241,7 @@ describe("payment allocation integrity (direct DB tests)", () => {
     // First payment of 60000
     const payment1 = await makePayment(60000);
     await prisma.paymentAllocation.create({
-      data: { masjidId, paymentId: payment1.id, duesPeriodId: period.id, categoryId, allocatedAmountPaise: 60000 },
+      data: { masjidId, paymentId: payment1.id, duesPeriodId: period.id, collectionDefinitionId, allocatedAmountPaise: 60000 },
     });
 
     await prisma.$transaction((tx) => recomputePeriodStatus(tx, period.id));
@@ -267,10 +270,10 @@ describe("payment allocation integrity (direct DB tests)", () => {
     const payment = await makePayment(80000);
 
     await prisma.paymentAllocation.create({
-      data: { masjidId, paymentId: payment.id, duesPeriodId: period1.id, categoryId, allocatedAmountPaise: 50000 },
+      data: { masjidId, paymentId: payment.id, duesPeriodId: period1.id, collectionDefinitionId, allocatedAmountPaise: 50000 },
     });
     await prisma.paymentAllocation.create({
-      data: { masjidId, paymentId: payment.id, duesPeriodId: period2.id, categoryId, allocatedAmountPaise: 30000 },
+      data: { masjidId, paymentId: payment.id, duesPeriodId: period2.id, collectionDefinitionId, allocatedAmountPaise: 30000 },
     });
 
     const allocations = await prisma.paymentAllocation.findMany({ where: { paymentId: payment.id } });
@@ -283,11 +286,14 @@ describe("payment allocation integrity (direct DB tests)", () => {
     const otherMember = await prisma.member.create({
       data: { masjidId: masjidId2, memberNo: "MAS-OTHER", fullName: "Other Member" },
     });
+    const otherCollectionDefinition = await getFirstCollectionDefinition(masjidId2);
+    if (!otherCollectionDefinition) throw new Error("Collection definitions not seeded for masjid2");
+
     const otherPlan = await prisma.contributionPlan.create({
-      data: { masjidId: masjidId2, memberId: otherMember.id, categoryId, frequency: "MONTHLY", amountPaise: 100000, startDate: new Date("2094-01-01T00:00:00+05:30"), dueDay: 10 },
+      data: { masjidId: masjidId2, memberId: otherMember.id, collectionDefinitionId: otherCollectionDefinition.id, frequency: "MONTHLY", amountPaise: 100000, startDate: new Date("2094-01-01T00:00:00+05:30"), dueDay: 10 },
     });
     const otherPeriod = await prisma.duesPeriod.create({
-      data: { masjidId: masjidId2, planId: otherPlan.id, memberId: otherMember.id, periodStart: new Date("2094-01-01T00:00:00+05:30"), periodEnd: new Date("2094-01-31T00:00:00+05:30"), dueDate: new Date("2094-02-10T00:00:00+05:30"), expectedAmountPaise: 100000 },
+      data: { masjidId: masjidId2, collectionDefinitionId: otherCollectionDefinition.id, planId: otherPlan.id, memberId: otherMember.id, periodStart: new Date("2094-01-01T00:00:00+05:30"), periodEnd: new Date("2094-01-31T00:00:00+05:30"), dueDate: new Date("2094-02-10T00:00:00+05:30"), expectedAmountPaise: 100000 },
     });
 
     // Verify that a query scoped to masjidId doesn't find the other period
@@ -310,7 +316,7 @@ describe("payment allocation integrity (direct DB tests)", () => {
     // First payment of 40000
     const payment1 = await makePayment(40000);
     await prisma.paymentAllocation.create({
-      data: { masjidId, paymentId: payment1.id, collectionEventId: event.id, categoryId, allocatedAmountPaise: 40000 },
+      data: { masjidId, paymentId: payment1.id, collectionEventId: event.id, collectionDefinitionId, allocatedAmountPaise: 40000 },
     });
 
     // Calculate allocated for this member+event
@@ -333,7 +339,7 @@ describe("payment allocation integrity (direct DB tests)", () => {
     // First payment of 80000
     const payment1 = await makePayment(80000);
     await prisma.paymentAllocation.create({
-      data: { masjidId, paymentId: payment1.id, duesPeriodId: period.id, categoryId, allocatedAmountPaise: 80000 },
+      data: { masjidId, paymentId: payment1.id, duesPeriodId: period.id, collectionDefinitionId, allocatedAmountPaise: 80000 },
     });
 
     await prisma.$transaction((tx) => recomputePeriodStatus(tx, period.id));
@@ -373,7 +379,7 @@ describe("payment allocation integrity (direct DB tests)", () => {
         },
       });
       await tx.paymentAllocation.create({
-        data: { masjidId, paymentId: p.id, duesPeriodId: period.id, categoryId, allocatedAmountPaise: 50000 },
+        data: { masjidId, paymentId: p.id, duesPeriodId: period.id, collectionDefinitionId, allocatedAmountPaise: 50000 },
       });
       return p;
     });
@@ -391,7 +397,7 @@ describe("payment allocation integrity (direct DB tests)", () => {
     // Pay only 50000
     const payment = await makePayment(50000);
     await prisma.paymentAllocation.create({
-      data: { masjidId, paymentId: payment.id, collectionEventId: event.id, categoryId, allocatedAmountPaise: 50000 },
+      data: { masjidId, paymentId: payment.id, collectionEventId: event.id, collectionDefinitionId, allocatedAmountPaise: 50000 },
     });
 
     // Mark event as completed

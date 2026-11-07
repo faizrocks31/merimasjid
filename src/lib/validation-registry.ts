@@ -82,7 +82,7 @@ export const VALIDATION_RULES = {
 
     plan: {
       memberId: { type: "ref", ref: "member", required: true, label: "Member" },
-      categoryId: { type: "ref", ref: "contributionCategory", required: true, label: "Category" },
+      collectionDefinitionId: { type: "ref", ref: "collectionDefinition", required: true, label: "Collection Definition" },
       frequency: { type: "enum", values: [FREQUENCIES.MONTHLY, FREQUENCIES.SEMI_ANNUAL, FREQUENCIES.ANNUAL, FREQUENCIES.ONE_TIME], required: true },
       amountPaise: { rule: "amount", required: true },
       startDate: { rule: "date", required: true },
@@ -94,7 +94,7 @@ export const VALIDATION_RULES = {
     payment: {
       memberId: { type: "ref", ref: "member", required: false, label: "Member" },
       walkInName: { rule: "name", required: false, max: 150 },
-      categoryId: { type: "ref", ref: "contributionCategory", required: true, label: "Category" },
+      collectionDefinitionId: { type: "ref", ref: "collectionDefinition", required: true, label: "Collection Definition" },
       paymentDate: { rule: "date", required: true },
       amountPaise: { rule: "amount", required: true },
       mode: { type: "enum", values: [PAYMENT_MODES.CASH, PAYMENT_MODES.UPI, PAYMENT_MODES.BANK_TRANSFER, PAYMENT_MODES.OTHER], required: true },
@@ -133,27 +133,24 @@ export const VALIDATION_RULES = {
       jummahTime: { type: "string", required: false, min: 5, max: 5, pattern: /^([01]\d|2[0-3]):[0-5]\d$/, patternMsg: "Format: HH:MM (24-hour)", label: "Jummah" },
     },
 
-    category: {
+    collectionDefinition: {
       name: { rule: "name", required: true },
-      code: { type: "string", required: true, min: 2, max: 20, pattern: /^[A-Z0-9_]+$/, patternMsg: "Capital letters, digits, underscores" },
-      restrictedPurpose: { type: "boolean", default: false },
-      reportingGroup: { type: "string", required: false, max: 60 },
       description: { rule: "notes", required: false },
-      defaultAmountPaise: { type: "number", required: false, min: 1, label: "Default Amount (Paise)" },
-      frequency: { type: "enum", values: Object.values(CATEGORY_FREQUENCIES), required: false },
-      collectionMode: { type: "enum", values: Object.values(COLLECTION_MODES), required: false },
-      schedulingRules: { type: "hidden", required: false },
-      defaultDueDay: { type: "number", min: 1, max: 28, required: false },
-      defaultGraceDays: { type: "number", min: 0, max: 60, required: false, default: 0 },
-    },
-
-    expenseCategory: {
-      name: { rule: "name", required: true },
+      baseCategoryId: { type: "ref", ref: "baseCategory", required: true, label: "Base Category" },
+      subcategoryId: { type: "ref", ref: "subcategory", required: true, label: "Subcategory" },
       active: { type: "boolean", default: true },
+      showInPaymentReceived: { type: "boolean", default: true, label: "Show in Payment Received" },
+      frequency: { type: "enum", values: ["WEEKLY", "MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL", "EVENT_BASED", "ONE_TIME"], required: true },
+      amountType: { type: "enum", values: ["FIXED", "VARIABLE"], required: true },
+      defaultAmountPaise: { type: "number", required: false, min: 1, label: "Default Amount (Paise)" },
+      donorEligibility: { type: "enum", values: ["MEMBERS_ONLY", "WALKIN_ONLY", "BOTH"], required: true },
+      memberAssignment: { type: "enum", values: ["ALL_ELIGIBLE", "SELECTED"], required: true },
+      dueGeneration: { type: "enum", values: ["ADMIN", "AUTOMATIC"], required: true },
+      settlementPolicy: { type: "enum", values: ["OLDEST_FIRST", "ANY_PENDING_PERIOD"], required: true },
     },
 
     collectionEvent: {
-      categoryId: { type: "ref", ref: "contributionCategory", required: true, label: "Category" },
+      collectionDefinitionId: { type: "ref", ref: "collectionDefinition", required: true, label: "Collection Definition" },
       name: { rule: "name", required: true },
       startDate: { rule: "date", required: true },
       endDate: { rule: "date", required: false },
@@ -170,6 +167,11 @@ export const VALIDATION_RULES = {
       memberId: { type: "ref", ref: "member", required: true, label: "Member" },
       expectedAmountPaise: { rule: "amount", required: true },
       status: { type: "enum", values: ["PENDING", "PARTIAL", "PAID", "WAIVED"], default: "PENDING" },
+    },
+
+    expenseCategory: {
+      name: { rule: "name", required: true },
+      active: { type: "boolean", default: true },
     },
 
     staff: {
@@ -202,7 +204,8 @@ export const VALIDATION_RULES = {
 
     allocation: {
       duesPeriodId: { type: "ref", ref: "duesPeriod", required: false, label: "Due Period" },
-      categoryId: { type: "ref", ref: "contributionCategory", required: true, label: "Category" },
+      collectionEventId: { type: "ref", ref: "collectionEvent", required: false, label: "Collection Event" },
+      collectionDefinitionId: { type: "ref", ref: "collectionDefinition", required: true, label: "Collection Definition" },
       amountPaise: { rule: "amount", required: true },
       purposeNote: { rule: "notes", required: false, max: 200 },
     },
@@ -315,7 +318,8 @@ function buildFieldSchema(entity: string, field: string, config: Record<string, 
       if (config.itemType === "allocation") {
         return z.array(z.object({
           duesPeriodId: z.string().optional().or(z.literal("")),
-          categoryId: z.string().min(1, "Category required"),
+          collectionEventId: z.string().optional().or(z.literal("")),
+          collectionDefinitionId: z.string().min(1, "Collection Definition required"),
           amountPaise: z.number().int().positive(),
           purposeNote: z.string().trim().max(200).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
         })).default([]);
@@ -349,7 +353,7 @@ const memberShape = {
 
 const planShape = {
   memberId: z.string().min(1, "Member required"),
-  categoryId: z.string().min(1, "Category required"),
+  collectionDefinitionId: z.string().min(1, "Collection Definition required"),
   frequency: z.enum([FREQUENCIES.MONTHLY, FREQUENCIES.SEMI_ANNUAL, FREQUENCIES.ANNUAL, FREQUENCIES.ONE_TIME]),
   amountPaise: z.number().int().positive("Amount must be > 0"),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD format"),
@@ -362,7 +366,7 @@ const planShape = {
 const paymentShape = {
   memberId: z.string().optional().or(z.literal("")),
   walkInName: z.string().trim().max(150).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
-  categoryId: z.string().min(1, "Category required"),
+  collectionDefinitionId: z.string().min(1, "Collection Definition required"),
   collectionEventId: z.string().optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
   paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD format"),
   amountPaise: z.number().int().positive("Amount must be > 0"),
@@ -374,7 +378,7 @@ const paymentShape = {
   allocations: z.array(z.object({
     duesPeriodId: z.string().optional().or(z.literal("")),
     collectionEventId: z.string().optional().or(z.literal("")),
-    categoryId: z.string().min(1, "Category required"),
+    collectionDefinitionId: z.string().min(1, "Collection Definition required"),
     amountPaise: z.number().int().positive(),
     purposeNote: z.string().trim().max(200).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
   })).default([]),
@@ -409,22 +413,24 @@ const settingsShape = {
   jummahTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format: HH:MM (24-hour)").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
 };
 
-const categoryShape = {
-  name: z.string().trim().min(1, "Category name required").max(200).refine((v) => /^[\p{L}\p{M}\s.\-'']+$/u.test(v), "Only letters, spaces, dots, hyphens, apostrophes"),
-  code: z.string().trim().min(2).max(20).regex(/^[A-Z0-9_]+$/, "Capital letters, digits, underscores"),
-  restrictedPurpose: z.coerce.boolean().default(false),
-  reportingGroup: z.string().trim().max(60).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+const collectionDefinitionShape = {
+  name: z.string().trim().min(1, "Collection definition name required").max(200).refine((v) => /^[\p{L}\p{M}\s.\-'']+$/u.test(v), "Only letters, spaces, dots, hyphens, apostrophes"),
   description: z.string().trim().max(500).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  baseCategoryId: z.string().min(1, "Base Category required"),
+  subcategoryId: z.string().min(1, "Subcategory required"),
+  active: z.coerce.boolean().default(true),
+  showInPaymentReceived: z.coerce.boolean().default(true),
+  frequency: z.enum(["WEEKLY", "MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL", "EVENT_BASED", "ONE_TIME"]),
+  amountType: z.enum(["FIXED", "VARIABLE"]),
   defaultAmountPaise: z.coerce.number().int().min(1).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : Number(v))).optional(),
-  frequency: z.enum(["WEEKLY", "MONTHLY", "SEMI_ANNUAL", "ANNUAL", "YEARLY", "EVENT_BASED", "OCCASIONAL"]).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
-  collectionMode: z.enum(["HOUSEHOLD_WISE", "COMBINED"]).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
-  schedulingRules: z.string().trim().max(2000).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
-  defaultDueDay: z.coerce.number().int().min(1).max(28).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : Number(v))).optional(),
-  defaultGraceDays: z.coerce.number().int().min(0).max(60).default(0),
+  donorEligibility: z.enum(["MEMBERS_ONLY", "WALKIN_ONLY", "BOTH"]),
+  memberAssignment: z.enum(["ALL_ELIGIBLE", "SELECTED"]),
+  dueGeneration: z.enum(["ADMIN", "AUTOMATIC"]),
+  settlementPolicy: z.enum(["OLDEST_FIRST", "ANY_PENDING_PERIOD"]),
 };
 
 const collectionEventShape = {
-  categoryId: z.string().min(1, "Category required"),
+  collectionDefinitionId: z.string().min(1, "Collection Definition required"),
   name: z.string().trim().min(1, "Event name required").max(200).refine((v) => /^[\p{L}\p{M}\s.\-''()0-9]+$/u.test(v), "Only letters, numbers, spaces and punctuation"),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD format"),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD format").optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
@@ -475,7 +481,7 @@ const masjidShape = {
 const allocationShape = {
   duesPeriodId: z.string().optional().or(z.literal("")),
   collectionEventId: z.string().optional().or(z.literal("")),
-  categoryId: z.string().min(1, "Category required"),
+  collectionDefinitionId: z.string().min(1, "Collection Definition required"),
   amountPaise: z.number().int().positive("Amount must be > 0"),
   purposeNote: z.string().trim().max(200).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
 };
@@ -489,13 +495,13 @@ export const planSchema = z.object(planShape);
 export const paymentSchema = z.object(paymentShape);
 export const expenseSchema = z.object(expenseShape);
 export const settingsSchema = z.object(settingsShape);
-export const categorySchema = z.object(categoryShape);
+export const collectionDefinitionSchema = z.object(collectionDefinitionShape);
+export const collectionEventSchema = z.object(collectionEventShape);
+export const collectionEventAssignmentSchema = z.object(collectionEventAssignmentShape);
 export const expenseCategorySchema = z.object(expenseCategoryShape);
 export const staffSchema = z.object(staffShape);
 export const masjidSchema = z.object(masjidShape);
 export const allocationSchema = z.object(allocationShape);
-export const collectionEventSchema = z.object(collectionEventShape);
-export const collectionEventAssignmentSchema = z.object(collectionEventAssignmentShape);
 
 export const reversalSchema = z.object({
   paymentId: z.string().min(1, "Payment required"),
@@ -521,13 +527,13 @@ export type PlanInput = z.infer<typeof planSchema>;
 export type PaymentInput = z.infer<typeof paymentSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
-export type CategoryInput = z.infer<typeof categorySchema>;
+export type CollectionDefinitionInput = z.infer<typeof collectionDefinitionSchema>;
+export type CollectionEventInput = z.infer<typeof collectionEventSchema>;
+export type CollectionEventAssignmentInput = z.infer<typeof collectionEventAssignmentSchema>;
 export type ExpenseCategoryInput = z.infer<typeof expenseCategorySchema>;
 export type StaffInput = z.infer<typeof staffSchema>;
 export type MasjidInput = z.infer<typeof masjidSchema>;
 export type AllocationInput = z.infer<typeof allocationSchema>;
-export type CollectionEventInput = z.infer<typeof collectionEventSchema>;
-export type CollectionEventAssignmentInput = z.infer<typeof collectionEventAssignmentSchema>;
 
 // ============================================
 // FORM FIELD METADATA (for auto-generating forms)
@@ -701,14 +707,14 @@ const SCHEMAS: Record<EntityName, z.ZodTypeAny> = {
   payment: paymentSchema,
   expense: expenseSchema,
   settings: settingsSchema,
-  category: categorySchema,
+  collectionDefinition: collectionDefinitionSchema,
+  collectionEvent: collectionEventSchema,
+  collectionEventAssignment: collectionEventAssignmentSchema,
   expenseCategory: expenseCategorySchema,
   staff: staffSchema,
   login: loginSchema,
   masjid: masjidSchema,
   allocation: allocationSchema,
-  collectionEvent: collectionEventSchema,
-  collectionEventAssignment: collectionEventAssignmentSchema,
 };
 
 /** The Zod schema registered for an entity. */

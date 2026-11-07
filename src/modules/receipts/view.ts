@@ -46,7 +46,7 @@ export function buildReceiptView(payment: {
   notes: string | null;
   donorMember: { memberNo: string; fullName: string } | null;
   enteredByUser: { name: string };
-  allocations: { allocatedAmountPaise: number; category: { name: string } }[];
+  allocations: { allocatedAmountPaise: number; collectionDefinition: { name: string } }[];
   masjid: { name: string; address: string | null; phone: string | null; email: string | null; receiptFooter: string | null };
   reversalFor: { reason: string } | null;
 }, opts: { duplicate: boolean; periodText?: string | null; footerText: string; taxNote: string }): ReceiptView {
@@ -74,7 +74,7 @@ export function buildReceiptView(payment: {
     notes: payment.notes,
     lines: [],
     purposes: payment.allocations.map((a) => ({
-      name: a.category.name,
+      name: a.collectionDefinition.name,
       amountText: formatPaise(a.allocatedAmountPaise),
     })),
     reversalReason: payment.reversalFor?.reason ?? null,

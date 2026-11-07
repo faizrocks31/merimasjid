@@ -23,11 +23,11 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
     where: { id, masjidId: user.masjidId! },
     include: {
       user: true,
-      plans: { include: { category: true }, orderBy: { createdAt: "desc" } },
+      plans: { include: { collectionDefinition: true }, orderBy: { createdAt: "desc" } },
       payments: { orderBy: { paymentDate: "desc" }, take: 50 },
       duesPeriods: {
         include: {
-          plan: { include: { category: true } },
+          plan: { include: { collectionDefinition: true } },
           allocations: { where: { payment: { status: "SUCCESS" } }, select: { allocatedAmountPaise: true } },
         },
         orderBy: { dueDate: "asc" },
@@ -159,7 +159,7 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
                   return (
                     <div key={plan.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
                       <div>
-                        <p className="text-sm font-medium">{plan.category.name}</p>
+                        <p className="text-sm font-medium">{plan.collectionDefinition?.name ?? "—"}</p>
                         <p className="text-[11px] text-[var(--ink-muted)]">
                           {FREQUENCY_LABELS[plan.frequency]} · {t("dueDay")} {plan.dueDay} · {t("startDate")} {formatDate(plan.startDate)}
                         </p>

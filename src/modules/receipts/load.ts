@@ -18,7 +18,7 @@ export async function loadReceipt(paymentId: string) {
     include: {
       donorMember: { select: { id: true, memberNo: true, fullName: true } },
       enteredByUser: { select: { name: true } },
-      allocations: { include: { category: { select: { name: true, code: true } } } },
+      allocations: { include: { collectionDefinition: { select: { name: true, purposeCode: true } } } },
       masjid: {
         select: {
           name: true, address: true, phone: true, email: true,

@@ -12,6 +12,10 @@ export const config: VercelConfig = {
       path: '/api/cron/subscription-sync',
       schedule: '0 2 * * *', // Daily at 2 AM UTC
     },
+    {
+      path: '/api/cron/due-generation',
+      schedule: '30 20 * * *', // Daily at 8:30 PM UTC (2:30 AM IST)
+    },
   ],
 
   // Environment variables that should be available at build time

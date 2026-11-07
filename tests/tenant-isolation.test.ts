@@ -116,8 +116,8 @@ type Fixture = {
   masjidB: string;
   superAdminUserId: string;
   localAdminUserId: string;
-  categoryA: string;
-  categoryB: string;
+  collectionDefinitionA: string;
+  collectionDefinitionB: string;
   memberA: string;
   memberB: string;
   paymentA: string;
@@ -160,14 +160,42 @@ beforeAll(async () => {
   const masjidA = await createMasjid("Isolation Masjid A", `iso-a-${suffix}`);
   const masjidB = await createMasjid("Isolation Masjid B", `iso-b-${suffix}`);
 
-  const categoryA = (
-    await prisma.contributionCategory.create({
-      data: { masjidId: masjidA, name: "General A", code: "GENA" },
+  const baseCategory = await prisma.baseCategory.findFirst();
+  const subcategory = await prisma.subcategory.findFirst();
+  if (!baseCategory || !subcategory) throw new Error("Base category or subcategory missing");
+
+  const collectionDefinitionA = (
+    await prisma.collectionDefinition.create({
+      data: {
+        masjidId: masjidA,
+        name: "General A",
+        purposeCode: "GENA",
+        baseCategoryId: baseCategory.id,
+        subcategoryId: subcategory.id,
+        frequency: "MONTHLY",
+        amountType: "VARIABLE",
+        donorEligibility: "BOTH",
+        memberAssignment: "SELECTED",
+        dueGeneration: "ADMIN",
+        settlementPolicy: "ANY_PENDING_PERIOD",
+      },
     })
   ).id;
-  const categoryB = (
-    await prisma.contributionCategory.create({
-      data: { masjidId: masjidB, name: "General B", code: "GENB" },
+  const collectionDefinitionB = (
+    await prisma.collectionDefinition.create({
+      data: {
+        masjidId: masjidB,
+        name: "General B",
+        purposeCode: "GENB",
+        baseCategoryId: baseCategory.id,
+        subcategoryId: subcategory.id,
+        frequency: "MONTHLY",
+        amountType: "VARIABLE",
+        donorEligibility: "BOTH",
+        memberAssignment: "SELECTED",
+        dueGeneration: "ADMIN",
+        settlementPolicy: "ANY_PENDING_PERIOD",
+      },
     })
   ).id;
 
@@ -240,8 +268,8 @@ beforeAll(async () => {
     masjidB,
     superAdminUserId,
     localAdminUserId,
-    categoryA,
-    categoryB,
+    collectionDefinitionA,
+    collectionDefinitionB,
     memberA,
     memberB,
     paymentA,
@@ -258,8 +286,10 @@ afterAll(async () => {
   await prisma.payment.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
   await prisma.duesPeriod.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
   await prisma.contributionPlan.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
+  await prisma.collectionEventAssignment.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
+  await prisma.collectionEvent.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
   await prisma.member.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
-  await prisma.contributionCategory.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
+  await prisma.collectionDefinition.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
   await prisma.expenseCategory.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
   await prisma.masjidUser.deleteMany({ where: { masjidId: { in: createdMasjidIds } } });
   await prisma.user.deleteMany({
@@ -323,7 +353,9 @@ describe("Super Admin platform operations", () => {
     form.set("masjidId", fx.masjidB);
     form.set("name", "Isolation Masjid B Renamed");
     form.set("slug", (await prisma.masjid.findUnique({ where: { id: fx.masjidB } }))!.slug);
-    form.set("receiptPrefix", "ISOB");
+    // Use a unique receiptPrefix with enough entropy to avoid collision (max 8 chars total)
+    const uniqueSuffix = Math.random().toString(36).slice(2, 6).toUpperCase(); // 4 chars
+    form.set("receiptPrefix", `ISO${uniqueSuffix}`);
     form.set("financialYearStartMonth", "4");
     form.set("status", "ACTIVE");
 
@@ -336,10 +368,12 @@ describe("Super Admin platform operations", () => {
   it("creates a masjid together with its default categories", async () => {
     await signInAsSuperAdmin();
     const slug = `iso-new-${Date.now().toString(36)}`;
+    // Use a unique receiptPrefix to avoid collision with other test masjids
+    const receiptPrefix = `NEW${Date.now().toString(36).toUpperCase().slice(0, 5)}`;
     const form = new FormData();
     form.set("name", "Created By Super Admin");
     form.set("slug", slug);
-    form.set("receiptPrefix", "NEWX");
+    form.set("receiptPrefix", receiptPrefix);
     form.set("financialYearStartMonth", "4");
 
     // `createMasjidAction` ends with redirect(), which the stub throws.
@@ -349,7 +383,7 @@ describe("Super Admin platform operations", () => {
     expect(created).not.toBeNull();
     createdMasjidIds.push(created!.id);
 
-    const categories = await prisma.contributionCategory.count({ where: { masjidId: created!.id } });
+    const categories = await prisma.collectionDefinition.count({ where: { masjidId: created!.id } });
     expect(categories).toBeGreaterThan(0);
   });
 
@@ -407,8 +441,9 @@ describe("Local Admin access to its own masjid", () => {
     form.set("paymentDate", "2093-05-01");
     form.set("amountPaise", "5000");
     form.set("mode", "CASH");
+    form.set("collectionDefinitionId", fx.collectionDefinitionA);
     form.set("idempotencyKey", `local-ok-${Date.now().toString(36)}`);
-    form.set("allocations", JSON.stringify([{ categoryId: fx.categoryA, amountPaise: 5000 }]));
+    form.set("allocations", JSON.stringify([{ collectionDefinitionId: fx.collectionDefinitionA, amountPaise: 5000 }]));
 
     const result = await createPaymentAction(form);
     expect(result.ok).toBe(true);
@@ -498,8 +533,9 @@ describe("Local Admin cannot modify another tenant's data", () => {
     form.set("paymentDate", "2093-05-02");
     form.set("amountPaise", "7000");
     form.set("mode", "CASH");
+    form.set("collectionDefinitionId", fx.collectionDefinitionA);
     form.set("idempotencyKey", `local-x-${Date.now().toString(36)}`);
-    form.set("allocations", JSON.stringify([{ categoryId: fx.categoryB, amountPaise: 7000 }]));
+    form.set("allocations", JSON.stringify([{ collectionDefinitionId: fx.collectionDefinitionA, amountPaise: 7000 }]));
 
     const result = await createPaymentAction(form);
     expect(result.ok).toBe(false);
@@ -512,19 +548,20 @@ describe("Local Admin cannot modify another tenant's data", () => {
     expect(count).toBe(1); // only the fixture payment
   });
 
-  it("cannot allocate to another masjid's category", async () => {
+  it("cannot allocate to another masjid's collection definition", async () => {
     await signInAsLocalAdmin();
     const form = new FormData();
     form.set("walkInName", "Walk In Donor");
     form.set("paymentDate", "2093-05-03");
     form.set("amountPaise", "3000");
     form.set("mode", "CASH");
+    form.set("collectionDefinitionId", fx.collectionDefinitionB);
     form.set("idempotencyKey", `local-y-${Date.now().toString(36)}`);
-    form.set("allocations", JSON.stringify([{ categoryId: fx.categoryB, amountPaise: 3000 }]));
+    form.set("allocations", JSON.stringify([{ collectionDefinitionId: fx.collectionDefinitionB, amountPaise: 3000 }]));
 
     const result = await createPaymentAction(form);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe("A selected category is not available in this Masjid.");
+    if (!result.ok) expect(result.error).toBe("Collection definition not found or inactive in this Masjid.");
   });
 
   it("cannot reverse another masjid's payment", async () => {
@@ -594,17 +631,23 @@ describe("Local Admin cannot perform platform operations", () => {
 
   it("cannot update a masjid", async () => {
     await signInAsLocalAdmin();
+    // Capture the current masjid name before the unauthorized attempt
+    const before = await prisma.masjid.findUnique({ where: { id: fx.masjidB } });
+    const originalName = before?.name;
+
     const form = new FormData();
     form.set("masjidId", fx.masjidB);
     form.set("name", "Renamed By Local Admin");
     form.set("slug", "iso-b-slug-does-not-matter");
-    form.set("receiptPrefix", "ISOB");
+    // Use a unique receiptPrefix to avoid collision with existing
+    form.set("receiptPrefix", `ISOB${Math.random().toString(36).slice(2, 6).toUpperCase()}`);
     form.set("financialYearStartMonth", "4");
     form.set("status", "ACTIVE");
 
     await expect(updateMasjidAction(undefined, form)).rejects.toThrow("FORBIDDEN");
     const unchanged = await prisma.masjid.findUnique({ where: { id: fx.masjidB } });
-    expect(unchanged?.name).toBe("Isolation Masjid B Renamed");
+    // Verify the masjid name was NOT changed by the unauthorized Local Admin
+    expect(unchanged?.name).toBe(originalName);
   });
 
   it("is refused the tenant:manage permission", async () => {
@@ -733,7 +776,7 @@ describe("database integrity", () => {
     form.set("amountPaise", "1000");
     form.set("mode", "CASH");
     form.set("idempotencyKey", `local-z-${Date.now().toString(36)}`);
-    form.set("allocations", JSON.stringify([{ categoryId: fx.categoryB, amountPaise: 1000 }]));
+    form.set("allocations", JSON.stringify([{ collectionDefinitionId: fx.collectionDefinitionB, amountPaise: 1000 }]));
 
     await createPaymentAction(form);
     const after = await prisma.payment.count({ where: { masjidId: fx.masjidB } });
@@ -761,7 +804,7 @@ describe("database integrity", () => {
         data: {
           masjidId: fx.masjidA,
           paymentId: payment.id,
-          categoryId: fx.categoryA,
+          collectionDefinitionId: fx.collectionDefinitionA,
           allocatedAmountPaise: 100,
           collectionEventId: "0000000000000000000000000",
         },
@@ -807,22 +850,52 @@ describe("database integrity", () => {
     ).rejects.toThrow();
   });
 
-  it("cascades a masjid deletion to its members, payments and categories", async () => {
+  it("cascades a masjid deletion to its collection definitions, but RESTRICTS deletion if members exist", async () => {
     const tempMasjid = await createMasjid("Cascade Probe", `cascade-${Date.now().toString(36)}`);
+    const baseCategory = await prisma.baseCategory.findFirst();
+    const subcategory = await prisma.subcategory.findFirst();
+    if (!baseCategory || !subcategory) throw new Error("Base category or subcategory missing");
+
     const category = (
-      await prisma.contributionCategory.create({
-        data: { masjidId: tempMasjid, name: "Temp", code: "TMP" },
+      await prisma.collectionDefinition.create({
+        data: {
+          masjidId: tempMasjid,
+          name: "Temp",
+          purposeCode: "TMP",
+          baseCategoryId: baseCategory.id,
+          subcategoryId: subcategory.id,
+          frequency: "MONTHLY",
+          amountType: "VARIABLE",
+          donorEligibility: "BOTH",
+          memberAssignment: "SELECTED",
+          dueGeneration: "ADMIN",
+          settlementPolicy: "ANY_PENDING_PERIOD",
+        },
       })
     ).id;
     const member = await prisma.member.create({
       data: { masjidId: tempMasjid, memberNo: "CASC-1", fullName: "Cascade Member" },
     });
 
+    // Deleting a masjid with members should fail due to RESTRICT on Member.masjid
+    await expect(prisma.masjid.delete({ where: { id: tempMasjid } })).rejects.toThrow();
+
+    // Verify member still exists
+    expect(await prisma.member.findUnique({ where: { id: member.id } })).not.toBeNull();
+    // Collection definition should still exist too (since masjid wasn't deleted)
+    expect(
+      await prisma.collectionDefinition.findUnique({ where: { id: category } }),
+    ).not.toBeNull();
+
+    // Now delete the member first, then the masjid deletion should cascade to collection definitions
+    await prisma.member.delete({ where: { id: member.id } });
     await prisma.masjid.delete({ where: { id: tempMasjid } });
 
+    // Member already deleted manually
     expect(await prisma.member.findUnique({ where: { id: member.id } })).toBeNull();
+    // Collection definition should be cascade-deleted
     expect(
-      await prisma.contributionCategory.findUnique({ where: { id: category } }),
+      await prisma.collectionDefinition.findUnique({ where: { id: category } }),
     ).toBeNull();
   });
 });
@@ -846,7 +919,7 @@ describe("Edge cases: suspended masjid", () => {
     paymentForm.set("amountPaise", "5000");
     paymentForm.set("mode", "CASH");
     paymentForm.set("idempotencyKey", `suspended-${Date.now().toString(36)}`);
-    paymentForm.set("allocations", JSON.stringify([{ categoryId: fx.categoryA, amountPaise: 5000 }]));
+    paymentForm.set("allocations", JSON.stringify([{ collectionDefinitionId: fx.collectionDefinitionA, amountPaise: 5000 }]));
 
     const result = await createPaymentAction(paymentForm);
     expect(result.ok).toBe(false);
@@ -898,7 +971,7 @@ describe("Edge cases: deactivated membership", () => {
     paymentForm.set("amountPaise", "5000");
     paymentForm.set("mode", "CASH");
     paymentForm.set("idempotencyKey", `inactive-${Date.now().toString(36)}`);
-    paymentForm.set("allocations", JSON.stringify([{ categoryId: fx.categoryA, amountPaise: 5000 }]));
+    paymentForm.set("allocations", JSON.stringify([{ collectionDefinitionId: fx.collectionDefinitionA, amountPaise: 5000 }]));
 
     const result = await createPaymentAction(paymentForm);
     expect(result.ok).toBe(false);
@@ -996,7 +1069,7 @@ describe("Edge cases: CollectionEventAssignment tenant scoping", () => {
     const event = await prisma.collectionEvent.create({
       data: {
         masjidId: fx.masjidA,
-        categoryId: fx.categoryA,
+        collectionDefinitionId: fx.collectionDefinitionA,
         name: "Test Event",
         startDate: new Date("2094-01-01"),
         dueDate: new Date("2094-01-31"),
@@ -1034,7 +1107,7 @@ describe("Edge cases: CollectionEventAssignment tenant scoping", () => {
     const event = await prisma.collectionEvent.create({
       data: {
         masjidId: fx.masjidA,
-        categoryId: fx.categoryA,
+        collectionDefinitionId: fx.collectionDefinitionA,
         name: "Test Event 2",
         startDate: new Date("2094-01-01"),
         dueDate: new Date("2094-01-31"),
@@ -1063,7 +1136,7 @@ describe("Edge cases: PaymentAllocation cross-tenant protection", () => {
       data: {
         masjidId: fx.masjidB,
         memberId: fx.memberB,
-        categoryId: fx.categoryB,
+        collectionDefinitionId: fx.collectionDefinitionB,
         frequency: "MONTHLY",
         amountPaise: 100000,
         startDate: new Date("2094-01-01"),
@@ -1076,6 +1149,7 @@ describe("Edge cases: PaymentAllocation cross-tenant protection", () => {
         masjidId: fx.masjidB,
         planId: plan.id,
         memberId: fx.memberB,
+        collectionDefinitionId: fx.collectionDefinitionB,
         periodStart: new Date("2094-01-01"),
         periodEnd: new Date("2094-01-31"),
         dueDate: new Date("2094-02-10"),
@@ -1104,8 +1178,9 @@ describe("Edge cases: PaymentAllocation cross-tenant protection", () => {
     form.set("paymentDate", "2094-01-15");
     form.set("amountPaise", "50000");
     form.set("mode", "CASH");
+    form.set("collectionDefinitionId", fx.collectionDefinitionA);
     form.set("idempotencyKey", `cross-${Date.now().toString(36)}`);
-    form.set("allocations", JSON.stringify([{ categoryId: fx.categoryA, duesPeriodId: period.id, amountPaise: 50000 }]));
+    form.set("allocations", JSON.stringify([{ collectionDefinitionId: fx.collectionDefinitionA, duesPeriodId: period.id, amountPaise: 50000 }]));
 
     const result = await createPaymentAction(form);
     expect(result.ok).toBe(false);
@@ -1122,7 +1197,7 @@ describe("Edge cases: PaymentAllocation cross-tenant protection", () => {
     const eventB = await prisma.collectionEvent.create({
       data: {
         masjidId: fx.masjidB,
-        categoryId: fx.categoryB,
+        collectionDefinitionId: fx.collectionDefinitionB,
         name: "Event B",
         startDate: new Date("2094-01-01"),
         dueDate: new Date("2094-01-31"),
@@ -1150,12 +1225,13 @@ describe("Edge cases: PaymentAllocation cross-tenant protection", () => {
     form.set("paymentDate", "2094-01-15");
     form.set("amountPaise", "50000");
     form.set("mode", "CASH");
+    form.set("collectionDefinitionId", fx.collectionDefinitionA);
     form.set("idempotencyKey", `cross-${Date.now().toString(36)}`);
-    form.set("allocations", JSON.stringify([{ categoryId: fx.categoryA, collectionEventId: eventB.id, amountPaise: 50000 }]));
+    form.set("allocations", JSON.stringify([{ collectionDefinitionId: fx.collectionDefinitionA, collectionEventId: eventB.id, amountPaise: 50000 }]));
 
     const result = await createPaymentAction(form);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe("Collection event does not belong to this Masjid");
+    if (!result.ok) expect(result.error).toBe("Collection event not found for donation.");
 
     await prisma.payment.delete({ where: { id: payment.id } });
     await prisma.collectionEvent.delete({ where: { id: eventB.id } });
@@ -1225,7 +1301,7 @@ describe("Edge cases: Plan/DuesPeriod cross-tenant protection", () => {
 
     const form = new FormData();
     form.set("memberId", fx.memberB);
-    form.set("categoryId", fx.categoryA);
+    form.set("collectionDefinitionId", fx.collectionDefinitionA);
     form.set("frequency", "MONTHLY");
     form.set("amountPaise", "100000");
     form.set("startDate", "2094-01-01");
@@ -1242,7 +1318,7 @@ describe("Edge cases: Plan/DuesPeriod cross-tenant protection", () => {
       data: {
         masjidId: fx.masjidB,
         memberId: fx.memberB,
-        categoryId: fx.categoryB,
+        collectionDefinitionId: fx.collectionDefinitionB,
         frequency: "MONTHLY",
         amountPaise: 100000,
         startDate: new Date("2094-01-01"),
@@ -1270,7 +1346,7 @@ describe("Edge cases: Plan/DuesPeriod cross-tenant protection", () => {
       data: {
         masjidId: fx.masjidB,
         memberId: fx.memberB,
-        categoryId: fx.categoryB,
+        collectionDefinitionId: fx.collectionDefinitionB,
         frequency: "MONTHLY",
         amountPaise: 100000,
         startDate: new Date("2094-01-01"),

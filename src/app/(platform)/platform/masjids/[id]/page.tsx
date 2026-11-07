@@ -23,7 +23,14 @@ export default async function MasjidDetailPage({ params }: { params: Promise<{ i
     where: { id },
     include: {
       _count: {
-        select: { users: true, members: true, payments: true, categories: true, expenseCategories: true, plans: true },
+        select: {
+          users: true,
+          members: true,
+          payments: true,
+          collectionDefinitions: true,
+          expenseCategories: true,
+          plans: true
+        },
       },
       users: {
         include: { user: { select: { id: true, name: true, email: true, lastLoginAt: true } } },
@@ -171,16 +178,16 @@ export default async function MasjidDetailPage({ params }: { params: Promise<{ i
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-[var(--ink-muted)]">Categories</span>
+                  <span className="text-[var(--ink-muted)]">Collection Definitions</span>
                   <span className="font-medium">
-                    {masjid._count.categories} / {masjid.maxCategories ?? "—"}
+                    {masjid._count.collectionDefinitions} / {masjid.maxCategories ?? "—"}
                   </span>
                 </div>
                 <div className="h-2 bg-[var(--surface)] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-[var(--brand)] transition-all"
                     style={{
-                      width: `${masjid.maxCategories ? Math.min(100, (masjid._count.categories / masjid.maxCategories) * 100) : 0}%`,
+                      width: `${masjid.maxCategories ? Math.min(100, (masjid._count.collectionDefinitions / masjid.maxCategories) * 100) : 0}%`,
                     }}
                   />
                 </div>
@@ -252,8 +259,8 @@ export default async function MasjidDetailPage({ params }: { params: Promise<{ i
           </CardHeader>
           <CardBody className="space-y-3">
             <dl className="grid gap-2 md:grid-cols-2 text-sm">
-              <dt className="text-[var(--ink-muted)]">Contribution Categories</dt>
-              <dd className="font-medium">{masjid._count.categories}</dd>
+              <dt className="text-[var(--ink-muted)]">Collection Definitions</dt>
+              <dd className="font-medium">{masjid._count.collectionDefinitions}</dd>
               <dt className="text-[var(--ink-muted)]">Expense Categories</dt>
               <dd className="font-medium">{masjid._count.expenseCategories}</dd>
               <dt className="text-[var(--ink-muted)]">Contribution Plans</dt>

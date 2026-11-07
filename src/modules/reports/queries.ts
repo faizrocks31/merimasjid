@@ -23,8 +23,6 @@ export async function collectionSummary(masjidId: string, range: DateRange) {
     }),
   ]);
 
-  // Gross includes reversed rows so that "gross − reversals = net" always
-  // reconciles with the transaction register.
   const grossPaise = gross._sum.amountPaise ?? 0;
   const reversedPaise = reversed._sum.amountPaise ?? 0;
 
@@ -119,7 +117,7 @@ export async function monthlyTrend(masjidId: string, months = 6) {
 
 export async function categoryTotals(masjidId: string, range: DateRange) {
   const rows = await prisma.paymentAllocation.groupBy({
-    by: ["categoryId"],
+    by: ["collectionDefinitionId"],
     where: {
       masjidId,
       payment: { status: "SUCCESS", paymentDate: { gte: range.from, lt: range.toExclusive } },
@@ -127,29 +125,26 @@ export async function categoryTotals(masjidId: string, range: DateRange) {
     _sum: { allocatedAmountPaise: true },
   });
 
-  const categories = await prisma.contributionCategory.findMany({
+  const definitions = await prisma.collectionDefinition.findMany({
     where: { masjidId },
-    select: { id: true, name: true, restrictedPurpose: true },
+    include: { baseCategory: { select: { code: true, name: true } }, subcategory: { select: { code: true, name: true } } },
   });
-  const byId = new Map(categories.map((c) => [c.id, c]));
+  const byId = new Map(definitions.map((d) => [d.id, d]));
 
   return rows
-    .map((r) => ({
-      name: byId.get(r.categoryId)?.name ?? "Unknown",
-      restricted: byId.get(r.categoryId)?.restrictedPurpose ?? false,
-      totalPaise: r._sum.allocatedAmountPaise ?? 0,
-    }))
+    .map((r) => {
+      const def = byId.get(r.collectionDefinitionId);
+      return {
+        id: r.collectionDefinitionId,
+        name: def?.name ?? "Unknown",
+        baseCategory: def?.baseCategory.name ?? "",
+        subcategory: def?.subcategory.name ?? "",
+        totalPaise: r._sum.allocatedAmountPaise ?? 0,
+      };
+    })
     .sort((a, b) => b.totalPaise - a.totalPaise);
 }
 
-/**
- * Event-level collection totals.
- *
- * Each row is one collection event, split into what was actually received
- * against that event and what is still outstanding. Only allocations that
- * point at the event count here, so a payment is never double-counted
- * between the category report and the event report.
- */
 export async function eventTotals(masjidId: string, range: DateRange) {
   const events = await prisma.collectionEvent.findMany({
     where: { masjidId },
@@ -164,7 +159,7 @@ export async function eventTotals(masjidId: string, range: DateRange) {
       applicableMonth: true,
       applicableYear: true,
       expectedAmountPaise: true,
-      category: { select: { id: true, name: true } },
+      collectionDefinition: { select: { id: true, name: true } },
       assignments: {
         select: { id: true, expectedAmountPaise: true, status: true },
       },
@@ -177,14 +172,12 @@ export async function eventTotals(masjidId: string, range: DateRange) {
 
   return events.map((e) => {
     const receivedPaise = e.allocations.reduce((s, a) => s + a.allocatedAmountPaise, 0);
-    // For household-wise events the expectation is the sum of the assignments;
-    // for a plain event it is the single expected amount on the event itself.
     const assignedPaise = e.assignments.reduce((s, a) => s + a.expectedAmountPaise, 0);
     const expectedPaise = e.assignments.length > 0 ? assignedPaise : (e.expectedAmountPaise ?? 0);
     return {
       id: e.id,
       name: e.name,
-      categoryName: e.category.name,
+      collectionDefinitionName: e.collectionDefinition.name,
       status: e.status,
       startDate: e.startDate,
       endDate: e.endDate,
@@ -232,6 +225,7 @@ export async function pendingDueRows(masjidId: string, limit = 200) {
     where: { masjidId, status: { in: ["PENDING", "PARTIAL"] } },
     include: {
       member: { select: { id: true, fullName: true, memberNo: true, phone: true } },
+      collectionDefinition: { select: { id: true, name: true } },
       allocations: { where: { payment: { status: "SUCCESS" } }, select: { allocatedAmountPaise: true } },
     },
     orderBy: { dueDate: "asc" },
@@ -247,6 +241,7 @@ export async function pendingDueRows(masjidId: string, limit = 200) {
         memberName: p.member.fullName,
         memberNo: p.member.memberNo,
         phone: p.member.phone,
+        collectionDefinitionName: p.collectionDefinition.name,
         periodStart: p.periodStart,
         periodEnd: p.periodEnd,
         dueDate: p.dueDate,

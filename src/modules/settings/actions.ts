@@ -2,12 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireStaff, hashPassword } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
+import { requireStaff } from "@/lib/auth";
 import { assertCan } from "@/lib/permissions";
-import { settingsSchema, categorySchema, expenseCategorySchema, staffSchema, collectionEventSchema } from "@/lib/validation";
+import { settingsSchema, collectionDefinitionSchema, collectionEventSchema, expenseCategorySchema, staffSchema } from "@/lib/validation";
 import { z } from "zod";
 import { writeAudit } from "@/modules/audit/write";
 import { checkLimit } from "@/lib/subscription";
+import {
+  COLLECTION_FREQUENCY,
+  AMOUNT_TYPE,
+  DONOR_ELIGIBILITY,
+  MEMBER_ASSIGNMENT,
+  DUE_GENERATION,
+  SETTLEMENT_POLICY,
+} from "@/lib/constants";
 
 // Prayer times schema (only validates prayer time fields)
 const prayerTimesSchema = z.object({
@@ -303,73 +312,490 @@ export async function sendAnnouncementAction(_prev: SettingsState, formData: For
   }
 }
 
-export async function createCategoryAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+// ============================================
+// COLLECTION DEFINITION CRUD (Phase 2A)
+// ============================================
+
+// Validate BaseCategory-Subcategory combination is valid
+async function validateBaseCategorySubcategory(tx: Prisma.TransactionClient, baseCategoryId: string, subcategoryId: string) {
+  const combo = await tx.baseCategorySubcategory.findUnique({
+    where: { baseCategoryId_subcategoryId: { baseCategoryId, subcategoryId } },
+  });
+  return !!combo;
+}
+
+export async function createCollectionDefinitionAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
   const user = await requireStaff();
   assertCan(user.role, "settings:write");
 
-  const parsed = categorySchema.safeParse({
+  const parsed = collectionDefinitionSchema.safeParse({
     name: String(formData.get("name") ?? ""),
-    code: String(formData.get("code") ?? "").toUpperCase(),
-    restrictedPurpose: formData.get("restrictedPurpose") === "on",
-    reportingGroup: String(formData.get("reportingGroup") ?? ""),
     description: String(formData.get("description") ?? ""),
+    baseCategoryId: String(formData.get("baseCategoryId") ?? ""),
+    subcategoryId: String(formData.get("subcategoryId") ?? ""),
+    active: formData.get("active") === "on",
+    showInPaymentReceived: formData.get("showInPaymentReceived") === "on" || formData.get("showInPaymentReceived") === "true",
+    frequency: String(formData.get("frequency") ?? ""),
+    amountType: String(formData.get("amountType") ?? ""),
     defaultAmountPaise: formData.get("defaultAmountPaise") ? Number(formData.get("defaultAmountPaise")) : undefined,
-    frequency: String(formData.get("frequency") ?? "") || undefined,
-    collectionMode: String(formData.get("collectionMode") ?? "") || undefined,
-    defaultDueDay: formData.get("defaultDueDay") ? Number(formData.get("defaultDueDay")) : undefined,
-    defaultGraceDays: formData.get("defaultGraceDays") ? Number(formData.get("defaultGraceDays")) : 0,
+    donorEligibility: String(formData.get("donorEligibility") ?? ""),
+    memberAssignment: String(formData.get("memberAssignment") ?? ""),
+    dueGeneration: String(formData.get("dueGeneration") ?? ""),
+    settlementPolicy: String(formData.get("settlementPolicy") ?? ""),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid category" };
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid collection definition" };
 
   const input = parsed.data;
 
-  try {
-    const existing = await prisma.contributionCategory.findFirst({
-      where: { masjidId: user.masjidId!, code: input.code },
-    });
-    if (existing) return { error: "A category with this code already exists." };
+  // Amount configuration rules
+  if (input.amountType === "FIXED" && !input.defaultAmountPaise) {
+    return { error: "Default amount is required when amount type is FIXED." };
+  }
+  // VARIABLE: defaultAmountPaise is optional; when provided, acts as a suggested/default amount
+  if (input.amountType === "VARIABLE" && input.defaultAmountPaise !== undefined && input.defaultAmountPaise <= 0) {
+    return { error: "Default amount must be positive when provided." };
+  }
 
-    const currentCategoryCount = await prisma.contributionCategory.count({
-      where: { masjidId: user.masjidId! },
+  // Validate BaseCategory-Subcategory combination
+  const isValidCombo = await validateBaseCategorySubcategory(prisma, input.baseCategoryId, input.subcategoryId);
+  if (!isValidCombo) {
+    return { error: "Invalid Base Category / Subcategory combination. Please select a valid pair." };
+  }
+
+  try {
+    const existing = await prisma.collectionDefinition.findFirst({
+      where: { masjidId: user.masjidId!, name: input.name },
     });
-    const limitCheck = await checkLimit(user.masjidId!, "categories", currentCategoryCount);
+    if (existing) return { error: "A collection definition with this name already exists." };
+
+    const currentCount = await prisma.collectionDefinition.count({
+      where: { masjidId: user.masjidId!, active: true },
+    });
+    const limitCheck = await checkLimit(user.masjidId!, "categories", currentCount);
     if (!limitCheck.allowed) {
-      return { error: `Category limit exceeded. Your plan allows a maximum of ${limitCheck.limit} categories.` };
+      return { error: `Collection definition limit exceeded. Your plan allows a maximum of ${limitCheck.limit} categories.` };
     }
 
     await prisma.$transaction(async (tx) => {
-      const created = await tx.contributionCategory.create({
+      const created = await tx.collectionDefinition.create({
         data: {
           masjidId: user.masjidId!,
           name: input.name,
-          code: input.code,
-          restrictedPurpose: input.restrictedPurpose,
-          reportingGroup: input.reportingGroup ?? null,
+          baseCategoryId: input.baseCategoryId,
+          subcategoryId: input.subcategoryId,
           description: input.description ?? null,
+          active: input.active,
+          showInPaymentReceived: input.showInPaymentReceived ?? true,
+          frequency: input.frequency as any,
+          amountType: input.amountType as any,
           defaultAmountPaise: input.defaultAmountPaise ?? null,
-          frequency: input.frequency ?? null,
-          collectionMode: input.collectionMode ?? null,
-          defaultDueDay: input.defaultDueDay ?? null,
-          defaultGraceDays: input.defaultGraceDays ?? 0,
+          donorEligibility: input.donorEligibility as any,
+          memberAssignment: input.memberAssignment as any,
+          dueGeneration: input.dueGeneration as any,
+          settlementPolicy: input.settlementPolicy as any,
         },
       });
       await writeAudit(tx, {
         masjidId: user.masjidId,
         actorUserId: user.id,
-        action: "category.create",
-        entityType: "ContributionCategory",
+        action: "collectionDefinition.create",
+        entityType: "CollectionDefinition",
         entityId: created.id,
-        after: { name: input.name, code: input.code },
+        after: { name: input.name, frequency: input.frequency, amountType: input.amountType },
       });
     });
 
     revalidatePath("/settings");
     return { ok: true };
   } catch (err) {
-    console.error("createCategoryAction failed", err);
-    return { error: "Could not create the category." };
+    console.error("createCollectionDefinitionAction failed", err);
+    return { error: "Could not create the collection definition." };
   }
 }
+
+export async function updateCollectionDefinitionAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const user = await requireStaff();
+  assertCan(user.role, "settings:write");
+
+  const definitionId = String(formData.get("definitionId") ?? "");
+  if (!definitionId) return { error: "Collection definition ID is required." };
+
+  const parsed = collectionDefinitionSchema.safeParse({
+    name: String(formData.get("name") ?? ""),
+    description: String(formData.get("description") ?? ""),
+    baseCategoryId: String(formData.get("baseCategoryId") ?? ""),
+    subcategoryId: String(formData.get("subcategoryId") ?? ""),
+    active: formData.get("active") === "on",
+    showInPaymentReceived: formData.get("showInPaymentReceived") === "on" || formData.get("showInPaymentReceived") === "true",
+    frequency: String(formData.get("frequency") ?? ""),
+    amountType: String(formData.get("amountType") ?? ""),
+    defaultAmountPaise: formData.get("defaultAmountPaise") ? Number(formData.get("defaultAmountPaise")) : undefined,
+    donorEligibility: String(formData.get("donorEligibility") ?? ""),
+    memberAssignment: String(formData.get("memberAssignment") ?? ""),
+    dueGeneration: String(formData.get("dueGeneration") ?? ""),
+    settlementPolicy: String(formData.get("settlementPolicy") ?? ""),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid collection definition" };
+
+  const input = parsed.data;
+
+  // Amount configuration rules
+  if (input.amountType === "FIXED" && !input.defaultAmountPaise) {
+    return { error: "Default amount is required when amount type is FIXED." };
+  }
+  // VARIABLE: defaultAmountPaise is optional; when provided, acts as a suggested/default amount
+  if (input.amountType === "VARIABLE" && input.defaultAmountPaise !== undefined && input.defaultAmountPaise <= 0) {
+    return { error: "Default amount must be positive when provided." };
+  }
+
+  // Validate BaseCategory-Subcategory combination
+  const isValidCombo = await validateBaseCategorySubcategory(prisma, input.baseCategoryId, input.subcategoryId);
+  if (!isValidCombo) {
+    return { error: "Invalid Base Category / Subcategory combination. Please select a valid pair." };
+  }
+
+  try {
+    const existing = await prisma.collectionDefinition.findFirst({
+      where: { id: definitionId, masjidId: user.masjidId! },
+    });
+    if (!existing) return { error: "Collection definition not found." };
+
+    const duplicateName = await prisma.collectionDefinition.findFirst({
+      where: { masjidId: user.masjidId!, name: input.name, id: { not: definitionId } },
+    });
+    if (duplicateName) return { error: "A collection definition with this name already exists." };
+
+    // Prevent changing taxonomy if there are dependent records (plans, dues periods, allocations)
+    const hasDependents = await prisma.$transaction(async (tx) => {
+      const planCount = await tx.contributionPlan.count({ where: { collectionDefinitionId: definitionId } });
+      const duesCount = await tx.duesPeriod.count({ where: { collectionDefinitionId: definitionId } });
+      const allocationCount = await tx.paymentAllocation.count({ where: { collectionDefinitionId: definitionId } });
+      return planCount > 0 || duesCount > 0 || allocationCount > 0;
+    });
+
+    if (hasDependents && (existing.baseCategoryId !== input.baseCategoryId || existing.subcategoryId !== input.subcategoryId)) {
+      return { error: "Cannot change Base Category or Subcategory because this definition has associated plans, dues, or payments." };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.collectionDefinition.update({
+        where: { id: definitionId },
+        data: {
+          name: input.name,
+          description: input.description ?? null,
+          baseCategoryId: input.baseCategoryId,
+          subcategoryId: input.subcategoryId,
+          active: input.active,
+          showInPaymentReceived: input.showInPaymentReceived ?? true,
+          frequency: input.frequency as any,
+          amountType: input.amountType as any,
+          defaultAmountPaise: input.defaultAmountPaise ?? null,
+          donorEligibility: input.donorEligibility as any,
+          memberAssignment: input.memberAssignment as any,
+          dueGeneration: input.dueGeneration as any,
+          settlementPolicy: input.settlementPolicy as any,
+        },
+      });
+      await writeAudit(tx, {
+        masjidId: user.masjidId,
+        actorUserId: user.id,
+        action: "collectionDefinition.update",
+        entityType: "CollectionDefinition",
+        entityId: definitionId,
+        before: {
+          name: existing.name,
+          baseCategoryId: existing.baseCategoryId,
+          subcategoryId: existing.subcategoryId,
+          active: existing.active,
+          showInPaymentReceived: existing.showInPaymentReceived,
+          frequency: existing.frequency,
+          amountType: existing.amountType,
+          defaultAmountPaise: existing.defaultAmountPaise,
+          donorEligibility: existing.donorEligibility,
+          memberAssignment: existing.memberAssignment,
+          dueGeneration: existing.dueGeneration,
+          settlementPolicy: existing.settlementPolicy,
+        },
+        after: {
+          name: updated.name,
+          baseCategoryId: updated.baseCategoryId,
+          subcategoryId: updated.subcategoryId,
+          frequency: updated.frequency,
+          amountType: updated.amountType,
+          defaultAmountPaise: updated.defaultAmountPaise,
+          donorEligibility: updated.donorEligibility,
+          memberAssignment: updated.memberAssignment,
+          dueGeneration: updated.dueGeneration,
+          settlementPolicy: updated.settlementPolicy,
+        },
+      });
+    });
+
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (err) {
+    console.error("updateCollectionDefinitionAction failed", err);
+    return { error: "Could not update the collection definition." };
+  }
+}
+
+export async function deleteCollectionDefinitionAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const user = await requireStaff();
+  assertCan(user.role, "settings:write");
+
+  const definitionId = String(formData.get("definitionId") ?? "");
+  if (!definitionId) return { error: "Collection definition ID is required." };
+
+  try {
+    const existing = await prisma.collectionDefinition.findFirst({
+      where: { id: definitionId, masjidId: user.masjidId! },
+    });
+    if (!existing) return { error: "Collection definition not found." };
+
+    // Check for dependent records
+    const [plansUsing, duesUsing, allocationsUsing, eventsUsing] = await Promise.all([
+      prisma.contributionPlan.count({ where: { collectionDefinitionId: definitionId } }),
+      prisma.duesPeriod.count({ where: { collectionDefinitionId: definitionId } }),
+      prisma.paymentAllocation.count({ where: { collectionDefinitionId: definitionId } }),
+      prisma.collectionEvent.count({ where: { collectionDefinitionId: definitionId } }),
+    ]);
+
+    if (plansUsing > 0 || duesUsing > 0 || allocationsUsing > 0 || eventsUsing > 0) {
+      const parts: string[] = [];
+      if (plansUsing) parts.push(`${plansUsing} plan(s)`);
+      if (duesUsing) parts.push(`${duesUsing} due period(s)`);
+      if (allocationsUsing) parts.push(`${allocationsUsing} payment allocation(s)`);
+      if (eventsUsing) parts.push(`${eventsUsing} collection event(s)`);
+      return { error: `Cannot delete: ${parts.join(", ")} use this collection definition.` };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.collectionDefinition.delete({ where: { id: definitionId } });
+      await writeAudit(tx, {
+        masjidId: user.masjidId,
+        actorUserId: user.id,
+        action: "collectionDefinition.delete",
+        entityType: "CollectionDefinition",
+        entityId: definitionId,
+        before: { name: existing.name },
+      });
+    });
+
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (err) {
+    console.error("deleteCollectionDefinitionAction failed", err);
+    return { error: "Could not delete the collection definition." };
+  }
+}
+
+// ============================================
+// COLLECTION EVENT CRUD
+// ============================================
+
+export async function createCollectionEventAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const user = await requireStaff();
+  assertCan(user.role, "settings:write");
+
+  const parsed = collectionEventSchema.safeParse({
+    collectionDefinitionId: String(formData.get("collectionDefinitionId") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    startDate: String(formData.get("startDate") ?? ""),
+    endDate: String(formData.get("endDate") ?? "") || undefined,
+    dueDate: String(formData.get("dueDate") ?? ""),
+    expectedAmountPaise: formData.get("expectedAmountPaise") ? Number(formData.get("expectedAmountPaise")) : undefined,
+    status: String(formData.get("status") ?? "SCHEDULED"),
+    applicableMonth: formData.get("applicableMonth") ? Number(formData.get("applicableMonth")) : undefined,
+    applicableYear: formData.get("applicableYear") ? Number(formData.get("applicableYear")) : undefined,
+    notes: String(formData.get("notes") ?? ""),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid collection event" };
+
+  const input = parsed.data;
+
+  try {
+    // Verify the collection definition exists and belongs to this masjid
+    const def = await prisma.collectionDefinition.findFirst({
+      where: { id: input.collectionDefinitionId, masjidId: user.masjidId! },
+      select: { id: true },
+    });
+    if (!def) return { error: "Collection definition not found in this Masjid." };
+
+    await prisma.$transaction(async (tx) => {
+      const created = await tx.collectionEvent.create({
+        data: {
+          masjidId: user.masjidId!,
+          collectionDefinitionId: input.collectionDefinitionId,
+          name: input.name,
+          startDate: new Date(input.startDate),
+          endDate: input.endDate ? new Date(input.endDate) : null,
+          dueDate: new Date(input.dueDate),
+          expectedAmountPaise: input.expectedAmountPaise ?? null,
+          status: input.status as any,
+          applicableMonth: input.applicableMonth ?? null,
+          applicableYear: input.applicableYear ?? null,
+          notes: input.notes ?? null,
+          createdBy: user.id,
+        },
+      });
+      await writeAudit(tx, {
+        masjidId: user.masjidId,
+        actorUserId: user.id,
+        action: "collectionEvent.create",
+        entityType: "CollectionEvent",
+        entityId: created.id,
+        after: { name: input.name, collectionDefinitionId: input.collectionDefinitionId, dueDate: input.dueDate },
+      });
+    });
+
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (err) {
+    console.error("createCollectionEventAction failed", err);
+    return { error: "Could not create the collection event." };
+  }
+}
+
+export async function updateCollectionEventAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const user = await requireStaff();
+  assertCan(user.role, "settings:write");
+
+  const eventId = String(formData.get("eventId") ?? "");
+  if (!eventId) return { error: "Event ID is required." };
+
+  const parsed = collectionEventSchema.safeParse({
+    collectionDefinitionId: String(formData.get("collectionDefinitionId") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    startDate: String(formData.get("startDate") ?? ""),
+    endDate: String(formData.get("endDate") ?? "") || undefined,
+    dueDate: String(formData.get("dueDate") ?? ""),
+    expectedAmountPaise: formData.get("expectedAmountPaise") ? Number(formData.get("expectedAmountPaise")) : undefined,
+    status: String(formData.get("status") ?? "SCHEDULED"),
+    applicableMonth: formData.get("applicableMonth") ? Number(formData.get("applicableMonth")) : undefined,
+    applicableYear: formData.get("applicableYear") ? Number(formData.get("applicableYear")) : undefined,
+    notes: String(formData.get("notes") ?? ""),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid collection event" };
+
+  const input = parsed.data;
+
+  try {
+    const existing = await prisma.collectionEvent.findFirst({
+      where: { id: eventId, masjidId: user.masjidId! },
+    });
+    if (!existing) return { error: "Collection event not found." };
+
+    // Verify the collection definition exists and belongs to this masjid
+    const def = await prisma.collectionDefinition.findFirst({
+      where: { id: input.collectionDefinitionId, masjidId: user.masjidId! },
+      select: { id: true },
+    });
+    if (!def) return { error: "Collection definition not found in this Masjid." };
+
+    const duplicate = await prisma.collectionEvent.findFirst({
+      where: { masjidId: user.masjidId!, collectionDefinitionId: input.collectionDefinitionId, name: input.name, id: { not: eventId } },
+    });
+    if (duplicate) return { error: "An event with this name already exists for this collection definition." };
+
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.collectionEvent.update({
+        where: { id: eventId },
+        data: {
+          collectionDefinitionId: input.collectionDefinitionId,
+          name: input.name,
+          startDate: new Date(input.startDate),
+          endDate: input.endDate ? new Date(input.endDate) : null,
+          dueDate: new Date(input.dueDate),
+          expectedAmountPaise: input.expectedAmountPaise ?? null,
+          status: input.status as any,
+          applicableMonth: input.applicableMonth ?? null,
+          applicableYear: input.applicableYear ?? null,
+          notes: input.notes ?? null,
+        },
+      });
+      await writeAudit(tx, {
+        masjidId: user.masjidId,
+        actorUserId: user.id,
+        action: "collectionEvent.update",
+        entityType: "CollectionEvent",
+        entityId: eventId,
+        before: {
+          name: existing.name,
+          collectionDefinitionId: existing.collectionDefinitionId,
+          startDate: existing.startDate,
+          endDate: existing.endDate,
+          dueDate: existing.dueDate,
+          expectedAmountPaise: existing.expectedAmountPaise,
+          status: existing.status,
+        },
+        after: {
+          name: updated.name,
+          collectionDefinitionId: updated.collectionDefinitionId,
+          startDate: updated.startDate,
+          endDate: updated.endDate,
+          dueDate: updated.dueDate,
+          expectedAmountPaise: updated.expectedAmountPaise,
+          status: updated.status,
+        },
+      });
+    });
+
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (err) {
+    console.error("updateCollectionEventAction failed", err);
+    return { error: "Could not update the collection event." };
+  }
+}
+
+export async function deleteCollectionEventAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const user = await requireStaff();
+  assertCan(user.role, "settings:write");
+
+  const eventId = String(formData.get("eventId") ?? "");
+  if (!eventId) return { error: "Event ID is required." };
+
+  try {
+    const existing = await prisma.collectionEvent.findFirst({
+      where: { id: eventId, masjidId: user.masjidId! },
+    });
+    if (!existing) return { error: "Collection event not found." };
+
+    const [assignmentsCount, allocationsCount] = await Promise.all([
+      prisma.collectionEventAssignment.count({ where: { eventId } }),
+      prisma.paymentAllocation.count({ where: { collectionEventId: eventId } }),
+    ]);
+
+    if (assignmentsCount > 0 || allocationsCount > 0) {
+      const parts: string[] = [];
+      if (assignmentsCount) parts.push(`${assignmentsCount} household assignment(s)`);
+      if (allocationsCount) parts.push(`${allocationsCount} payment allocation(s)`);
+      return { error: `Cannot delete: ${parts.join(", ")} use this collection event.` };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.collectionEvent.delete({ where: { id: eventId } });
+      await writeAudit(tx, {
+        masjidId: user.masjidId,
+        actorUserId: user.id,
+        action: "collectionEvent.delete",
+        entityType: "CollectionEvent",
+        entityId: eventId,
+        before: { name: existing.name },
+      });
+    });
+
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (err) {
+    console.error("deleteCollectionEventAction failed", err);
+    return { error: "Could not delete the collection event." };
+  }
+}
+
+// ============================================
+// EXPENSE CATEGORY CRUD (unchanged)
+// ============================================
 
 export async function createExpenseCategoryAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
   const user = await requireStaff();
@@ -404,142 +830,6 @@ export async function createExpenseCategoryAction(_prev: SettingsState, formData
   } catch (err) {
     console.error("createExpenseCategoryAction failed", err);
     return { error: "Could not create the expense category." };
-  }
-}
-
-export async function updateCategoryAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
-  const user = await requireStaff();
-  assertCan(user.role, "settings:write");
-
-  const categoryId = String(formData.get("categoryId") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
-  const code = String(formData.get("code") ?? "").toUpperCase().trim();
-  const restrictedPurpose = formData.get("restrictedPurpose") === "on";
-  const reportingGroup = String(formData.get("reportingGroup") ?? "").trim() || null;
-  const description = String(formData.get("description") ?? "").trim() || null;
-  const defaultAmountPaise = formData.get("defaultAmountPaise") ? Number(formData.get("defaultAmountPaise")) : undefined;
-  const frequency = String(formData.get("frequency") ?? "") || undefined;
-  const collectionMode = String(formData.get("collectionMode") ?? "") || undefined;
-  const defaultDueDay = formData.get("defaultDueDay") ? Number(formData.get("defaultDueDay")) : undefined;
-  const defaultGraceDays = formData.get("defaultGraceDays") ? Number(formData.get("defaultGraceDays")) : undefined;
-
-  if (!categoryId) return { error: "Category ID is required." };
-  if (name.length < 1 || name.length > 200) return { error: "Enter a category name (1–200 characters)." };
-  if (code.length < 2 || code.length > 20) return { error: "Code must be 2–20 characters." };
-  if (!/^[A-Z0-9_]+$/.test(code)) return { error: "Code must contain only capital letters, digits, and underscores." };
-
-  try {
-    const existing = await prisma.contributionCategory.findFirst({
-      where: { id: categoryId, masjidId: user.masjidId! },
-    });
-    if (!existing) return { error: "Category not found." };
-
-    const duplicateName = await prisma.contributionCategory.findFirst({
-      where: { masjidId: user.masjidId!, name, id: { not: categoryId } },
-    });
-    if (duplicateName) return { error: "A category with this name already exists." };
-
-    if (code !== existing.code) {
-      const duplicateCode = await prisma.contributionCategory.findFirst({
-        where: { masjidId: user.masjidId!, code, id: { not: categoryId } },
-      });
-      if (duplicateCode) return { error: "A category with this code already exists." };
-    }
-
-    await prisma.$transaction(async (tx) => {
-      const updated = await tx.contributionCategory.update({
-        where: { id: categoryId },
-        data: {
-          name,
-          code,
-          restrictedPurpose,
-          reportingGroup,
-          description,
-          defaultAmountPaise: defaultAmountPaise ?? null,
-          frequency: frequency ?? null,
-          collectionMode: collectionMode ?? null,
-          defaultDueDay: defaultDueDay ?? null,
-          defaultGraceDays: defaultGraceDays ?? 0,
-        },
-      });
-      await writeAudit(tx, {
-        masjidId: user.masjidId,
-        actorUserId: user.id,
-        action: "category.update",
-        entityType: "ContributionCategory",
-        entityId: categoryId,
-        before: {
-          name: existing.name,
-          code: existing.code,
-          restrictedPurpose: existing.restrictedPurpose,
-          reportingGroup: existing.reportingGroup,
-          description: existing.description,
-          defaultAmountPaise: existing.defaultAmountPaise,
-          frequency: existing.frequency,
-          collectionMode: existing.collectionMode,
-          defaultDueDay: existing.defaultDueDay,
-          defaultGraceDays: existing.defaultGraceDays,
-        },
-        after: {
-          name: updated.name,
-          code: updated.code,
-          restrictedPurpose: updated.restrictedPurpose,
-          reportingGroup: updated.reportingGroup,
-          description: updated.description,
-          defaultAmountPaise: updated.defaultAmountPaise,
-          frequency: updated.frequency,
-          collectionMode: updated.collectionMode,
-          defaultDueDay: updated.defaultDueDay,
-          defaultGraceDays: updated.defaultGraceDays,
-        },
-      });
-    });
-
-    revalidatePath("/settings");
-    return { ok: true };
-  } catch (err) {
-    console.error("updateCategoryAction failed", err);
-    return { error: "Could not update the category." };
-  }
-}
-
-export async function deleteCategoryAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
-  const user = await requireStaff();
-  assertCan(user.role, "settings:write");
-
-  const categoryId = String(formData.get("categoryId") ?? "");
-  if (!categoryId) return { error: "Category ID is required." };
-
-  try {
-    const existing = await prisma.contributionCategory.findFirst({
-      where: { id: categoryId, masjidId: user.masjidId! },
-    });
-    if (!existing) return { error: "Category not found." };
-
-    const plansUsing = await prisma.contributionPlan.count({
-      where: { categoryId, masjidId: user.masjidId! },
-    });
-    if (plansUsing > 0) {
-      return { error: `Cannot delete: ${plansUsing} contribution plan(s) use this category.` };
-    }
-
-    await prisma.$transaction(async (tx) => {
-      await tx.contributionCategory.delete({ where: { id: categoryId } });
-      await writeAudit(tx, {
-        masjidId: user.masjidId,
-        actorUserId: user.id,
-        action: "category.delete",
-        entityType: "ContributionCategory",
-        entityId: categoryId,
-        before: { name: existing.name, code: existing.code },
-      });
-    });
-
-    revalidatePath("/settings");
-    return { ok: true };
-  } catch (err) {
-    console.error("deleteCategoryAction failed", err);
-    return { error: "Could not delete the category." };
   }
 }
 
@@ -635,6 +925,10 @@ export async function deleteExpenseCategoryAction(_prev: SettingsState, formData
   }
 }
 
+// ============================================
+// STAFF CRUD (unchanged)
+// ============================================
+
 export async function createStaffAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
   let user;
   try {
@@ -701,7 +995,7 @@ export async function createStaffAction(_prev: SettingsState, formData: FormData
           data: {
             name: input.name,
             email: input.email,
-            passwordHash: await hashPassword(input.password),
+            passwordHash: await (await import("@/lib/auth")).hashPassword(input.password),
             phone: input.phone ?? null,
             upiId: input.upiId ?? null,
           },

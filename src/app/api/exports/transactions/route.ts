@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     include: {
       donorMember: { select: { memberNo: true } },
       enteredByUser: { select: { name: true } },
-      allocations: { include: { category: { select: { name: true } } } },
+      allocations: { include: { collectionDefinition: { select: { name: true } } } },
     },
     take: 20000,
   });
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     formatDate(p.paymentDate),
     p.donorMember?.memberNo ?? "",
     p.donorNameSnapshot,
-    p.allocations.map((a) => a.category.name).join("; "),
+    p.allocations.map((a) => a.collectionDefinition.name).join("; "),
     (p.amountPaise / 100).toFixed(2),
     PAYMENT_MODE_LABELS[p.mode] ?? p.mode,
     p.referenceNo ?? "",

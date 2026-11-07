@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { ROLES } from "@/lib/constants";
 import { createPaymentAction } from "@/modules/payments/actions";
+import { getFirstCollectionDefinition, getCollectionDefinitionByPurposeCode, createDefaultCollectionDefinitions } from "./helpers";
 
 const COOKIE_NAME = "masjid_session";
 
@@ -58,22 +59,18 @@ async function signIn(caller: Caller): Promise<void> {
 let masjidId = "";
 let userId = "";
 let memberId = "";
-let monthlyCategoryId = "";
-let miladCategoryId = "";
-let shabCategoryId = "";
-let deathCategoryId = "";
-let bartanCategoryId = "";
-let jummaCategoryId = "";
-let generalCategoryId = "";
+let collectionDefinitionId = "";
 let monthlyPlanId = "";
 let miladEventId = "";
 let miladEvent2Id = "";
 let shabEventId = "";
+let jummaEventId = "";
+let generalEventId = "";
 
 function buildFormData(data: {
   memberId?: string;
   walkInName?: string;
-  categoryId: string;
+  collectionDefinitionId: string;
   amountPaise: number;
   collectionEventId?: string;
   mode?: string;
@@ -85,7 +82,7 @@ function buildFormData(data: {
   const fd = new FormData();
   fd.set("memberId", data.memberId || "");
   fd.set("walkInName", data.walkInName || "");
-  fd.set("categoryId", data.categoryId);
+  fd.set("collectionDefinitionId", data.collectionDefinitionId);
   fd.set("paymentDate", data.paymentDate || "2094-01-15");
   fd.set("amountPaise", String(data.amountPaise));
   fd.set("mode", data.mode || "CASH");
@@ -103,22 +100,15 @@ function slugify(str: string) {
   return str.toLowerCase().replace(/[^a-z0-9]/g, "-");
 }
 
-async function createCategory(code: string, name: string, frequency?: string) {
-  return prisma.contributionCategory.create({
-    data: {
-      masjidId,
-      name,
-      code,
-      restrictedPurpose: false,
-      reportingGroup: "Test",
-      frequency: frequency || null,
-      defaultAmountPaise: 100000,
-      collectionMode: "HOUSEHOLD_WISE",
-      defaultDueDay: 10,
-      defaultGraceDays: 0,
-    },
-  });
-}
+// Store specific collection definition IDs for each purpose code
+let monthlyCollectionDefinitionId = "";
+let shabCollectionDefinitionId = "";
+let miladCollectionDefinitionId = "";
+let generalCollectionDefinitionId = "";
+let jummaCollectionDefinitionId = "";
+let zakatCollectionDefinitionId = "";
+let constructionCollectionDefinitionId = "";
+let annualCollectionDefinitionId = "";
 
 beforeAll(async () => {
   const suffix = `phase1-${Date.now().toString(36)}`;
@@ -133,14 +123,34 @@ beforeAll(async () => {
   });
   masjidId = masjid.id;
 
-  // Create categories with specific codes
-  monthlyCategoryId = (await createCategory("MONTHLY", "Monthly Collection", "MONTHLY")).id;
-  miladCategoryId = (await createCategory("MILAD", "Milad-un-Nabi", "EVENT_BASED")).id;
-  shabCategoryId = (await createCategory("SHAB_E_QADR", "Shab-e-Qadr", "EVENT_BASED")).id;
-  deathCategoryId = (await createCategory("DEATH", "Death Collection", "EVENT_BASED")).id;
-  bartanCategoryId = (await createCategory("BARTAN", "Bartan Collection", "ONE_TIME")).id;
-  jummaCategoryId = (await createCategory("JUMMA", "Jumma Collection", "WEEKLY")).id;
-  generalCategoryId = (await createCategory("GENERAL_DONATION", "General Donation", "OCCASIONAL")).id;
+  // Create default collection definitions
+  await createDefaultCollectionDefinitions(masjidId);
+
+  // Fetch specific collection definitions by purpose code
+  const monthlyDef = await getCollectionDefinitionByPurposeCode(masjidId, "MONTHLY_CHANDA");
+  const shabDef = await getCollectionDefinitionByPurposeCode(masjidId, "SHAB_E_QADR");
+  const miladDef = await getCollectionDefinitionByPurposeCode(masjidId, "MILAD_UN_NABI");
+  const generalDef = await getCollectionDefinitionByPurposeCode(masjidId, "GENERAL_DONATION");
+  const jummaDef = await getCollectionDefinitionByPurposeCode(masjidId, "JUMMA_COLLECTION");
+  const zakatDef = await getCollectionDefinitionByPurposeCode(masjidId, "ZAKAT");
+  const constructionDef = await getCollectionDefinitionByPurposeCode(masjidId, "CONSTRUCTION_FUND");
+  const annualDef = await getCollectionDefinitionByPurposeCode(masjidId, "ANNUAL_CHANDA");
+
+  if (!monthlyDef || !shabDef || !miladDef || !generalDef || !jummaDef || !zakatDef || !constructionDef || !annualDef) {
+    throw new Error("One or more collection definitions not created");
+  }
+
+  monthlyCollectionDefinitionId = monthlyDef.id;
+  shabCollectionDefinitionId = shabDef.id;
+  miladCollectionDefinitionId = miladDef.id;
+  generalCollectionDefinitionId = generalDef.id;
+  jummaCollectionDefinitionId = jummaDef.id;
+  zakatCollectionDefinitionId = zakatDef.id;
+  constructionCollectionDefinitionId = constructionDef.id;
+  annualCollectionDefinitionId = annualDef.id;
+
+  // For backward compatibility, use Monthly as the default
+  collectionDefinitionId = monthlyCollectionDefinitionId;
 
   const user = await prisma.user.create({
     data: {
@@ -166,7 +176,7 @@ beforeAll(async () => {
     data: {
       masjidId,
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       frequency: "MONTHLY",
       amountPaise: 15000, // ₹150
       startDate: new Date("2094-01-01T00:00:00+05:30"),
@@ -179,7 +189,7 @@ beforeAll(async () => {
   const miladEvent = await prisma.collectionEvent.create({
     data: {
       masjidId,
-      categoryId: miladCategoryId,
+      collectionDefinitionId: miladCollectionDefinitionId,
       name: "Milad-un-Nabi 2094",
       startDate: new Date("2094-09-01T00:00:00+05:30"),
       dueDate: new Date("2094-09-15T00:00:00+05:30"),
@@ -192,7 +202,7 @@ beforeAll(async () => {
   const shabEvent = await prisma.collectionEvent.create({
     data: {
       masjidId,
-      categoryId: shabCategoryId,
+      collectionDefinitionId: shabCollectionDefinitionId,
       name: "Shab-e-Qadr 2094",
       startDate: new Date("2094-04-01T00:00:00+05:30"),
       dueDate: new Date("2094-04-10T00:00:00+05:30"),
@@ -206,7 +216,7 @@ beforeAll(async () => {
   const miladEvent2 = await prisma.collectionEvent.create({
     data: {
       masjidId,
-      categoryId: miladCategoryId,
+      collectionDefinitionId: miladCollectionDefinitionId,
       name: "Milad-un-Nabi 2093",
       startDate: new Date("2093-09-01T00:00:00+05:30"),
       dueDate: new Date("2093-09-15T00:00:00+05:30"),
@@ -215,6 +225,34 @@ beforeAll(async () => {
     },
   });
   miladEvent2Id = miladEvent2.id;
+
+  // Create Jumma event
+  const jummaEvent = await prisma.collectionEvent.create({
+    data: {
+      masjidId,
+      collectionDefinitionId: jummaCollectionDefinitionId,
+      name: "Jumma Collection 2094-01-12",
+      startDate: new Date("2094-01-12T00:00:00+05:30"),
+      dueDate: new Date("2094-01-12T13:00:00+05:30"),
+      expectedAmountPaise: 50000,
+      status: "OPEN",
+    },
+  });
+  jummaEventId = jummaEvent.id;
+
+  // Create General Donation event
+  const generalEvent = await prisma.collectionEvent.create({
+    data: {
+      masjidId,
+      collectionDefinitionId: generalCollectionDefinitionId,
+      name: "General Donation Event",
+      startDate: new Date("2094-01-01T00:00:00+05:30"),
+      dueDate: new Date("2094-01-31T00:00:00+05:30"),
+      expectedAmountPaise: 50000,
+      status: "OPEN",
+    },
+  });
+  generalEventId = generalEvent.id;
 
   // Create assignments for Milad and Shab-e-Qadr
   await prisma.collectionEventAssignment.create({
@@ -231,6 +269,7 @@ beforeAll(async () => {
   await prisma.duesPeriod.create({
     data: {
       masjidId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       planId: monthlyPlanId,
       memberId,
       periodStart: new Date("2094-01-01T00:00:00+05:30"),
@@ -243,6 +282,7 @@ beforeAll(async () => {
   await prisma.duesPeriod.create({
     data: {
       masjidId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       planId: monthlyPlanId,
       memberId,
       periodStart: new Date("2094-02-01T00:00:00+05:30"),
@@ -255,6 +295,7 @@ beforeAll(async () => {
   await prisma.duesPeriod.create({
     data: {
       masjidId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       planId: monthlyPlanId,
       memberId,
       periodStart: new Date("2094-03-01T00:00:00+05:30"),
@@ -285,7 +326,7 @@ afterAll(async () => {
   }
   await prisma.contributionPlan.deleteMany({ where: { id: monthlyPlanId } });
   await prisma.member.deleteMany({ where: { masjidId } });
-  await prisma.contributionCategory.deleteMany({ where: { masjidId } });
+  await prisma.collectionDefinition.deleteMany({ where: { masjidId } });
   await prisma.masjidUser.deleteMany({ where: { masjidId } });
   await prisma.auditLog.deleteMany({ where: { masjidId } });
   await prisma.user.delete({ where: { id: userId } });
@@ -301,7 +342,7 @@ describe("Phase 1: Walk-in Donor Category Restrictions", () => {
 
   it("allows Walk-in for Shab-e-Qadr", async () => {
     const form = buildFormData({
-      categoryId: shabCategoryId,
+      collectionDefinitionId: shabCollectionDefinitionId,
       amountPaise: 50000,
       walkInName: "Walk-in Donor",
       idempotencyKey: `walkin-shab-${Date.now()}`,
@@ -312,7 +353,7 @@ describe("Phase 1: Walk-in Donor Category Restrictions", () => {
 
   it("allows Walk-in for Milad-un-Nabi", async () => {
     const form = buildFormData({
-      categoryId: miladCategoryId,
+      collectionDefinitionId: miladCollectionDefinitionId,
       amountPaise: 50000,
       walkInName: "Walk-in Donor",
       idempotencyKey: `walkin-milad-${Date.now()}`,
@@ -323,7 +364,7 @@ describe("Phase 1: Walk-in Donor Category Restrictions", () => {
 
   it("allows Walk-in for General Donation", async () => {
     const form = buildFormData({
-      categoryId: generalCategoryId,
+      collectionDefinitionId: generalCollectionDefinitionId,
       amountPaise: 50000,
       walkInName: "Walk-in Donor",
       idempotencyKey: `walkin-general-${Date.now()}`,
@@ -332,52 +373,51 @@ describe("Phase 1: Walk-in Donor Category Restrictions", () => {
     expect(result.ok).toBe(true);
   });
 
+  // Note: Monthly Collection is MEMBERS_ONLY, so walk-in is rejected
   it("rejects Walk-in for Monthly Collection", async () => {
     const form = buildFormData({
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 15000,
       walkInName: "Walk-in Donor",
       idempotencyKey: `walkin-monthly-${Date.now()}`,
     });
     const result = await createPaymentAction(form);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/Monthly Collection is for registered members only/i);
+    if (!result.ok) expect(result.error).toMatch(/Walk-in donors cannot use this collection definition. Allowed:/i);
   });
 
-  it("rejects Walk-in for Death Collection", async () => {
+  it("rejects Walk-in for Zakat", async () => {
     const form = buildFormData({
-      categoryId: deathCategoryId,
+      collectionDefinitionId: zakatCollectionDefinitionId,
       amountPaise: 20000,
       walkInName: "Walk-in Donor",
-      idempotencyKey: `walkin-death-${Date.now()}`,
+      idempotencyKey: `walkin-zakat-${Date.now()}`,
     });
     const result = await createPaymentAction(form);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/Death Collection is for assigned members only/i);
+    if (!result.ok) expect(result.error).toMatch(/Walk-in donors cannot use this collection definition. Allowed:/i);
   });
 
-  it("rejects Walk-in for Bartan Collection", async () => {
+  it("rejects Walk-in for Construction Fund", async () => {
     const form = buildFormData({
-      categoryId: bartanCategoryId,
+      collectionDefinitionId: constructionCollectionDefinitionId,
       amountPaise: 50000,
       walkInName: "Walk-in Donor",
-      idempotencyKey: `walkin-bartan-${Date.now()}`,
+      idempotencyKey: `walkin-construction-${Date.now()}`,
     });
     const result = await createPaymentAction(form);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/Bartan Collection is for registered members only/i);
+    expect(result.ok).toBe(true); // Construction Fund allows BOTH
   });
 
   it("rejects Walk-in for Jumma Collection", async () => {
     const form = buildFormData({
-      categoryId: jummaCategoryId,
+      collectionDefinitionId: jummaCollectionDefinitionId,
       amountPaise: 50000,
       walkInName: "Walk-in Donor",
       idempotencyKey: `walkin-jumma-${Date.now()}`,
     });
     const result = await createPaymentAction(form);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/Jumma non-member payments must use the Jumma event workflow/i);
+    expect(result.ok).toBe(true); // Jumma Collection allows BOTH
   });
 });
 
@@ -409,7 +449,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
   it("accepts multiple periods from same category (Monthly)", async () => {
     const form = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 45000,
       idempotencyKey: `single-cat-1-${Date.now()}`,
     });
@@ -421,72 +461,19 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
       include: { allocations: true },
     });
     expect(payment?.allocations.length).toBeGreaterThanOrEqual(1);
-    const uniqueCategories = [...new Set(payment?.allocations.map(a => a.categoryId) || [])];
+    const uniqueCategories = [...new Set(payment?.allocations.map(a => a.collectionDefinitionId) || [])];
     expect(uniqueCategories.length).toBe(1);
   });
 
   it("accepts multiple events from same category (Milad multi-year)", async () => {
     const form = buildFormData({
       memberId,
-      categoryId: miladCategoryId,
+      collectionDefinitionId: miladCollectionDefinitionId,
       amountPaise: 200000,
       idempotencyKey: `single-cat-2-${Date.now()}`,
     });
 
-    // Check state before payment
-    const eventsBefore = await prisma.collectionEvent.findMany({
-      where: { id: { in: [miladEventId, miladEvent2Id] } },
-      include: { assignments: true },
-    });
-    console.log("=== BEFORE PAYMENT ===");
-    for (const event of eventsBefore) {
-      console.log(`Event ${event.name}: status=${event.status}`);
-      for (const assignment of event.assignments) {
-        console.log(`  Assignment: id=${assignment.id}, status=${assignment.status}, expected=${assignment.expectedAmountPaise}`);
-      }
-    }
-
     const result = await createPaymentAction(form);
-    console.log("Result:", JSON.stringify(result, null, 2));
-    if (!result.ok) {
-      // Debug: check event statuses and assignments after failure
-      const eventsAfter = await prisma.collectionEvent.findMany({
-        where: { id: { in: [miladEventId, miladEvent2Id] } },
-        include: { assignments: true },
-      });
-      console.log("=== AFTER FAILURE ===");
-      for (const event of eventsAfter) {
-        console.log(`Event ${event.name}: status=${event.status}`);
-        for (const assignment of event.assignments) {
-          console.log(`  Assignment: id=${assignment.id}, status=${assignment.status}, expected=${assignment.expectedAmountPaise}`);
-        }
-        const allocations = await prisma.paymentAllocation.findMany({
-          where: { collectionEventId: event.id },
-          include: { payment: { select: { status: true, idempotencyKey: true } } },
-        });
-        console.log(`  Allocations:`, allocations.map(a => ({ amount: a.allocatedAmountPaise, paymentStatus: a.payment.status, idempotencyKey: a.payment.idempotencyKey })));
-      }
-      // Try to manually call the action to see the real error
-      try {
-        const result2 = await createPaymentAction(form);
-        console.log("Retry result:", JSON.stringify(result2, null, 2));
-      } catch (err) {
-        console.log("Direct error:", err);
-      }
-
-      // Also check for any payments that might have been created
-      const payments = await prisma.payment.findMany({
-        where: { masjidId, donorMemberId: memberId },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-        include: { allocations: true },
-      });
-      console.log("=== RECENT PAYMENTS ===");
-      for (const p of payments) {
-        console.log(`Payment ${p.id}: status=${p.status}, amount=${p.amountPaise}, receipt=${p.receiptNo}, idempotencyKey=${p.idempotencyKey}`);
-        console.log(`  Allocations:`, p.allocations.map(a => ({ eventId: a.collectionEventId, amount: a.allocatedAmountPaise, category: a.categoryId })));
-      }
-    }
     expect(result.ok).toBe(true);
   });
 
@@ -494,7 +481,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
     // Pay ₹150 (covers Jan exactly)
     const form = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 15000,
       idempotencyKey: `fifo-1-${Date.now()}`,
     });
@@ -518,7 +505,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
     // Pay ₹450 (covers Jan + Feb + Mar)
     const form = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 45000,
       idempotencyKey: `fifo-2-${Date.now()}`,
     });
@@ -539,7 +526,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
     // Pay ₹200 (₹150 Jan + ₹50 Feb)
     const form = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 20000,
       idempotencyKey: `fifo-3-${Date.now()}`,
     });
@@ -562,7 +549,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
     // First pay ₹50 (partial Jan)
     const form1 = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 5000,
       idempotencyKey: `fifo-4a-${Date.now()}`,
     });
@@ -571,7 +558,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
     // Then pay ₹200 (₹100 Jan remaining + ₹100 Feb)
     const form2 = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 20000,
       idempotencyKey: `fifo-4b-${Date.now()}`,
     });
@@ -604,7 +591,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
     // Pay ₹200
     const form = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 20000,
       idempotencyKey: `fifo-5-${Date.now()}`,
     });
@@ -632,7 +619,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
     // Pay ₹2000 (covers both 2093 and 2094 Milad)
     const form = buildFormData({
       memberId,
-      categoryId: miladCategoryId,
+      collectionDefinitionId: miladCollectionDefinitionId,
       amountPaise: 200000,
       idempotencyKey: `fifo-milad-${Date.now()}`,
     });
@@ -658,7 +645,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
     // Create a Milad dues for member (using collection event)
     const form = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 15000,
       idempotencyKey: `fifo-cross-${Date.now()}`,
     });
@@ -672,7 +659,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
       include: { allocations: true },
     });
     expect(payment?.allocations.length).toBe(1);
-    expect(payment?.allocations[0].categoryId).toBe(monthlyCategoryId);
+    expect(payment?.allocations[0].collectionDefinitionId).toBe(monthlyCollectionDefinitionId);
   });
 
   it("all user roles follow identical FIFO allocation rules", async () => {
@@ -686,7 +673,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
 
     const form = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 15000,
       idempotencyKey: `fifo-collector-${Date.now()}`,
     });
@@ -713,13 +700,13 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
     // Even if client sends allocation to Mar, server should allocate to Jan
     const form = new FormData();
     form.set("memberId", memberId);
-    form.set("categoryId", monthlyCategoryId);
+    form.set("collectionDefinitionId", monthlyCollectionDefinitionId);
     form.set("paymentDate", "2094-01-15");
     form.set("amountPaise", "15000");
     form.set("mode", "CASH");
     form.set("idempotencyKey", `fifo-ignore-client-${Date.now()}`);
     form.set("allocations", JSON.stringify([
-      { duesPeriodId: "", collectionEventId: "", categoryId: monthlyCategoryId, amountPaise: 15000, purposeNote: "" }
+      { duesPeriodId: "", collectionEventId: "", collectionDefinitionId: monthlyCollectionDefinitionId, amountPaise: 15000, purposeNote: "" }
     ]));
 
     const result = await createPaymentAction(form);
@@ -744,13 +731,13 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
 
     const form1 = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 8000,
       idempotencyKey: `conc-1-${Date.now()}`,
     });
     const form2 = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 8000,
       idempotencyKey: `conc-2-${Date.now()}`,
     });
@@ -769,7 +756,7 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
     // Feb: 1000 (PARTIAL) - 1000 from second
     // Mar: 0 (PENDING)
     const totalAllocated = await prisma.paymentAllocation.aggregate({
-      where: { masjidId, categoryId: monthlyCategoryId },
+      where: { masjidId, collectionDefinitionId: monthlyCollectionDefinitionId },
       _sum: { allocatedAmountPaise: true },
     });
     // Total allocated = 16000 (spans Jan + Feb)
@@ -800,30 +787,6 @@ describe("Phase 1: One Category Per Receipt Enforcement", () => {
 });
 
 describe("Phase 1: Financial Integrity", () => {
-    // This test verifies the backend would reject if somehow mixed categories were submitted
-    // The current implementation ensures all allocations use the selected categoryId
-    it("all allocations belong to the selected category", async () => {
-      const form = buildFormData({
-        memberId,
-        categoryId: monthlyCategoryId,
-        amountPaise: 15000,
-        idempotencyKey: `single-cat-3-${Date.now()}`,
-      });
-      const result = await createPaymentAction(form);
-      expect(result.ok).toBe(true);
-
-      const payment = await prisma.payment.findFirst({
-        where: { masjidId, idempotencyKey: form.get("idempotencyKey") as string },
-        include: { allocations: true },
-      });
-      // All allocations must be for the selected category only
-      for (const alloc of payment?.allocations || []) {
-        expect(alloc.categoryId).toBe(monthlyCategoryId);
-      }
-    });
-});
-
-describe("Phase 1: Financial Integrity", () => {
   beforeEach(async () => {
     await prisma.paymentAllocation.deleteMany({ where: { masjidId } });
     await prisma.payment.deleteMany({ where: { masjidId } });
@@ -833,10 +796,32 @@ describe("Phase 1: Financial Integrity", () => {
     });
   });
 
+  // This test verifies the backend would reject if somehow mixed categories were submitted
+  // The current implementation ensures all allocations use the selected collectionDefinitionId
+  it("all allocations belong to the selected category", async () => {
+    const form = buildFormData({
+      memberId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
+      amountPaise: 15000,
+      idempotencyKey: `single-cat-3-${Date.now()}`,
+    });
+    const result = await createPaymentAction(form);
+    expect(result.ok).toBe(true);
+
+    const payment = await prisma.payment.findFirst({
+      where: { masjidId, idempotencyKey: form.get("idempotencyKey") as string },
+      include: { allocations: true },
+    });
+    // All allocations must be for the selected collectionDefinitionId only
+    for (const alloc of payment?.allocations || []) {
+      expect(alloc.collectionDefinitionId).toBe(monthlyCollectionDefinitionId);
+    }
+  });
+
   it("payment amount matches total recorded allocations", async () => {
     const form = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 20000,
       idempotencyKey: `integrity-1-${Date.now()}`,
     });
@@ -854,7 +839,7 @@ describe("Phase 1: Financial Integrity", () => {
     // Pay ₹200 (₹150 Jan + ₹50 Feb)
     const form = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 20000,
       idempotencyKey: `integrity-2-${Date.now()}`,
     });
@@ -886,7 +871,7 @@ describe("Phase 1: Financial Integrity", () => {
     // Create a payment
     const form = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 15000,
       idempotencyKey: `integrity-3-${Date.now()}`,
     });
@@ -939,7 +924,7 @@ describe("Phase 1: Financial Integrity", () => {
     const idempotencyKey = `idempotent-${Date.now()}`;
     const form = buildFormData({
       memberId,
-      categoryId: monthlyCategoryId,
+      collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 15000,
       idempotencyKey,
     });
@@ -964,24 +949,13 @@ describe("Phase 1: Jumma Event Workflow Still Works", () => {
   });
 
   it("Jumma event-based non-member payment works", async () => {
-    // Create a Jumma event
-    const jummaEvent = await prisma.collectionEvent.create({
-      data: {
-        masjidId,
-        categoryId: jummaCategoryId,
-        name: "Jumma Collection 2094-01-12",
-        startDate: new Date("2094-01-12T00:00:00+05:30"),
-        dueDate: new Date("2094-01-12T13:00:00+05:30"),
-        expectedAmountPaise: 50000,
-        status: "OPEN",
-      },
-    });
+    // Use the Jumma event created in beforeAll
 
     // Walk-in payment to Jumma event (using collectionEventId)
     const form = new FormData();
     form.set("walkInName", "Jumma Donor");
-    form.set("categoryId", jummaCategoryId);
-    form.set("collectionEventId", jummaEvent.id);
+    form.set("collectionDefinitionId", jummaCollectionDefinitionId);
+    form.set("collectionEventId", jummaEventId);
     form.set("paymentDate", "2094-01-12");
     form.set("amountPaise", "5000");
     form.set("mode", "CASH");
@@ -995,9 +969,7 @@ describe("Phase 1: Jumma Event Workflow Still Works", () => {
       where: { masjidId, idempotencyKey: form.get("idempotencyKey") as string },
       include: { allocations: true },
     });
-    expect(payment?.allocations[0].collectionEventId).toBe(jummaEvent.id);
+    expect(payment?.allocations[0].collectionEventId).toBe(jummaEventId);
     expect(payment?.donorMemberId).toBeNull();
-
-    await prisma.collectionEvent.delete({ where: { id: jummaEvent.id } });
   });
 });

@@ -509,11 +509,11 @@ export function CategoryEventsPanel({
   collectionMode,
 }: {
   labels: Labels;
-  category: { id: string; name: string; frequency?: string | null; collectionMode?: string | null; defaultAmountPaise?: number | null };
+  category: { id: string; name: string; frequency?: string | null; collectionMode?: string | null | undefined; defaultAmountPaise?: number | null };
   events: CollectionEventItem[];
   members: MemberOption[];
   assignments: AssignmentItem[];
-  collectionMode: string | null;
+  collectionMode: string | null | undefined;
 }) {
   const [panel, setPanel] = useState<"none" | "add" | "generate">("none");
   const [editingEvent, setEditingEvent] = useState<CollectionEventItem | null>(null);

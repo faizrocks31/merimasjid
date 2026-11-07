@@ -107,6 +107,7 @@ export async function generateDuesPeriods(planId: string): Promise<number> {
     const result = await prisma.duesPeriod.createMany({
       data: periods.map((p) => ({
         masjidId: plan.masjidId,
+        collectionDefinitionId: plan.collectionDefinitionId,
         planId: plan.id,
         memberId: plan.memberId,
         periodStart: p.periodStart,
@@ -293,7 +294,7 @@ export async function sendDuesReminders(masjidId: string, daysAhead: number = 3)
       dueDate: { lte: cutoffDate },
     },
     include: {
-      plan: { include: { category: { select: { name: true } } } },
+      plan: { include: { collectionDefinition: { select: { name: true } } } },
       member: { select: { id: true, fullName: true } },
       allocations: {
         include: { payment: { select: { status: true } } },
@@ -305,16 +306,16 @@ export async function sendDuesReminders(masjidId: string, daysAhead: number = 3)
   for (const period of periods) {
     const allocated = period.allocations
       ?.filter((a) => a.payment?.status === "SUCCESS")
-      .reduce((sum, a) => sum + a.allocatedAmountPaise, 0) ?? 0;
+      .reduce((sum: number, a) => sum + a.allocatedAmountPaise, 0) ?? 0;
     const outstanding = Math.max(period.expectedAmountPaise - allocated, 0);
 
     if (outstanding > 0 && period.member) {
-      const periodLabel = `${period.plan.category.name} (${period.periodStart.toISOString().split("T")[0]} - ${period.periodEnd?.toISOString().split("T")[0] ?? period.periodStart.toISOString().split("T")[0]})`;
+      const periodLabel = `${period.plan?.collectionDefinition?.name ?? "—"} (${period.periodStart.toISOString().split("T")[0]} - ${period.periodEnd?.toISOString().split("T")[0] ?? period.periodStart.toISOString().split("T")[0]})`;
       await notifyDuesReminder({
         masjidId,
         memberId: period.member.id,
         amount: outstanding,
-        category: period.plan.category.name,
+        category: period.plan?.collectionDefinition?.name ?? "—",
         dueDate: period.dueDate,
         period: periodLabel,
       });

@@ -4,10 +4,11 @@ import { useActionState, useMemo, useTransition, useEffect, useState } from "rea
 import { useRouter } from "next/navigation";
 import { Plus, Save, Edit, Trash2, X, MessageCircle } from "lucide-react";
 import {
-  createCategoryAction,
   createExpenseCategoryAction,
-  updateCategoryAction,
   updateExpenseCategoryAction,
+  createCollectionDefinitionAction,
+  updateCollectionDefinitionAction,
+  deleteCollectionDefinitionAction,
   updateNotificationSettingsAction,
   sendAnnouncementAction,
   updateSettingsAction,
@@ -27,6 +28,82 @@ const MONTHS = [
   ["5", "May"], ["6", "June"], ["7", "July"], ["8", "August"],
   ["9", "September"], ["10", "October"], ["11", "November"], ["12", "December"],
 ];
+
+interface CategoryListItem {
+  id: string;
+  name: string;
+  meta?: string;
+  restricted?: boolean;
+  active: boolean;
+  code?: string;
+  reportingGroup?: string | null;
+  restrictedPurpose?: boolean;
+  description?: string | null;
+  defaultAmountPaise?: number | null;
+  frequency?: string | null;
+  collectionMode?: string | null;
+  defaultDueDay?: number | null;
+  defaultGraceDays?: number | null;
+}
+
+interface CategoryListProps {
+  items: CategoryListItem[];
+  labels: Labels;
+  onEdit: (item: CategoryListItem) => void;
+  onDelete: (item: CategoryListItem) => void;
+  /** Rendered under a row — used for the per-category collection events. */
+  renderChildren?: (item: CategoryListItem) => React.ReactNode;
+}
+
+export function CategoryList({ items, labels, onEdit, onDelete, renderChildren }: CategoryListProps) {
+  if (items.length === 0) return <p className="px-5 py-6 text-xs text-[var(--ink-muted)]">—</p>;
+  return (
+    <ul className="divide-y divide-[var(--border-subtle)]">
+      {items.map((item) => (
+        <li key={item.id} className="flex items-center justify-between px-5 py-3 hover:bg-[var(--surface)]">
+          <div className="min-w-0">
+            <p className="text-sm font-medium truncate">{item.name}</p>
+            {item.meta && <p className="text-[11px] text-[var(--ink-muted)] truncate">{item.meta}</p>}
+            {item.description && <p className="text-[11px] text-[var(--ink-muted)] truncate">{item.description}</p>}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {item.restrictedPurpose && (
+              <Badge tone="warning" className="text-[10px]">{labels.restrictedPurpose}</Badge>
+            )}
+            <Badge tone={item.active ? "success" : "neutral"} className="text-[10px]">
+              {item.active ? labels.active : labels.inactive}
+            </Badge>
+            <Button type="button" variant="ghost" size="sm" onClick={() => onEdit(item)}>
+              <Edit className="h-3.5 w-3.5" />
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => onDelete(item)} className="text-[var(--danger)]">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+interface CollectionDefinitionListItem {
+  id: string;
+  name: string;
+  code?: string;
+  description?: string | null;
+  active: boolean;
+  showInPaymentReceived: boolean;
+  frequency: string | null;
+  amountType: string | null;
+  defaultAmountPaise: number | null;
+  donorEligibility: string | null;
+  memberAssignment: string | null;
+  dueGeneration: string | null;
+  settlementPolicy: string | null;
+  baseCategoryName: string;
+  subcategoryName: string;
+  meta: string;
+}
 
 function Notice({ state, saved }: { state: SettingsState; saved: string }) {
   if (state?.error) {
@@ -283,99 +360,6 @@ export function PrayerTimesForm({
   );
 }
 
-interface EditingCategory {
-  id: string;
-  name: string;
-  code: string;
-  restrictedPurpose: boolean;
-  reportingGroup: string | null;
-}
-
-export function ContributionCategoryForm({
-  labels,
-  editingCategory,
-  onCancel,
-  redirectTo,
-}: {
-  labels: Labels;
-  editingCategory?: EditingCategory;
-  onCancel?: () => void;
-  redirectTo?: string;
-}) {
-  const isEditing = !!editingCategory;
-  const action = isEditing ? updateCategoryAction : createCategoryAction;
-  const [state, formAction, pending] = useActionState<SettingsState, FormData>(action, undefined);
-  const [, startTransition] = useTransition();
-  useReloadOnSuccess(state, redirectTo);
-
-  const fields = useMemo(
-    () => getFormFields("category").map((f) => {
-      const mapped = { ...f, label: labels[f.name] ?? f.label };
-      if (f.name === "name") mapped.placeholder = "e.g. Ramadan Fund";
-      if (f.name === "code") mapped.placeholder = "RAMADAN";
-      // The code is the category's identity — it can be updated but must remain unique.
-      // We don't disable it anymore; server-side validation ensures uniqueness.
-      if (isEditing && f.name === "code") {
-        mapped.defaultValue = editingCategory.code;
-      }
-      if (isEditing && f.name === "name") {
-        mapped.defaultValue = editingCategory.name;
-      }
-      if (isEditing && f.name === "restrictedPurpose") {
-        mapped.defaultValue = editingCategory.restrictedPurpose;
-      }
-      if (isEditing && f.name === "reportingGroup") {
-        mapped.defaultValue = editingCategory.reportingGroup ?? "";
-      }
-      return mapped;
-    }),
-    [labels, isEditing, editingCategory]
-  );
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    // code should be uppercase
-    const code = String(formData.get("code") ?? "").toUpperCase();
-    formData.set("code", code);
-    if (isEditing) {
-      formData.set("categoryId", editingCategory.id);
-    }
-    startTransition(() => formAction(formData));
-  };
-
-  return (
-    <form action={formAction} method="post" className="space-y-3 p-5">
-      {isEditing && (
-        <input type="hidden" name="categoryId" value={editingCategory.id} />
-      )}
-      {/* The key forces a remount when the edited category changes: SimpleForm
-          renders uncontrolled inputs, whose `defaultValue` is only applied on
-          mount, so reusing the DOM would keep showing the previous values. */}
-      <SimpleForm
-        key={isEditing ? editingCategory.id : "new"}
-        fields={fields}
-        values={{}}
-        disabled={pending}
-        fieldsOnly={true}
-        uncontrolled={true}
-      />
-      <Notice state={state} saved={labels.saved} />
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" variant={isEditing ? "primary" : "secondary"} disabled={pending} className="flex-1">
-          {isEditing ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {pending ? labels.loading : isEditing ? labels.update : labels.save}
-        </Button>
-        {isEditing && (
-          <Button type="button" size="sm" variant="ghost" onClick={onCancel} className="flex-1">
-            <X className="h-4 w-4" /> {labels.cancel}
-          </Button>
-        )}
-      </div>
-    </form>
-  );
-}
-
 interface EditingExpenseCategory {
   id: string;
   name: string;
@@ -445,160 +429,6 @@ export function ExpenseCategoryForm({
         )}
       </div>
     </form>
-  );
-}
-
-interface CategoryListItem {
-  id: string;
-  name: string;
-  meta?: string;
-  restricted?: boolean;
-  active: boolean;
-  code?: string;
-  reportingGroup?: string | null;
-  restrictedPurpose?: boolean;
-  description?: string | null;
-  defaultAmountPaise?: number | null;
-  frequency?: string | null;
-  collectionMode?: string | null;
-  defaultDueDay?: number | null;
-  defaultGraceDays?: number | null;
-}
-
-interface CategoryListProps {
-  items: CategoryListItem[];
-  labels: Labels;
-  onEdit: (item: CategoryListItem) => void;
-  onDelete: (item: CategoryListItem) => void;
-  /** Rendered under a row — used for the per-category collection events. */
-  renderChildren?: (item: CategoryListItem) => React.ReactNode;
-}
-
-export function CategoryList({ items, labels, onEdit, onDelete, renderChildren }: CategoryListProps) {
-  if (items.length === 0) return <p className="px-5 py-6 text-xs text-[var(--ink-muted)]">—</p>;
-  return (
-    <ul className="divide-y divide-[var(--border-subtle)]">
-      {items.map((item) => (
-        <li key={item.id} className="px-5 py-2.5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm">{item.name}</p>
-              {item.meta ? <p className="num text-[11px] text-[var(--ink-muted)]">{item.meta}</p> : null}
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              {item.restricted ? <Badge tone="gold">Restricted</Badge> : null}
-              {item.active === false ? <Badge tone="neutral">Inactive</Badge> : null}
-              {item.frequency ? <Badge tone="brand">{labels[item.frequency.toLowerCase()] ?? item.frequency}</Badge> : null}
-              {item.collectionMode ? (
-                <Badge tone="neutral">
-                  {labels[item.collectionMode.toLowerCase()] ?? item.collectionMode}
-                </Badge>
-              ) : null}
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onEdit(item)}
-                  className="h-8 w-8 p-0"
-                  aria-label={labels.edit ?? "Edit"}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onDelete(item)}
-                  className="h-8 w-8 p-0 text-[var(--danger)] hover:bg-[var(--danger-soft)]"
-                  aria-label={labels.delete ?? "Delete"}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-          {renderChildren ? renderChildren(item) : null}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/**
- * Contribution Categories Panel - handles list, add form toggle, edit navigation
- * and per-category collection events
- */
-export function ContributionCategoriesPanel({
-  items,
-  labels,
-  onDelete,
-  events = [],
-  members = [],
-  assignments = [],
-}: {
-  items: CategoryListItem[];
-  labels: Labels;
-  onDelete: (item: CategoryListItem) => void;
-  events?: CollectionEventItem[];
-  members?: MemberOption[];
-  assignments?: AssignmentItem[];
-}) {
-  const router = useRouter();
-  const [showAddForm, setShowAddForm] = useState(false);
-
-  const handleEdit = (item: CategoryListItem) => {
-    router.push(`/settings/categories/${item.id}/edit`);
-  };
-  const handleCancelAdd = () => {
-    setShowAddForm(false);
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* Add Form - shown when toggled */}
-      {showAddForm && (
-        <Card>
-          <ContributionCategoryForm
-            labels={labels}
-            onCancel={handleCancelAdd}
-          />
-        </Card>
-      )}
-
-      {/* List */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>{labels.category}</CardTitle>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="gap-1.5"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{showAddForm ? labels.cancel : labels.addCategory}</span>
-          </Button>
-        </CardHeader>
-        <CategoryList
-          items={items}
-          labels={labels}
-          onEdit={handleEdit}
-          onDelete={onDelete}
-          renderChildren={(item) => (
-            <CategoryEventsPanel
-              labels={labels}
-              category={item}
-              events={events}
-              members={members}
-              assignments={assignments}
-              collectionMode={item.collectionMode ?? null}
-            />
-          )}
-        />
-      </Card>
-    </div>
   );
 }
 
@@ -851,6 +681,412 @@ export function NotificationSettingsForm({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Collection Definition Form - Create/Edit collection definitions (Phase 2A)
+ */
+interface EditingCollectionDefinition {
+  id: string;
+  name: string;
+  description?: string | null;
+  baseCategoryId: string;
+  subcategoryId: string;
+  active: boolean;
+  showInPaymentReceived: boolean;
+  frequency: string;
+  amountType: string;
+  defaultAmountPaise?: number | null;
+  donorEligibility: string;
+  memberAssignment: string;
+  dueGeneration: string;
+  settlementPolicy: string;
+}
+
+export function CollectionDefinitionForm({
+  labels,
+  baseCategories,
+  subcategories,
+  editingDefinition,
+  onCancel,
+  redirectTo,
+}: {
+  labels: Labels;
+  baseCategories: { id: string; name: string; code: string }[];
+  subcategories: { id: string; name: string; code: string }[];
+  editingDefinition?: EditingCollectionDefinition;
+  onCancel?: () => void;
+  redirectTo?: string;
+}) {
+  const isEditing = !!editingDefinition;
+  const action = isEditing ? updateCollectionDefinitionAction : createCollectionDefinitionAction;
+  const [state, formAction, pending] = useActionState<SettingsState, FormData>(action, undefined);
+  const [, startTransition] = useTransition();
+  useReloadOnSuccess(state, redirectTo);
+
+  // Filter valid subcategories based on selected baseCategory
+  const [selectedBaseCategoryId, setSelectedBaseCategoryId] = useState(
+    isEditing ? editingDefinition.baseCategoryId : ""
+  );
+
+  const validSubcategories = useMemo(
+    () => subcategories.filter((sc) => {
+      // Valid combinations from the system taxonomy
+      const validCombos: Record<string, string[]> = {
+        ZAKAT: ["ZAKAT_FITR", "ZAKAT_MAAL"],
+        SADAQAH: ["GENERAL", "FIDYAH", "KAFFARAH"],
+        INFAQ: ["CONSTRUCTION", "MAINTENANCE", "OPERATIONS"],
+        CHANDA: ["MONTHLY", "ANNUAL"],
+        FUNDRAISING: ["CAMPAIGN", "PROJECT", "EMERGENCY"],
+        COMMUNITY_EVENT: ["EID", "MILAD", "ISRA_MIRAJ", "SHAB_E_QADR", "RAMADAN", "JUMMA"],
+        GENERAL_DONATION: ["UNRESTRICTED"],
+      };
+      return validCombos[selectedBaseCategoryId]?.includes(sc.code) ?? false;
+    }),
+    [subcategories, selectedBaseCategoryId]
+  );
+
+  const baseCategoryLabels: Record<string, string> = {
+    ZAKAT: labels.zakat ?? "Zakat",
+    SADAQAH: labels.sadaqah ?? "Sadaqah",
+    INFAQ: labels.infaq ?? "Infaq",
+    CHANDA: labels.chanda ?? "Chanda",
+    FUNDRAISING: labels.fundraising ?? "Fundraising",
+    COMMUNITY_EVENT: labels.communityEvent ?? "Community Event",
+    GENERAL_DONATION: labels.generalDonation ?? "General Donation",
+  };
+
+  const subcategoryLabels: Record<string, string> = {
+    ZAKAT_FITR: labels.zakatFitr ?? "Zakat al-Fitr",
+    ZAKAT_MAAL: labels.zakatMaal ?? "Zakat al-Maal",
+    GENERAL: labels.general ?? "General",
+    FIDYAH: labels.fidyah ?? "Fidyah",
+    KAFFARAH: labels.kaffarah ?? "Kaffarah",
+    CONSTRUCTION: labels.construction ?? "Construction",
+    MAINTENANCE: labels.maintenance ?? "Maintenance",
+    OPERATIONS: labels.operations ?? "Operations",
+    MONTHLY: labels.monthly ?? "Monthly",
+    ANNUAL: labels.annual ?? "Annual",
+    CAMPAIGN: labels.campaign ?? "Campaign",
+    PROJECT: labels.project ?? "Project",
+    EMERGENCY: labels.emergency ?? "Emergency",
+    EID: labels.eid ?? "Eid",
+    MILAD: labels.milad ?? "Milad un-Nabi",
+    ISRA_MIRAJ: labels.israMiraj ?? "Isra wal Miraj",
+    SHAB_E_QADR: labels.shabEQadr ?? "Shab-e-Qadr",
+    RAMADAN: labels.ramadan ?? "Ramadan",
+    JUMMA: labels.jumma ?? "Jumma",
+    UNRESTRICTED: labels.unrestricted ?? "Unrestricted",
+  };
+
+  const frequencyLabels: Record<string, string> = {
+    WEEKLY: labels.weekly ?? "Weekly",
+    MONTHLY: labels.monthly ?? "Monthly",
+    QUARTERLY: labels.quarterly ?? "Quarterly",
+    SEMI_ANNUAL: labels.semiAnnual ?? "Semi-Annual",
+    ANNUAL: labels.annual ?? "Annual",
+    EVENT_BASED: labels.eventBased ?? "Event-Based",
+    ONE_TIME: labels.oneTime ?? "One-Time",
+  };
+
+  const amountTypeLabels: Record<string, string> = {
+    FIXED: labels.fixedAmount ?? "Fixed Amount",
+    VARIABLE: labels.variableAmount ?? "Variable Amount",
+  };
+
+  const donorEligibilityLabels: Record<string, string> = {
+    MEMBERS_ONLY: labels.membersOnly ?? "Members Only",
+    WALKIN_ONLY: labels.walkinOnly ?? "Walk-in Only",
+    BOTH: labels.both ?? "Both Members & Walk-ins",
+  };
+
+  const memberAssignmentLabels: Record<string, string> = {
+    ALL_ELIGIBLE: labels.allEligible ?? "All Eligible Members",
+    SELECTED: labels.selectedMembers ?? "Selected Members",
+  };
+
+  const dueGenerationLabels: Record<string, string> = {
+    ADMIN: labels.adminGenerated ?? "Admin Generated",
+    AUTOMATIC: labels.automaticGenerated ?? "Automatic",
+  };
+
+  const settlementPolicyLabels: Record<string, string> = {
+    OLDEST_FIRST: labels.oldestFirst ?? "Oldest First (FIFO)",
+    ANY_PENDING_PERIOD: labels.anyPendingPeriod ?? "Any Pending Period",
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    if (isEditing) {
+      formData.set("definitionId", editingDefinition.id);
+    }
+    startTransition(() => formAction(formData));
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3 p-5">
+      {isEditing && (
+        <input type="hidden" name="definitionId" value={editingDefinition.id} />
+      )}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SimpleForm
+          key={isEditing ? editingDefinition.id : "new"}
+          fields={[
+            { name: "name", label: labels.name, type: "text", required: true, placeholder: "e.g. Monthly Chanda" },
+            { name: "description", label: labels.description, type: "textarea", required: false, placeholder: labels.descriptionHint ?? "" },
+            {
+              name: "baseCategoryId",
+              label: labels.baseCategory ?? "Base Category",
+              type: "select",
+              required: true,
+              options: baseCategories.map((bc) => ({
+                value: bc.id,
+                label: baseCategoryLabels[bc.code] || bc.name,
+              })),
+              defaultValue: selectedBaseCategoryId || undefined,
+            },
+            {
+              name: "subcategoryId",
+              label: labels.subcategory ?? "Subcategory",
+              type: "select",
+              required: true,
+              options: validSubcategories.map((sc) => ({
+                value: sc.id,
+                label: subcategoryLabels[sc.code] || sc.name,
+              })),
+              defaultValue: isEditing ? editingDefinition.subcategoryId : undefined,
+            },
+            { name: "active", label: labels.active, type: "checkbox", required: false, defaultValue: isEditing ? editingDefinition.active : true },
+            { name: "showInPaymentReceived", label: labels.showInPaymentReceived ?? "Show in Payment Received", type: "checkbox", required: false, defaultValue: isEditing ? editingDefinition.showInPaymentReceived : true },
+          ]}
+          values={{}}
+          disabled={pending}
+          fieldsOnly={true}
+          uncontrolled={true}
+        />
+        <SimpleForm
+          fields={[
+            {
+              name: "frequency",
+              label: labels.frequency,
+              type: "select",
+              required: true,
+              options: Object.entries(frequencyLabels).map(([value, label]) => ({ value, label })),
+              defaultValue: isEditing ? editingDefinition.frequency : undefined,
+            },
+            {
+              name: "amountType",
+              label: labels.amountType ?? "Amount Type",
+              type: "select",
+              required: true,
+              options: Object.entries(amountTypeLabels).map(([value, label]) => ({ value, label })),
+              defaultValue: isEditing ? editingDefinition.amountType : undefined,
+            },
+            {
+              name: "defaultAmountPaise",
+              label: labels.defaultAmount ?? "Default Amount (Paise)",
+              type: "number",
+              required: false,
+              min: 1,
+              placeholder: "e.g. 50000 for ₹500",
+              defaultValue: isEditing && editingDefinition.defaultAmountPaise ? String(editingDefinition.defaultAmountPaise) : undefined,
+            },
+            {
+              name: "donorEligibility",
+              label: labels.donorEligibility ?? "Donor Eligibility",
+              type: "select",
+              required: true,
+              options: Object.entries(donorEligibilityLabels).map(([value, label]) => ({ value, label })),
+              defaultValue: isEditing ? editingDefinition.donorEligibility : undefined,
+            },
+            {
+              name: "memberAssignment",
+              label: labels.memberAssignment ?? "Member Assignment",
+              type: "select",
+              required: true,
+              options: Object.entries(memberAssignmentLabels).map(([value, label]) => ({ value, label })),
+              defaultValue: isEditing ? editingDefinition.memberAssignment : undefined,
+            },
+            {
+              name: "dueGeneration",
+              label: labels.dueGeneration ?? "Due Generation",
+              type: "select",
+              required: true,
+              options: Object.entries(dueGenerationLabels).map(([value, label]) => ({ value, label })),
+              defaultValue: isEditing ? editingDefinition.dueGeneration : undefined,
+            },
+            {
+              name: "settlementPolicy",
+              label: labels.settlementPolicy ?? "Settlement Policy",
+              type: "select",
+              required: true,
+              options: Object.entries(settlementPolicyLabels).map(([value, label]) => ({ value, label })),
+              defaultValue: isEditing ? editingDefinition.settlementPolicy : undefined,
+            },
+          ]}
+          values={{}}
+          disabled={pending}
+          fieldsOnly={true}
+          uncontrolled={true}
+        />
+      </div>
+      <Notice state={state} saved={labels.saved} />
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" variant={isEditing ? "primary" : "secondary"} disabled={pending} className="flex-1">
+          {isEditing ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {pending ? labels.loading : isEditing ? labels.update : labels.save}
+        </Button>
+        {isEditing && (
+          <Button type="button" size="sm" variant="ghost" onClick={onCancel} className="flex-1">
+            <X className="h-4 w-4" /> {labels.cancel}
+          </Button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Collection Definitions Panel - handles list, add form toggle, edit navigation
+ */
+interface CollectionDefinitionsPanelProps {
+  items: CollectionDefinitionListItem[];
+  labels: Labels;
+  baseCategories: { id: string; name: string; code: string }[];
+  subcategories: { id: string; name: string; code: string }[];
+  onDelete: (item: CollectionDefinitionListItem) => void;
+}
+
+export function CollectionDefinitionsPanel({
+  items,
+  labels,
+  baseCategories,
+  subcategories,
+  onDelete,
+}: CollectionDefinitionsPanelProps) {
+  const router = useRouter();
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const frequencyLabels: Record<string, string> = {
+    WEEKLY: labels.weekly ?? "Weekly",
+    MONTHLY: labels.monthly ?? "Monthly",
+    QUARTERLY: labels.quarterly ?? "Quarterly",
+    SEMI_ANNUAL: labels.semiAnnual ?? "Semi-Annual",
+    ANNUAL: labels.annual ?? "Annual",
+    EVENT_BASED: labels.eventBased ?? "Event-Based",
+    ONE_TIME: labels.oneTime ?? "One-Time",
+  };
+
+  const amountTypeLabels: Record<string, string> = {
+    FIXED: labels.fixedAmount ?? "Fixed Amount",
+    VARIABLE: labels.variableAmount ?? "Variable Amount",
+  };
+
+  const handleEdit = (item: CollectionDefinitionListItem) => {
+    router.push(`/settings/collection-definitions/${item.id}/edit`);
+  };
+
+  const handleCancelAdd = () => {
+    setShowAddForm(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Add Form - shown when toggled */}
+      {showAddForm && (
+        <Card>
+          <CollectionDefinitionForm
+            labels={labels}
+            baseCategories={baseCategories}
+            subcategories={subcategories}
+            onCancel={handleCancelAdd}
+          />
+        </Card>
+      )}
+
+      {/* List */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>{labels.collectionDefinitions ?? "Collection Definitions"}</CardTitle>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="gap-1.5"
+          >
+            <Plus className="h-4 w-4" />
+            <span>{showAddForm ? labels.cancel : labels.addCollectionDefinition ?? "Add Collection Definition"}</span>
+          </Button>
+        </CardHeader>
+        <ul className="divide-y divide-[var(--border-subtle)]">
+          {items.length === 0 && (
+            <li className="px-5 py-6 text-xs text-[var(--ink-muted)]">—</li>
+          )}
+          {items.map((item) => (
+            <li key={item.id} className="px-5 py-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">{item.name}</p>
+                  <p className="num text-[11px] text-[var(--ink-muted)]">
+                    {item.meta}
+                    {item.code && ` · ${item.code}`}
+                    {item.donorEligibility && ` · ${labels[item.donorEligibility.toLowerCase()] ?? item.donorEligibility}`}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {item.active === false ? <Badge tone="neutral">{labels.inactive}</Badge> : <Badge tone="success">{labels.active}</Badge>}
+                  {item.showInPaymentReceived ? (
+                    <Badge tone="brand">{labels.showInPaymentReceived ?? "Visible"}</Badge>
+                  ) : (
+                    <Badge tone="neutral">{labels.hiddenInPaymentReceived ?? "Hidden"}</Badge>
+                  )}
+                  {item.frequency && (
+                    <Badge tone="neutral">
+                      {frequencyLabels[item.frequency] ?? item.frequency}
+                    </Badge>
+                  )}
+                  {item.amountType && (
+                    <Badge tone="neutral">
+                      {amountTypeLabels[item.amountType] ?? item.amountType}
+                    </Badge>
+                  )}
+                  {item.defaultAmountPaise && (
+                    <Badge tone="neutral">
+                      ₹{(item.defaultAmountPaise / 100).toFixed(2)}
+                    </Badge>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleEdit(item)}
+                      className="h-8 w-8 p-0"
+                      aria-label={labels.edit ?? "Edit"}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => onDelete(item)}
+                      className="h-8 w-8 p-0 text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+                      aria-label={labels.delete ?? "Delete"}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Card>
     </div>
   );
 }

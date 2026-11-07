@@ -525,11 +525,12 @@ export function ReceiptPreview({
         aria-live="polite"
         aria-label="Receipt preview"
         style={{
-          maxWidth: '210mm',
+          maxWidth: '100%',
+          width: '100%',
           aspectRatio: '210 / 148.5',
           boxSizing: 'border-box',
           flexShrink: 0,
-          minWidth: '210mm',
+          minWidth: 0,
         }}
       >
       {/* Watermark */}

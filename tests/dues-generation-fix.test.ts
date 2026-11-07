@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { ROLES } from "@/lib/constants";
 import { generateDuesPeriods, buildPeriods, generateAllDuesForMasjid } from "@/lib/dues";
 import { generateDuesAction } from "@/modules/plans/actions";
+import { getFirstCollectionDefinition, createDefaultCollectionDefinitions } from "./helpers";
 
 const COOKIE_NAME = "masjid_session";
 
@@ -59,7 +60,7 @@ async function signIn(caller: Caller): Promise<void> {
 let masjidId = "";
 let userId = "";
 let memberId = "";
-let categoryId = "";
+let collectionDefinitionId = "";
 let planId = "";
 let planId2 = "";
 
@@ -76,10 +77,11 @@ beforeAll(async () => {
   });
   masjidId = masjid.id;
 
-  const category = await prisma.contributionCategory.create({
-    data: { masjidId, name: "General", code: "GEN" },
-  });
-  categoryId = category.id;
+  // Create default collection definitions
+  await createDefaultCollectionDefinitions(masjidId);
+  const collectionDefinition = await getFirstCollectionDefinition(masjidId);
+  if (!collectionDefinition) throw new Error("Collection definitions not created");
+  collectionDefinitionId = collectionDefinition.id;
 
   const user = await prisma.user.create({
     data: {
@@ -104,7 +106,7 @@ beforeAll(async () => {
     data: {
       masjidId,
       memberId,
-      categoryId,
+      collectionDefinitionId,
       frequency: "MONTHLY",
       amountPaise: 50000,
       startDate: new Date("2026-01-01T00:00:00+05:30"),
@@ -122,7 +124,7 @@ beforeAll(async () => {
     data: {
       masjidId,
       memberId: member2.id,
-      categoryId,
+      collectionDefinitionId,
       frequency: "MONTHLY",
       amountPaise: 30000,
       startDate: new Date("2026-01-01T00:00:00+05:30"),
@@ -145,7 +147,7 @@ afterAll(async () => {
   await prisma.duesPeriod.deleteMany({ where: { masjidId } });
   await prisma.contributionPlan.deleteMany({ where: { masjidId } });
   await prisma.member.deleteMany({ where: { masjidId } });
-  await prisma.contributionCategory.deleteMany({ where: { masjidId } });
+  await prisma.collectionDefinition.deleteMany({ where: { masjidId } });
   await prisma.masjidUser.deleteMany({ where: { masjidId } });
   await prisma.auditLog.deleteMany({ where: { masjidId } });
   await prisma.user.delete({ where: { id: userId } });
@@ -225,7 +227,7 @@ describe("Dues Generation Atomicity & Idempotency (Phase 2D Fix)", () => {
         masjidId,
         paymentId: payment.id,
         duesPeriodId: firstPeriod.id,
-        categoryId,
+        collectionDefinitionId,
         allocatedAmountPaise: 50000,
       },
     });

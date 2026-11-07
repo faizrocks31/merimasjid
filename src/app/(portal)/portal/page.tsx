@@ -103,7 +103,7 @@ export default async function PortalHome() {
               {summary.open.slice(0, 4).map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{p.plan.category.name}</p>
+                    <p className="truncate text-sm font-medium">{p.plan?.collectionDefinition?.name ?? "—"}</p>
                     <p className="num text-[11px] text-[var(--ink-muted)]">
                       {formatDate(p.periodStart)} – {formatDate(p.periodEnd)} · {t("dueDate")} {formatDate(p.dueDate)}
                     </p>

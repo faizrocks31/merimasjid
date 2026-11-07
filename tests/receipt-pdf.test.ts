@@ -27,8 +27,8 @@ function payment(overrides: Record<string, unknown> = {}) {
     donorMember: { memberNo: "MAS-000042", fullName: "Abdul Rahman" },
     enteredByUser: { name: "Masjid Admin" },
     allocations: [
-      { allocatedAmountPaise: 100000, category: { name: "Monthly Chanda" } },
-      { allocatedAmountPaise: 25050, category: { name: "Construction Fund" } },
+      { allocatedAmountPaise: 100000, collectionDefinition: { name: "Monthly Chanda" } },
+      { allocatedAmountPaise: 25050, collectionDefinition: { name: "Construction Fund" } },
     ],
     masjid: {
       name: "Jama Masjid",
