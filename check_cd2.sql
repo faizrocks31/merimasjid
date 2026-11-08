@@ -1,0 +1,1 @@
+SELECT id, name, "masjidId", active FROM "CollectionDefinition" WHERE "masjidId" = (SELECT id FROM "Masjid" WHERE slug = 'test-masjid');

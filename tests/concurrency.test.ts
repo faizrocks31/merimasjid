@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
 import { getFirstCollectionDefinition } from "./helpers";
+import testDbReady from "./setup";
 
 let masjidId = "";
 let memberId = "";
@@ -51,8 +52,10 @@ async function makePayment(amount: number, idempotencyKey: string) {
 }
 
 beforeAll(async () => {
-  const masjid = await prisma.masjid.findFirst();
-  if (!masjid) throw new Error("Seed first");
+  await testDbReady;
+
+  const masjid = await prisma.masjid.findFirst({ where: { slug: "test-masjid" } });
+  if (!masjid) throw new Error("Seed first - test-masjid not found");
   masjidId = masjid.id;
   const user = await prisma.user.findFirst();
   if (!user) throw new Error("Seed first");

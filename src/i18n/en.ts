@@ -242,9 +242,6 @@ export const en = {
   masjidCreated: "Masjid created successfully. Now create the admin account.",
   registrationComplete: "Registration complete! Masjid and admin account are ready.",
 
-  // Member Portal Notifications
-  // Moved to portal* keys below to avoid duplicate keys with notification settings section
-
   // Subscription
   subscription: "Subscription",
   subscriptionPlan: "Plan",
@@ -469,6 +466,10 @@ export const en = {
   selectedMembers: "Selected Members",
   memberCount: "members selected",
   noActiveMembers: "No active members found",
+  generateDuesAction: "Generate Dues",
+  generating: "Generating...",
+  skipped: "skipped (already existed)",
+  errors: "Errors",
   review: "Review",
   reviewDesc: "Review your settings before generating dues",
   summary: "Summary",
@@ -476,18 +477,24 @@ export const en = {
   modeLabel: "Generation Mode",
   dateRangeLabel: "Date Range",
   membersLabel: "Member Assignment",
-  generateDuesAction: "Generate Dues",
-  generating: "Generating...",
-  skipped: "skipped (already existed)",
-  errors: "Errors",
-
-  // Assignment status
+  noCategories: "No active collection categories found",
+  next: "Next",
+  generateDuesDesc: "5-step wizard to generate dues periods for collection categories",
+  selectCategoryError: "Please select a category",
+  selectCategoryPlaceholder: "— Select a category —",
+  allEligibleModeInfo: "This category uses 'All Eligible Members' mode. Dues are automatically generated for all active members. Use the 'Generate Dues' section below.",
+  generateAllDues: "Generate All Automatic Dues",
+  generateAllDuesDesc: "Generates dues periods for all categories with 'Automatic' due generation mode for the next 30 days.",
+  generateAllDuesAction: "Generate All Dues Now",
+  assignmentsInfo: "Assignment Info",
+  noEventsForCategory: "No events exist for this category. Generate events first.",
+  expectedAmountPerMember: "Expected Amount Per Member",
+  assignMembersToCategory: "Assign Members to Category",
+  assigned: "Assigned",
   assignmentStatus: "Status",
   assignmentExpected: "Expected",
   assignmentReceived: "Received",
   assignmentOutstanding: "Outstanding",
-
-  // Collection Definitions (Phase 2A)
   collectionDefinitions: "Collection Definitions",
   addCollectionDefinition: "Add Collection Definition",
   baseCategory: "Base Category",
@@ -541,12 +548,18 @@ export const en = {
   semiAnnualSub: "Semi-Annual",
   eventBasedSub: "Event-Based",
   oneTimeSub: "One-Time",
-
-  // Missing keys used in pages
-  noCategories: "No active collection categories found",
-  next: "Next",
-  generateDuesDesc: "5-step wizard to generate dues periods for collection categories",
-
+  // Frequency labels
+  quarterly: "Quarterly",
+  semiAnnual: "Semi-Annual",
+  annual: "Annual",
+  // Frequency descriptions
+  weeklyDesc: "Weekly periods (Monday-Sunday)",
+  monthlyDesc: "Monthly calendar periods",
+  quarterlyDesc: "Quarterly periods (Jan-Mar, Apr-Jun, Jul-Sep, Oct-Dec)",
+  semiAnnualDesc: "Semi-annual periods (Jan-Jun, Jul-Dec)",
+  annualDesc: "Annual periods (Jan-Dec)",
+  eventBasedDesc: "Event-based (manual only)",
+  oneTimeDesc: "One-time (manual only)",
   // Due Generation Wizard - unique keys
   wizardMemberAssignment: "Member Assignment",
   wizardDueGeneration: "Due Generation",

@@ -41,7 +41,6 @@ model Masjid {
   collectionDefinitions      CollectionDefinition[]
   collectionEvents           CollectionEvent[]
   collectionEventAssignments CollectionEventAssignment[]
-  ContributionCategory       ContributionCategory[]
   plans                      ContributionPlan[]
   duesPeriods                DuesPeriod[]
   expenses                   Expense[]
@@ -184,6 +183,8 @@ model CollectionDefinition {
   frequency              CollectionFrequency
   amountType             AmountType
   defaultAmountPaise     Int?
+  defaultDueDay          Int?                @default(10)
+  defaultGraceDays       Int?                @default(0)
   donorEligibility       DonorEligibility
   memberAssignment       MemberAssignment
   dueGeneration          DueGeneration
@@ -524,25 +525,6 @@ model MasjidNotificationSettings {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   masjid           Masjid   @relation(fields: [masjidId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-}
-
-model ContributionCategory {
-  id                 String              @id
-  masjidId           String
-  name               String
-  code               String
-  restrictedPurpose  Boolean             @default(false)
-  reportingGroup     String?
-  active             Boolean             @default(true)
-  createdAt          DateTime            @default(now())
-  defaultAmountPaise Int?
-  frequency          String?
-  collectionMode     String?
-  schedulingRules    String?
-  defaultDueDay      Int?
-  defaultGraceDays   Int                 @default(0)
-  description        String?
-  Masjid             Masjid              @relation(fields: [masjidId], references: [id], onDelete: Cascade)
 }
 
 /// Enums

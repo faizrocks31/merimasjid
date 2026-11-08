@@ -53,7 +53,8 @@ assertIsTestDatabase(testUrl);
 process.env.DATABASE_URL = testUrl;
 process.env.AUTH_SECRET ||= "test-secret-that-is-long-enough-for-hs256-signing";
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: testUrl }) });
+// Create a separate PrismaClient for the test database
+const testPrisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: testUrl }) });
 
 /**
  * Verifies the test database has the expected schema by checking that the
@@ -62,7 +63,7 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: test
  */
 async function verifySchema(): Promise<void> {
   // Check that the _prisma_migrations table exists and our baseline is recorded.
-  const result = await prisma.$queryRawUnsafe<{ migration_name: string; finished_at: Date }[]>(
+  const result = await testPrisma.$queryRawUnsafe<{ migration_name: string; finished_at: Date }[]>(
     `SELECT migration_name, finished_at FROM "_prisma_migrations" WHERE migration_name = '20261022000000_postgres_baseline' AND finished_at IS NOT NULL`,
   );
   if (!result || result.length === 0) {
@@ -79,11 +80,11 @@ async function verifySchema(): Promise<void> {
  * are covered by the dedicated seed test).
  */
 async function seedTestFixture(): Promise<void> {
-  const masjid = await prisma.masjid.findFirst({ where: { slug: "test-masjid" } });
+  const masjid = await testPrisma.masjid.findFirst({ where: { slug: "test-masjid" } });
   const masjidId =
     masjid?.id ??
     (
-      await prisma.masjid.create({
+      await testPrisma.masjid.create({
         data: {
           name: "Test Masjid",
           slug: "test-masjid",
@@ -102,17 +103,17 @@ async function seedTestFixture(): Promise<void> {
   // handled by prisma migrate/db push since they are non-tenant tables.
 
   for (const name of DEFAULT_EXPENSE_CATEGORIES) {
-    const exists = await prisma.expenseCategory.findUnique({
+    const exists = await testPrisma.expenseCategory.findUnique({
       where: { masjidId_name: { masjidId, name } },
     });
     if (!exists) {
-      await prisma.expenseCategory.create({ data: { masjidId, name } });
+      await testPrisma.expenseCategory.create({ data: { masjidId, name } });
     }
   }
 
-  const user = await prisma.user.findFirst({ where: { email: "test-user@example.invalid" } });
+  const user = await testPrisma.user.findFirst({ where: { email: "test-user@example.invalid" } });
   if (!user) {
-    await prisma.user.create({
+    await testPrisma.user.create({
       data: {
         name: "Test User",
         email: "test-user@example.invalid",
@@ -125,10 +126,6 @@ async function seedTestFixture(): Promise<void> {
 
 // Vitest loads this file once per test file, so guard the one-time setup.
 const globalForTests = globalThis as unknown as { __masjidTestDbReady?: Promise<void> };
-
-// Clear any cached Prisma client from the app's db.ts module so it picks up the test DATABASE_URL
-const globalForPrisma = globalThis as unknown as { prisma?: import("@prisma/client").PrismaClient };
-delete globalForPrisma.prisma;
 
 if (!globalForTests.__masjidTestDbReady) {
   globalForTests.__masjidTestDbReady = (async () => {

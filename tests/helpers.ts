@@ -155,6 +155,8 @@ export async function createDefaultCollectionDefinitions(masjidId: string) {
           frequency: def.frequency,
           amountType: def.amountType,
           defaultAmountPaise: def.defaultAmountPaise,
+          defaultDueDay: 10,
+          defaultGraceDays: 0,
           donorEligibility: def.donorEligibility,
           memberAssignment: def.memberAssignment,
           dueGeneration: def.dueGeneration,

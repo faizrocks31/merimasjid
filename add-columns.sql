@@ -1,0 +1,2 @@
+ALTER TABLE "CollectionDefinition" ADD COLUMN IF NOT EXISTS "defaultDueDay" INTEGER DEFAULT 10;
+ALTER TABLE "CollectionDefinition" ADD COLUMN IF NOT EXISTS "defaultGraceDays" INTEGER DEFAULT 0;

@@ -40,8 +40,8 @@ interface DefinitionLike {
   memberAssignment: string;
   dueGeneration: string;
   settlementPolicy: string;
-  defaultDueDay?: number;
-  defaultGraceDays?: number;
+  defaultDueDay?: number | null;
+  defaultGraceDays?: number | null;
 }
 
 interface MemberLike {
@@ -136,25 +136,149 @@ export function buildWeeklyPeriods(
     periodEnd.setDate(periodEnd.getDate() + 6);
     periodEnd.setUTCHours(23, 59, 59, 999);
 
-    // Due date is defaultDueDay days from period start (or end of week)
+    // Due date is defaultDueDay days from period start + grace days
     const dueDate = new Date(periodStart);
-    dueDate.setDate(dueDate.getDate() + defaultDueDay);
-    dueDate.setHours(
-      dueDate.getHours() - 5.5 * 60 * 60 * 1000 + // IST offset in ms (already handled by setHours)
-      defaultGraceDays * 86400000,
-    );
-    // Better: just add grace days
-    const dueDateCorrect = new Date(periodStart);
-    dueDateCorrect.setDate(dueDateCorrect.getDate() + defaultDueDay + defaultGraceDays);
+    dueDate.setDate(dueDate.getDate() + defaultDueDay + defaultGraceDays);
 
     out.push({
       periodStart,
       periodEnd,
-      dueDate: dueDateCorrect,
+      dueDate,
       expectedAmountPaise: amountPaise,
     });
 
     cursor.setDate(cursor.getDate() + 7);
+  }
+  return out;
+}
+
+/**
+ * Builds quarterly periods for a collection definition.
+ * Aligns to calendar quarters: Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec
+ */
+export function buildQuarterlyPeriods(
+  definition: DefinitionLike,
+  horizon: Date = addMonths(new Date(), 12),
+  defaultDueDay = 10,
+  defaultGraceDays = 0,
+): Array<{ periodStart: Date; periodEnd: Date; dueDate: Date; expectedAmountPaise: number }> {
+  const out: Array<{ periodStart: Date; periodEnd: Date; dueDate: Date; expectedAmountPaise: number }> = [];
+  const amountPaise = definition.defaultAmountPaise ?? 0;
+  if (amountPaise <= 0) return out;
+
+  let cursor = startOfDay(new Date());
+  // Align to start of current quarter
+  const quarterStartMonth = Math.floor(cursor.getMonth() / 3) * 3;
+  cursor = new Date(cursor.getFullYear(), quarterStartMonth, 1);
+  cursor.setUTCHours(0, 0, 0, 0);
+
+  let guard = 0;
+  while (cursor <= horizon && guard < 240) {
+    guard++;
+    const periodStart = new Date(cursor);
+    const periodEnd = new Date(cursor);
+    periodEnd.setMonth(periodEnd.getMonth() + 2); // 3 months
+    periodEnd.setDate(periodEnd.getDate() - 1);
+    periodEnd.setUTCHours(23, 59, 59, 999);
+
+    const dueDate = new Date(periodStart);
+    dueDate.setDate(dueDate.getDate() + defaultDueDay + defaultGraceDays);
+
+    out.push({
+      periodStart,
+      periodEnd,
+      dueDate,
+      expectedAmountPaise: amountPaise,
+    });
+
+    cursor.setMonth(cursor.getMonth() + 3);
+  }
+  return out;
+}
+
+/**
+ * Builds semi-annual periods for a collection definition.
+ * Aligns to half-years: H1=Jan-Jun, H2=Jul-Dec
+ */
+export function buildSemiAnnualPeriods(
+  definition: DefinitionLike,
+  horizon: Date = addMonths(new Date(), 12),
+  defaultDueDay = 10,
+  defaultGraceDays = 0,
+): Array<{ periodStart: Date; periodEnd: Date; dueDate: Date; expectedAmountPaise: number }> {
+  const out: Array<{ periodStart: Date; periodEnd: Date; dueDate: Date; expectedAmountPaise: number }> = [];
+  const amountPaise = definition.defaultAmountPaise ?? 0;
+  if (amountPaise <= 0) return out;
+
+  let cursor = startOfDay(new Date());
+  // Align to start of current half-year
+  const halfStartMonth = cursor.getMonth() < 6 ? 0 : 6;
+  cursor = new Date(cursor.getFullYear(), halfStartMonth, 1);
+  cursor.setUTCHours(0, 0, 0, 0);
+
+  let guard = 0;
+  while (cursor <= horizon && guard < 240) {
+    guard++;
+    const periodStart = new Date(cursor);
+    const periodEnd = new Date(cursor);
+    periodEnd.setMonth(periodEnd.getMonth() + 5); // 6 months
+    periodEnd.setDate(periodEnd.getDate() - 1);
+    periodEnd.setUTCHours(23, 59, 59, 999);
+
+    const dueDate = new Date(periodStart);
+    dueDate.setDate(dueDate.getDate() + defaultDueDay + defaultGraceDays);
+
+    out.push({
+      periodStart,
+      periodEnd,
+      dueDate,
+      expectedAmountPaise: amountPaise,
+    });
+
+    cursor.setMonth(cursor.getMonth() + 6);
+  }
+  return out;
+}
+
+/**
+ * Builds annual periods for a collection definition.
+ * Aligns to calendar year: Jan-Dec
+ */
+export function buildAnnualPeriods(
+  definition: DefinitionLike,
+  horizon: Date = addMonths(new Date(), 12),
+  defaultDueDay = 10,
+  defaultGraceDays = 0,
+): Array<{ periodStart: Date; periodEnd: Date; dueDate: Date; expectedAmountPaise: number }> {
+  const out: Array<{ periodStart: Date; periodEnd: Date; dueDate: Date; expectedAmountPaise: number }> = [];
+  const amountPaise = definition.defaultAmountPaise ?? 0;
+  if (amountPaise <= 0) return out;
+
+  let cursor = startOfDay(new Date());
+  // Align to start of current year
+  cursor = new Date(cursor.getFullYear(), 0, 1);
+  cursor.setUTCHours(0, 0, 0, 0);
+
+  let guard = 0;
+  while (cursor <= horizon && guard < 240) {
+    guard++;
+    const periodStart = new Date(cursor);
+    const periodEnd = new Date(cursor);
+    periodEnd.setMonth(periodEnd.getMonth() + 11); // 12 months
+    periodEnd.setDate(periodEnd.getDate() - 1);
+    periodEnd.setUTCHours(23, 59, 59, 999);
+
+    const dueDate = new Date(periodStart);
+    dueDate.setDate(dueDate.getDate() + defaultDueDay + defaultGraceDays);
+
+    out.push({
+      periodStart,
+      periodEnd,
+      dueDate,
+      expectedAmountPaise: amountPaise,
+    });
+
+    cursor.setFullYear(cursor.getFullYear() + 1);
   }
   return out;
 }
@@ -172,10 +296,13 @@ export function buildAllPeriods(
     case COLLECTION_FREQUENCY.WEEKLY:
       return buildWeeklyPeriods(definition, horizon, defaultDueDay, defaultGraceDays);
     case COLLECTION_FREQUENCY.MONTHLY:
-    case COLLECTION_FREQUENCY.QUARTERLY:
-    case COLLECTION_FREQUENCY.SEMI_ANNUAL:
-    case COLLECTION_FREQUENCY.ANNUAL:
       return buildPeriods(definition, horizon, defaultDueDay, defaultGraceDays);
+    case COLLECTION_FREQUENCY.QUARTERLY:
+      return buildQuarterlyPeriods(definition, horizon, defaultDueDay, defaultGraceDays);
+    case COLLECTION_FREQUENCY.SEMI_ANNUAL:
+      return buildSemiAnnualPeriods(definition, horizon, defaultDueDay, defaultGraceDays);
+    case COLLECTION_FREQUENCY.ANNUAL:
+      return buildAnnualPeriods(definition, horizon, defaultDueDay, defaultGraceDays);
     case COLLECTION_FREQUENCY.EVENT_BASED:
     case COLLECTION_FREQUENCY.ONE_TIME:
     default:
@@ -202,6 +329,12 @@ export interface GenerationResult {
 
 /**
  * Core engine: generates dues periods for all eligible members of a collection definition.
+ * 5-step workflow:
+ * 1. Validate definition and settings
+ * 2. Determine eligible members based on memberAssignment and ACTIVE status
+ * 3. Build period boundaries for all 7 frequencies
+ * 4. Check ADMIN/AUTOMATIC mode - ADMIN requires forceRegenerate
+ * 5. Batch insert with idempotency (P2002) using unique constraint
  */
 export async function generateDuesForCategory(
   masjidId: string,
@@ -215,7 +348,7 @@ export async function generateDuesForCategory(
     return { created: 0, skipped: 0, errors: ["Collection definition not found"] };
   }
 
-  // Check dueGeneration mode - ADMIN means manual only
+  // Check dueGeneration mode - ADMIN means manual only (unless forceRegenerate)
   if (definition.dueGeneration === DUE_GENERATION.ADMIN && !options.forceRegenerate) {
     return { created: 0, skipped: 0, errors: ["Category is in Admin mode; use forceRegenerate to override"] };
   }
@@ -224,10 +357,11 @@ export async function generateDuesForCategory(
     return { created: 0, skipped: 0, errors: ["Category has no default amount configured"] };
   }
 
-  // Get target members
+  // Get target members based on memberAssignment mode
+  // CRITICAL: Only ACTIVE members are eligible for dues generation
   let members: MemberLike[];
   if (definition.memberAssignment === MEMBER_ASSIGNMENT.SELECTED && options.memberIds && options.memberIds.length > 0) {
-    // SELECTED mode: only specified members
+    // SELECTED mode: only specified members (must be ACTIVE)
     members = await prisma.member.findMany({
       where: { id: { in: options.memberIds }, masjidId, status: "ACTIVE" },
       select: { id: true, masjidId: true, fullName: true, memberNo: true },
@@ -245,7 +379,7 @@ export async function generateDuesForCategory(
     });
     members = assignments.map(a => a.member).filter(m => m.status === "ACTIVE");
   } else {
-    // ALL_ELIGIBLE: all active members in the masjid
+    // ALL_ELIGIBLE: all ACTIVE members in the masjid
     members = await prisma.member.findMany({
       where: { masjidId, status: "ACTIVE" },
       select: { id: true, masjidId: true, fullName: true, memberNo: true },
@@ -253,13 +387,15 @@ export async function generateDuesForCategory(
   }
 
   if (members.length === 0) {
-    return { created: 0, skipped: 0, errors: ["No eligible members found"] };
+    return { created: 0, skipped: 0, errors: ["No eligible ACTIVE members found"] };
   }
 
   // Build periods for the date range
   const horizon = options.endDate;
-  // Use defaults since CollectionDefinition doesn't have defaultDueDay/defaultGraceDays fields
-  const periods = buildAllPeriods(definition, horizon, 10, 0);
+  // Use defaultDueDay and defaultGraceDays from definition if available, otherwise defaults
+  const defaultDueDay = definition.defaultDueDay ?? 10;
+  const defaultGraceDays = definition.defaultGraceDays ?? 0;
+  const periods = buildAllPeriods(definition, horizon, defaultDueDay, defaultGraceDays);
 
   // Filter periods to the requested range
   const filteredPeriods = periods.filter(p =>
@@ -480,7 +616,9 @@ export async function previewDuesGeneration(
   }
 
   const horizon = endDate;
-  const periods = buildAllPeriods(definition, horizon, 10, 0);
+  const defaultDueDay = definition.defaultDueDay ?? 10;
+  const defaultGraceDays = definition.defaultGraceDays ?? 0;
+  const periods = buildAllPeriods(definition, horizon, defaultDueDay, defaultGraceDays);
   const filteredPeriods = periods.filter(p =>
     p.periodStart >= startDate && p.periodStart <= endDate
   );
