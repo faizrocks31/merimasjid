@@ -27,9 +27,19 @@ export default async function NewCollectionPage({
       take: 2000,
     }),
     prisma.collectionDefinition.findMany({
-      where: { masjidId: user.masjidId!, active: true },
+      where: { masjidId: user.masjidId!, active: true, showInPaymentReceived: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, purposeCode: true, defaultAmountPaise: true, donorEligibility: true },
+      select: {
+        id: true,
+        name: true,
+        purposeCode: true,
+        defaultAmountPaise: true,
+        donorEligibility: true,
+        settlementPolicy: true,
+        frequency: true,
+        amountType: true,
+        baseCategory: { select: { code: true } }
+      },
     }),
     // Collection events (category-level scheduling)
     prisma.collectionEvent.findMany({
@@ -45,12 +55,14 @@ export default async function NewCollectionPage({
       },
     }),
     // Legacy DuesPeriods (for backward compatibility)
+    // Include both plan (legacy) and collectionDefinition (new direct FK) paths
     prisma.duesPeriod.findMany({
       where: { masjidId: user.masjidId!, status: { in: ["PENDING", "PARTIAL"] } },
       orderBy: { dueDate: "asc" },
       take: 3000,
       include: {
         plan: { include: { collectionDefinition: { select: { id: true, name: true } } } },
+        collectionDefinition: { select: { id: true, name: true } },
         allocations: { where: { payment: { status: "SUCCESS" } }, select: { allocatedAmountPaise: true } },
       },
     }),
@@ -89,8 +101,8 @@ export default async function NewCollectionPage({
         type: "duesPeriod" as const,
         memberId: p.memberId,
         planId: p.planId ?? "",
-        categoryId: p.plan?.collectionDefinition.id ?? "",
-        categoryName: p.plan?.collectionDefinition.name ?? "",
+        categoryId: (p.collectionDefinition?.id ?? p.plan?.collectionDefinition.id) ?? "",
+        categoryName: (p.collectionDefinition?.name ?? p.plan?.collectionDefinition.name) ?? "",
         periodStart: p.periodStart.toISOString(),
         periodEnd: p.periodEnd?.toISOString() ?? null,
         dueDate: p.dueDate.toISOString(),

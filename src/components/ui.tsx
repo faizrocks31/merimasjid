@@ -478,6 +478,7 @@ interface ReceiptPreviewProps {
   masjidAddress?: string | null;
   masjidPhone?: string | null;
   donorName: string;
+  memberNo?: string;
   categoryName: string;
   mode: string;
   date: string;
@@ -493,6 +494,7 @@ export function ReceiptPreview({
   masjidAddress,
   masjidPhone,
   donorName,
+  memberNo,
   categoryName,
   mode,
   date,
@@ -598,7 +600,9 @@ export function ReceiptPreview({
             <div className="field-content flex-1">
               <label className="field-label block font-poppins font-bold text-[13px] text-[var(--brand-primary)] mb-0.5">मोहतरम जनाब</label>
               <div className="field-value-line border-b-2 border-dotted border-[var(--brand-primary)] min-h-[24px] flex items-end">
-                <span className="field-value field-value-strong font-poppins font-semibold text-[12px] text-[var(--ink-primary)]">{donorName || "—"}</span>
+                <span className="field-value field-value-strong font-poppins font-semibold text-[12px] text-[var(--ink-primary)]">
+                  {memberNo ? `${memberNo} — ${donorName || "—"}` : `__________ — ${donorName || "—"}`}
+                </span>
               </div>
             </div>
           </div>

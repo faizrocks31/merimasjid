@@ -7,9 +7,9 @@
 **Database Adapter:** `@prisma/adapter-pg`
 **Implementation Approach:** Audit-driven, incremental, test-first
 **Priority:** Financial integrity, database safety, tenant isolation and data recovery
-**Last updated:** 2026-11-03
-**Current phase:** Phase 9 — Member Portal and Notifications (ready to start; Phase 8 registration flow + custom Phase 9 additions implemented)
-**Completed phases:** 0, 1, 2, 3, 4, 5, 6, 7, 8, Phase 9 Custom Additions (Prayer Times + Announcement Workflow)
+**Last updated:** 2026-11-08
+**Current phase:** Phase 2C — Collection Management Enhancements (complete); Phase 9 — Member Portal and Notifications ready to start
+**Completed phases:** 0, 1, 2, 2A, 2C, 3, 4, 5, 6, 7, 7a, 8, 0b, Phase 9 Custom Additions (Prayer Times + Announcement Workflow)
 
 ---
 

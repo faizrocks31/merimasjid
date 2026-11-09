@@ -29,7 +29,19 @@ import { newIdempotencyKey } from "./collection-form-helpers";
 type Labels = Record<string, string>;
 
 type MemberOption = { id: string; memberNo: string; fullName: string; phone: string | null };
-type CategoryOption = { id: string; name: string; code?: string; restrictedPurpose?: boolean; defaultAmountPaise: number | null; purposeCode?: string | null };
+type CategoryOption = {
+  id: string;
+  name: string;
+  code?: string;
+  restrictedPurpose?: boolean;
+  defaultAmountPaise: number | null;
+  purposeCode?: string | null;
+  donorEligibility?: "MEMBERS_ONLY" | "WALKIN_ONLY" | "BOTH";
+  settlementPolicy?: "OLDEST_FIRST" | "ANY_PENDING_PERIOD";
+  frequency?: string;
+  amountType?: "FIXED" | "VARIABLE";
+  baseCategoryCode?: string;
+};
 type PeriodOption = {
   id: string;
   memberId: string | null;
@@ -51,6 +63,9 @@ type PeriodOrEventOption = PeriodOption & {
   applicableYear?: number | null;
 };
 
+// Settlement policies that use FIFO (OLDEST_FIRST)
+const FIFO_CATEGORIES = ["OLDEST_FIRST"] as const;
+
 // FIFO allocation preview item
 type FIFOPreviewItem = {
   id: string;
@@ -60,6 +75,11 @@ type FIFOPreviewItem = {
   allocated: number;
   remaining: number;
   type: "duesPeriod" | "collectionEventAssignment";
+};
+
+// Settlement policy UI helper
+const isAnyPendingPeriodCategory = (cat: CategoryOption | undefined) => {
+  return cat?.settlementPolicy === "ANY_PENDING_PERIOD";
 };
 
 function MemberSearch({
@@ -235,6 +255,7 @@ export function CollectionForm({
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedEventId, setSelectedEventId] = useState("");
   const [idempotencyKey] = useState(newIdempotencyKey);
+  const [selectedDuesPeriodIds, setSelectedDuesPeriodIds] = useState<string[]>([]);
 
   // Split periods into collection events and dues periods
   const collectionEvents = useMemo(
@@ -249,16 +270,21 @@ export function CollectionForm({
   const member = members.find((m) => m.id === memberId);
   const amountPaise = parseRupeesToPaise(amount) ?? 0;
 
-  // Walk-in allowed category codes
-  const WALKIN_ALLOWED_CODES = ["SHAB_E_QADR", "MILAD", "GENERAL", "GENERAL_DONATION"];
+  // Dynamic walk-in eligibility: use donorEligibility field from collection definition
+  // WALKIN_ONLY or BOTH are allowed for walk-in donors
+  const isWalkInEligible = (cat: CategoryOption) => {
+    return cat.donorEligibility === "WALKIN_ONLY" || cat.donorEligibility === "BOTH";
+  };
 
-  // FIFO categories (dues-based allocation)
-  const FIFO_CATEGORIES = ["MONTHLY", "MILAD", "SHAB_E_QADR", "DEATH", "ANNUAL"];
+  // FIFO categories (dues-based allocation) - use settlementPolicy instead
+  const isFifoCategory = (cat: CategoryOption | undefined) => {
+    return cat?.settlementPolicy === "OLDEST_FIRST";
+  };
 
   // Filter categories based on donor mode
   const availableCategories = useMemo(() => {
     if (donorMode === "walkin") {
-      return categories.filter((c) => c.code && WALKIN_ALLOWED_CODES.includes(c.code));
+      return categories.filter(isWalkInEligible);
     }
     return categories;
   }, [categories, donorMode]);
@@ -276,9 +302,24 @@ export function CollectionForm({
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [collectionEvents, selectedCategoryId, selectedCategory?.code]);
 
-  // Build FIFO preview for member payments in FIFO categories
+  // For ANY_PENDING_PERIOD settlement policy, show available dues periods for member
+  const availableDuesPeriodsForCategory = useMemo(() => {
+    if (!memberId || !selectedCategoryId || selectedCategory?.settlementPolicy !== "ANY_PENDING_PERIOD") {
+      return [];
+    }
+    return duesPeriods
+      .filter((p) => p.memberId === memberId && p.categoryId === selectedCategoryId && p.outstandingPaise > 0)
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [duesPeriods, memberId, selectedCategoryId, selectedCategory?.settlementPolicy]);
+
+  // Clear selected periods when category or member changes
+  useEffect(() => {
+    setSelectedDuesPeriodIds([]);
+  }, [selectedCategoryId, memberId]);
+
+  // Build FIFO preview for member payments in FIFO categories (OLDEST_FIRST settlement policy)
   const fifoPreview = useMemo((): FIFOPreviewItem[] => {
-    if (!memberId || !selectedCategoryId || !selectedCategory || !selectedCategory.code || !FIFO_CATEGORIES.includes(selectedCategory.code)) {
+    if (!memberId || !selectedCategoryId || !selectedCategory || selectedCategory.settlementPolicy !== "OLDEST_FIRST") {
       return [];
     }
 
@@ -414,6 +455,11 @@ export function CollectionForm({
       setError(labels.txnRefCheque + ": " + labels.required);
       return;
     }
+    // For ANY_PENDING_PERIOD, at least one period must be selected
+    if (memberId && selectedCategory && selectedCategory.settlementPolicy === "ANY_PENDING_PERIOD" && selectedDuesPeriodIds.length === 0) {
+      setError("Please select at least one period to allocate the payment to.");
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -428,11 +474,15 @@ export function CollectionForm({
       formData.set("referenceNo", referenceNo);
       formData.set("notes", notes);
       formData.set("idempotencyKey", idempotencyKey);
+      // Pass selected dues period IDs for ANY_PENDING_PERIOD
+      if (selectedDuesPeriodIds.length > 0) {
+        formData.set("selectedDuesPeriodIds", JSON.stringify(selectedDuesPeriodIds));
+      }
       // For backward compatibility, include collectionEventId if selected
       if (selectedEventId) {
         formData.set("collectionEventId", selectedEventId);
       }
-      // Empty allocations - server will calculate FIFO
+      // Empty allocations - server will calculate FIFO or use selected periods
       formData.set("allocations", JSON.stringify([]));
 
       const response = await fetch("/api/payments/create", {
@@ -668,7 +718,7 @@ export function CollectionForm({
             )}
 
             {/* FIFO ALLOCATION PREVIEW (for member payments in FIFO categories) */}
-            {memberId && selectedCategory && selectedCategory.code && FIFO_CATEGORIES.includes(selectedCategory.code) && fifoPreview.length > 0 && (
+            {memberId && selectedCategory && selectedCategory.settlementPolicy === "OLDEST_FIRST" && fifoPreview.length > 0 && (
               <div className="space-y-3">
                 <p className="text-[12px] font-manrope font-extrabold uppercase tracking-[0.08em] text-[var(--ink-muted-new)]">
                   {labels.purpose} - FIFO Allocation Preview (Informational)
@@ -709,6 +759,59 @@ export function CollectionForm({
                       <span className="font-semibold">{formatPaise(remainingAfterFIFO)}</span>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* ANY_PENDING_PERIOD: period selection checkboxes */}
+            {memberId && selectedCategory && selectedCategory.settlementPolicy === "ANY_PENDING_PERIOD" && availableDuesPeriodsForCategory.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-[12px] font-manrope font-extrabold uppercase tracking-[0.08em] text-[var(--ink-muted-new)]">
+                  Select Periods to Allocate
+                </p>
+                <div className="flex items-center gap-2 text-[11px] text-[var(--ink-muted-new)] mb-2">
+                  <Info className="h-3.5 w-3.5 shrink-0" />
+                  <span>Select which pending periods this payment should be allocated to.</span>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {availableDuesPeriodsForCategory.map((period) => {
+                    const isChecked = selectedDuesPeriodIds.includes(period.id);
+                    return (
+                      <label
+                        key={period.id}
+                        className={cn(
+                          "flex items-center gap-3 p-2.5 rounded-lg border-2 cursor-pointer transition-all",
+                          isChecked
+                            ? "border-[var(--brand-primary)] bg-[var(--brand-soft)]"
+                            : "border-[var(--border-tile)] bg-[var(--surface-card)] hover:border-[var(--brand-primary)]"
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          name="selectedDuesPeriodIds"
+                          value={period.id}
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedDuesPeriodIds([...selectedDuesPeriodIds, period.id]);
+                            } else {
+                              setSelectedDuesPeriodIds(selectedDuesPeriodIds.filter((id) => id !== period.id));
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          className="h-4 w-4 rounded border-[var(--border-tile)] text-[var(--brand-primary)] focus:ring-[var(--brand-soft)]"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-[var(--ink-primary)] truncate">
+                            {period.categoryName} — {formatDate(period.periodStart)}
+                          </p>
+                          <p className="text-[11px] text-[var(--ink-muted-new)]">
+                            Due: {formatDate(period.dueDate)} · Outstanding: {formatPaise(period.outstandingPaise)}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -790,6 +893,7 @@ export function CollectionForm({
             masjidAddress={masjidAddress}
             masjidPhone={masjidPhone}
             donorName={member?.fullName || walkIn || labels.anonymousDonor || "Anonymous Donor"}
+            memberNo={member?.memberNo}
             categoryName={selectedCategoryName || ""}
             mode={mode}
             date={displayDate}
@@ -974,7 +1078,7 @@ export function CollectionForm({
           )}
 
           {/* FIFO Preview in Sheet */}
-          {memberId && selectedCategory && selectedCategory.code && FIFO_CATEGORIES.includes(selectedCategory.code) && fifoPreview.length > 0 && (
+          {memberId && selectedCategory && selectedCategory.settlementPolicy === "OLDEST_FIRST" && fifoPreview.length > 0 && (
             <div className="space-y-3">
               <h3 className="font-manrope font-semibold text-[var(--ink-primary)]">FIFO Allocation Preview</h3>
               <div className="rounded-lg border border-[var(--border-tile)] bg-[var(--surface-field)] p-3 text-sm">
@@ -1011,6 +1115,51 @@ export function CollectionForm({
             </div>
           )}
 
+          {/* ANY_PENDING_PERIOD: period selection in sheet */}
+          {memberId && selectedCategory && selectedCategory.settlementPolicy === "ANY_PENDING_PERIOD" && availableDuesPeriodsForCategory.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="font-manrope font-semibold text-[var(--ink-primary)]">Select Periods</h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {availableDuesPeriodsForCategory.map((period) => {
+                  const isChecked = selectedDuesPeriodIds.includes(period.id);
+                  return (
+                    <label
+                      key={period.id}
+                      className={cn(
+                        "flex items-center gap-3 p-2.5 rounded-lg border-2 cursor-pointer transition-all",
+                        isChecked
+                          ? "border-[var(--brand-primary)] bg-[var(--brand-soft)]"
+                          : "border-[var(--border-tile)] bg-[var(--surface-card)] hover:border-[var(--brand-primary)]"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedDuesPeriodIds([...selectedDuesPeriodIds, period.id]);
+                          } else {
+                            setSelectedDuesPeriodIds(selectedDuesPeriodIds.filter((id) => id !== period.id));
+                          }
+                        }}
+                        disabled={isSubmitting}
+                        className="h-4 w-4 rounded border-[var(--border-tile)] text-[var(--brand-primary)]"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[var(--ink-primary)] truncate">
+                          {period.categoryName} — {formatDate(period.periodStart)}
+                        </p>
+                        <p className="text-[11px] text-[var(--ink-muted-new)]">
+                          Due: {formatDate(period.dueDate)} · Outstanding: {formatPaise(period.outstandingPaise)}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* DATE */}
           <Field label={labels.date} htmlFor="paymentDate-mobile">
             <Input
@@ -1041,6 +1190,7 @@ export function CollectionForm({
             masjidAddress={masjidAddress}
             masjidPhone={masjidPhone}
             donorName={member?.fullName || walkIn || labels.anonymousDonor || "Anonymous Donor"}
+            memberNo={member?.memberNo}
             categoryName={selectedCategoryName || ""}
             mode={mode}
             date={displayDate}
@@ -1106,6 +1256,7 @@ export function CollectionForm({
             masjidAddress={masjidAddress}
             masjidPhone={masjidPhone}
             donorName={member?.fullName || walkIn || labels.anonymousDonor || "Anonymous Donor"}
+            memberNo={member?.memberNo}
             categoryName={selectedCategoryName || ""}
             mode={mode}
             date={displayDate}

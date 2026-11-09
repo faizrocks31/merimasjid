@@ -138,6 +138,8 @@ afterAll(async () => {
   await prisma.paymentAllocation.deleteMany({ where: { masjidId } });
   await prisma.payment.deleteMany({ where: { masjidId } });
   await prisma.collectionEvent.deleteMany({ where: { masjidId } });
+  // Delete JummaCollection records before collectionDefinition (FK constraint)
+  await prisma.jummaCollection.deleteMany({ where: { masjidId } });
   await prisma.collectionDefinition.deleteMany({ where: { masjidId } });
   await prisma.masjidUser.deleteMany({ where: { masjidId } });
   await prisma.auditLog.deleteMany({ where: { masjidId } });
@@ -168,7 +170,8 @@ describe("Debug Jumma Event Workflow", () => {
 
     console.log("Created Jumma event:", jummaEvent.id);
 
-    // Walk-in payment to Jumma event (using collectionEventId)
+    // Phase 2C: Jumma now uses dedicated aggregate workflow (recordJummaCollectionAction)
+    // Individual payments via createPaymentAction are rejected for JUMMA_COLLECTION
     const form = new FormData();
     form.set("walkInName", "Jumma Donor");
     form.set("collectionDefinitionId", jummaCollectionDefinitionId);
@@ -191,18 +194,15 @@ describe("Debug Jumma Event Workflow", () => {
     console.log("Result:", JSON.stringify(result, null, 2));
 
     if (!result.ok) {
-      console.log("ERROR:", result.error);
+      console.log("Expected error (Jumma must use aggregate workflow):", result.error);
     }
 
-    expect(result.ok).toBe(true);
-
-    const payment = await prisma.payment.findFirst({
-      where: { masjidId, idempotencyKey: form.get("idempotencyKey") as string },
-      include: { allocations: true },
-    });
-    console.log("Payment:", payment);
-    expect(payment?.allocations[0].collectionEventId).toBe(jummaEvent.id);
-    expect(payment?.donorMemberId).toBeNull();
+    // Phase 2C: Jumma individual payments are now rejected
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      // Phase 2C: Walk-in restriction for Jumma is checked before purpose code check
+      expect(result.error).toContain("Walk-in donors are not allowed for this collection type");
+    }
 
     await prisma.collectionEvent.delete({ where: { id: jummaEvent.id } });
   });

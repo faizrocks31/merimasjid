@@ -483,9 +483,7 @@ export function SimpleForm({
             <Field key={field.name} label={field.label} htmlFor={field.name} error={error}>
               <GenericSelect
                 id={field.name} name={field.name}
-                value={uncontrolled ? undefined : value}
-                defaultValue={uncontrolled ? value : undefined}
-                onChange={uncontrolled ? undefined : (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); }}
+                {...(uncontrolled ? { defaultValue: value } : { value, onChange: (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); } })}
                 disabled={isDisabled}
                 required={field.required}
                 options={field.options}
@@ -500,9 +498,7 @@ export function SimpleForm({
             <Field key={field.name} label={field.label} htmlFor={field.name} error={error}>
               <GenericCheckbox
                 id={field.name} name={field.name}
-                checked={uncontrolled ? undefined : isChecked}
-                defaultChecked={uncontrolled ? isChecked : undefined}
-                onChange={uncontrolled ? undefined : (e) => { onChange?.(field.name, e.target.checked); onFieldChange?.(field.name, e.target.checked); }}
+                {...(uncontrolled ? { defaultChecked: isChecked } : { checked: isChecked, onChange: (e) => { onChange?.(field.name, e.target.checked); onFieldChange?.(field.name, e.target.checked); } })}
                 disabled={isDisabled}
               />
             </Field>
@@ -514,9 +510,7 @@ export function SimpleForm({
             <Field key={field.name} label={field.label} htmlFor={field.name} hint={field.helpText}>
               <GenericTextarea
                 id={field.name} name={field.name}
-                value={uncontrolled ? undefined : value}
-                defaultValue={uncontrolled ? value : undefined}
-                onChange={uncontrolled ? undefined : (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); }}
+                {...(uncontrolled ? { defaultValue: value } : { value, onChange: (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); } })}
                 placeholder={field.placeholder}
                 disabled={isDisabled}
                 maxLength={field.maxLength}
@@ -531,9 +525,7 @@ export function SimpleForm({
             <Field key={field.name} label={field.label} htmlFor={field.name} hint={field.helpText} error={error}>
               <GenericInput
                 id={field.name} name={field.name} type="date"
-                value={uncontrolled ? undefined : value}
-                defaultValue={uncontrolled ? value : undefined}
-                onChange={uncontrolled ? undefined : (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); }}
+                {...(uncontrolled ? { defaultValue: value } : { value, onChange: (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); } })}
                 disabled={isDisabled}
                 required={field.required}
               />
@@ -546,9 +538,7 @@ export function SimpleForm({
             <Field key={field.name} label={field.label} htmlFor={field.name} error={error}>
               <GenericInput
                 id={field.name} name={field.name} type="number" className="num"
-                value={uncontrolled ? undefined : value}
-                defaultValue={uncontrolled ? value : undefined}
-                onChange={uncontrolled ? undefined : (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); }}
+                {...(uncontrolled ? { defaultValue: value } : { value, onChange: (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); } })}
                 disabled={isDisabled}
                 required={field.required}
                 min={field.min}
@@ -562,10 +552,8 @@ export function SimpleForm({
           return (
             <Field key={field.name} label={field.label} htmlFor={field.name} error={error}>
               <GenericInput
-                id={field.name} name={field.name} type="password"
-                value={uncontrolled ? undefined : value}
-                defaultValue={uncontrolled ? value : undefined}
-                onChange={uncontrolled ? undefined : (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); }}
+                id={field.name} name={field.name} type="password" autoComplete="new-password"
+                {...(uncontrolled ? { defaultValue: value } : { value, onChange: (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); } })}
                 disabled={isDisabled}
                 required={field.required}
                 minLength={field.min}
@@ -580,9 +568,7 @@ export function SimpleForm({
             <Field key={field.name} label={field.label} htmlFor={field.name} error={error}>
               <GenericInput
                 id={field.name} name={field.name} type="number" inputMode="decimal" step="0.01" min="0" className="num"
-                value={uncontrolled ? undefined : value}
-                defaultValue={uncontrolled ? value : undefined}
-                onChange={uncontrolled ? undefined : (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); }}
+                {...(uncontrolled ? { defaultValue: value } : { value, onChange: (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); } })}
                 disabled={isDisabled}
                 required={field.required}
               />
@@ -596,13 +582,11 @@ export function SimpleForm({
               <PrefixInput
                 id={field.name} name={field.name} type="tel" inputMode="numeric"
                 prefix={field.prefix}
-                value={uncontrolled ? undefined : value}
-                defaultValue={uncontrolled ? value : undefined}
-                onChange={filterHandler(field.filter, (v) => {
+                {...(uncontrolled ? { defaultValue: value } : { value, onChange: filterHandler(field.filter, (v) => {
                   if (uncontrolled) return;
                   onChange?.(field.name, v);
                   onFieldChange?.(field.name, v);
-                })}
+                }) })}
                 disabled={isDisabled}
                 required={field.required}
                 maxLength={field.maxLength}
@@ -618,9 +602,7 @@ export function SimpleForm({
             <Field key={field.name} label={field.label} htmlFor={field.name} error={error}>
               <GenericInput
                 id={field.name} name={field.name} type="email" autoComplete="off"
-                value={uncontrolled ? undefined : value}
-                defaultValue={uncontrolled ? value : undefined}
-                onChange={uncontrolled ? undefined : (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); }}
+                {...(uncontrolled ? { defaultValue: value } : { value, onChange: (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); } })}
                 disabled={isDisabled}
                 required={field.required}
                 maxLength={field.maxLength}
@@ -649,13 +631,11 @@ export function SimpleForm({
           <Field key={field.name} label={field.label} htmlFor={field.name} hint={field.helpText}>
             <GenericInput
               id={field.name} name={field.name} type="text"
-              value={uncontrolled ? undefined : value}
-              defaultValue={uncontrolled ? value : undefined}
-              onChange={filterHandler(field.filter, (v) => {
+              {...(uncontrolled ? { defaultValue: value } : { value, onChange: filterHandler(field.filter, (v) => {
                 if (uncontrolled) return;
                 onChange?.(field.name, v);
                 onFieldChange?.(field.name, v);
-              })}
+              }) })}
               placeholder={field.placeholder}
               disabled={isDisabled}
               required={field.required}

@@ -552,6 +552,7 @@ export const en = {
   quarterly: "Quarterly",
   semiAnnual: "Semi-Annual",
   annual: "Annual",
+  monthly: "Monthly",
   // Frequency descriptions
   weeklyDesc: "Weekly periods (Monday-Sunday)",
   monthlyDesc: "Monthly calendar periods",

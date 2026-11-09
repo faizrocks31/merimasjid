@@ -556,6 +556,7 @@ export async function generateDuesForCategoryAction(
       endDate: new Date(endDate),
       memberIds: memberIds.length > 0 ? memberIds : undefined,
       forceRegenerate,
+      actorUserId: user.id,
     });
 
     revalidatePath("/settings");
@@ -567,7 +568,8 @@ export async function generateDuesForCategoryAction(
     return { ok: true, message: `Created ${result.created} dues periods, skipped ${result.skipped} existing.` };
   } catch (err) {
     console.error("generateDuesForCategoryAction failed", err);
-    return { error: "Could not generate dues periods." };
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return { error: `Could not generate dues periods: ${errorMessage}` };
   }
 }
 

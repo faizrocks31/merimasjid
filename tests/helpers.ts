@@ -22,7 +22,7 @@ export async function createDefaultCollectionDefinitions(masjidId: string) {
       frequency: "MONTHLY" as const,
       amountType: "VARIABLE" as const,
       defaultAmountPaise: null,
-      donorEligibility: "MEMBERS_ONLY" as const,
+      donorEligibility: "BOTH" as const,
       memberAssignment: "ALL_ELIGIBLE" as const,
       dueGeneration: "AUTOMATIC" as const,
       settlementPolicy: "OLDEST_FIRST" as const,

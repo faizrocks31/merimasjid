@@ -113,7 +113,9 @@ export function ReceiptSheet({ view, taxNote }: { view: ReceiptView; taxNote: st
             <div className="field-content flex-1">
               <label className="field-label block font-poppins font-bold text-[15px] text-[var(--brand-primary)] mb-1">मोहतरम जनाब</label>
               <div className="field-value-line border-b-2 border-dotted border-[var(--brand-primary)] min-h-[28px] flex items-end">
-                <span className="field-value field-value-strong font-poppins font-semibold text-[14px] text-[var(--ink-primary)]">{view.donorName || "—"}</span>
+                <span className="field-value field-value-strong font-poppins font-semibold text-[14px] text-[var(--ink-primary)]">
+                  {view.memberNo ? `${view.memberNo} — ${view.donorName || "—"}` : `__________ — ${view.donorName || "—"}`}
+                </span>
               </div>
             </div>
           </div>

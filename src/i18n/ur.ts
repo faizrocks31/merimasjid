@@ -547,13 +547,14 @@ export const ur: Dictionary = {
   jumma: "جمعہ",
   unrestricted: "غیر محدود",
   quarterlySub: "سہ ماہی",
-  semiAnnualSub: "شماہی",
+  semiAnnualSub: "ششماہی",
   eventBasedSub: "تقریب پر مبنی",
-  oneTimeSub: "یکبارگی",
+  oneTimeSub: "ایک مرتبہ",
   // Frequency labels
   quarterly: "سہ ماہی",
   semiAnnual: "ششماہی",
   annual: "سالانہ",
+  monthly: "ماہانہ",
   // Frequency descriptions
   weeklyDesc: "ہفتہ وار مدتیں (پیر-اتوار)",
   monthlyDesc: "ماہانہ کیلنڈر مدتیں",

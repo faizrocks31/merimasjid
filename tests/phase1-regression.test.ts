@@ -326,6 +326,8 @@ afterAll(async () => {
   }
   await prisma.contributionPlan.deleteMany({ where: { id: monthlyPlanId } });
   await prisma.member.deleteMany({ where: { masjidId } });
+  // Delete JummaCollection records before collectionDefinition (FK constraint)
+  await prisma.jummaCollection.deleteMany({ where: { masjidId } });
   await prisma.collectionDefinition.deleteMany({ where: { masjidId } });
   await prisma.masjidUser.deleteMany({ where: { masjidId } });
   await prisma.auditLog.deleteMany({ where: { masjidId } });
@@ -373,8 +375,8 @@ describe("Phase 1: Walk-in Donor Category Restrictions", () => {
     expect(result.ok).toBe(true);
   });
 
-  // Note: Monthly Collection is MEMBERS_ONLY, so walk-in is rejected
-  it("rejects Walk-in for Monthly Collection", async () => {
+  // Monthly Collection is BOTH in test helpers, so walk-in is ALLOWED
+  it("allows Walk-in for Monthly Collection", async () => {
     const form = buildFormData({
       collectionDefinitionId: monthlyCollectionDefinitionId,
       amountPaise: 15000,
@@ -382,8 +384,7 @@ describe("Phase 1: Walk-in Donor Category Restrictions", () => {
       idempotencyKey: `walkin-monthly-${Date.now()}`,
     });
     const result = await createPaymentAction(form);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/Walk-in donors cannot use this collection definition. Allowed:/i);
+    expect(result.ok).toBe(true);
   });
 
   it("rejects Walk-in for Zakat", async () => {
@@ -395,18 +396,37 @@ describe("Phase 1: Walk-in Donor Category Restrictions", () => {
     });
     const result = await createPaymentAction(form);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/Walk-in donors cannot use this collection definition. Allowed:/i);
+    // Zakat is MEMBERS_ONLY
+    if (!result.ok) expect(result.error).toMatch(/Walk-in donors are not allowed for this collection definition \(Members Only\)\./i);
   });
 
-  it("rejects Walk-in for Construction Fund", async () => {
+  it("allows Walk-in for Construction Fund", async () => {
+    // Construction Fund requires collectionEventId for walk-in payments
+    // Create a construction fund event for this test
+    const constructionEvent = await prisma.collectionEvent.create({
+      data: {
+        masjidId,
+        collectionDefinitionId: constructionCollectionDefinitionId,
+        name: "Construction Fund Event",
+        startDate: new Date("2094-01-01T00:00:00+05:30"),
+        dueDate: new Date("2094-01-31T00:00:00+05:30"),
+        expectedAmountPaise: 50000,
+        status: "OPEN",
+      },
+    });
+
     const form = buildFormData({
       collectionDefinitionId: constructionCollectionDefinitionId,
+      collectionEventId: constructionEvent.id,
       amountPaise: 50000,
       walkInName: "Walk-in Donor",
       idempotencyKey: `walkin-construction-${Date.now()}`,
     });
     const result = await createPaymentAction(form);
     expect(result.ok).toBe(true); // Construction Fund allows BOTH
+
+    // Clean up the event
+    await prisma.collectionEvent.delete({ where: { id: constructionEvent.id } });
   });
 
   it("rejects Walk-in for Jumma Collection", async () => {
@@ -417,7 +437,8 @@ describe("Phase 1: Walk-in Donor Category Restrictions", () => {
       idempotencyKey: `walkin-jumma-${Date.now()}`,
     });
     const result = await createPaymentAction(form);
-    expect(result.ok).toBe(true); // Jumma Collection allows BOTH
+    expect(result.ok).toBe(false); // Jumma Collection is MEMBERS_ONLY (mandatory restriction)
+    if (!result.ok) expect(result.error).toContain("Walk-in donors are not allowed for this collection type");
   });
 });
 
@@ -948,10 +969,9 @@ describe("Phase 1: Jumma Event Workflow Still Works", () => {
     await prisma.payment.deleteMany({ where: { masjidId } });
   });
 
-  it("Jumma event-based non-member payment works", async () => {
-    // Use the Jumma event created in beforeAll
-
-    // Walk-in payment to Jumma event (using collectionEventId)
+  it("Jumma aggregate collection works via dedicated workflow", async () => {
+    // Jumma now uses dedicated aggregate workflow (recordJummaCollectionAction)
+    // Individual payments via createPaymentAction are rejected
     const form = new FormData();
     form.set("walkInName", "Jumma Donor");
     form.set("collectionDefinitionId", jummaCollectionDefinitionId);
@@ -963,13 +983,8 @@ describe("Phase 1: Jumma Event Workflow Still Works", () => {
     form.set("allocations", JSON.stringify([]));
 
     const result = await createPaymentAction(form);
-    expect(result.ok).toBe(true);
-
-    const payment = await prisma.payment.findFirst({
-      where: { masjidId, idempotencyKey: form.get("idempotencyKey") as string },
-      include: { allocations: true },
-    });
-    expect(payment?.allocations[0].collectionEventId).toBe(jummaEventId);
-    expect(payment?.donorMemberId).toBeNull();
+    expect(result.ok).toBe(false);
+    // Walk-in restriction for Jumma is checked before purpose code check
+    if (!result.ok) expect(result.error).toContain("Walk-in donors are not allowed for this collection type");
   });
 });

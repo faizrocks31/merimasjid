@@ -1184,7 +1184,7 @@ describe("Edge cases: PaymentAllocation cross-tenant protection", () => {
 
     const result = await createPaymentAction(form);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe("A selected due period is not available in this Masjid.");
+    if (!result.ok) expect(result.error).toBe("A selected due period is not available for this member in this Masjid.");
 
     await prisma.payment.delete({ where: { id: payment.id } });
     await prisma.duesPeriod.delete({ where: { id: period.id } });
@@ -1314,6 +1314,15 @@ describe("Edge cases: Plan/DuesPeriod cross-tenant protection", () => {
   it("Cannot change amount of another masjid's plan", async () => {
     await signInAsLocalAdmin();
 
+    // Clean up any existing plans for this combination
+    await prisma.contributionPlan.deleteMany({
+      where: {
+        masjidId: fx.masjidB,
+        memberId: fx.memberB,
+        collectionDefinitionId: fx.collectionDefinitionB,
+      },
+    });
+
     const plan = await prisma.contributionPlan.create({
       data: {
         masjidId: fx.masjidB,
@@ -1341,6 +1350,15 @@ describe("Edge cases: Plan/DuesPeriod cross-tenant protection", () => {
 
   it("Cannot generate dues for another masjid's plans", async () => {
     await signInAsLocalAdmin();
+
+    // Clean up any existing plans for this combination
+    await prisma.contributionPlan.deleteMany({
+      where: {
+        masjidId: fx.masjidB,
+        memberId: fx.memberB,
+        collectionDefinitionId: fx.collectionDefinitionB,
+      },
+    });
 
     await prisma.contributionPlan.create({
       data: {

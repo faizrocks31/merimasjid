@@ -32,6 +32,7 @@ const MATRIX: Record<Role, Permission[]> = {
     "member:read", "member:write", "member:view-credentials", "plan:write", "payment:create", "payment:read",
     "payment:reverse", "receipt:reprint", "expense:create", "expense:approve",
     "report:read", "export:data", "settings:write", "staff:manage", "audit:read",
+    "collection:write", "collection:read",
   ],
   [ROLES.COLLECTOR]: [
     "member:read", "member:write", "payment:create", "payment:read",

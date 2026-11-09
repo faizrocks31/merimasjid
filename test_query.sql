@@ -1,0 +1,1 @@
+SELECT * FROM "JummaCollection" LIMIT 1;

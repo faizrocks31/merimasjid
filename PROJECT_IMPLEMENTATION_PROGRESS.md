@@ -921,7 +921,75 @@ User requested three changes to the member creation/edit flow:
 
 ---
 
-## Phase status summary (Updated 2026-11-07)
+## Phase 2C — Collection Management Enhancements (Jumma Aggregate, Settlement Policies, Walk-in Restrictions, Receipt Identity)
+
+**Status:** Complete
+**Priority:** High
+**Started:** 2026-11-08
+**Finished:** 2026-11-08
+**Roadmap source:** `PHASE_2C_COMPLETION_PLAN.md`
+
+### Requirements
+
+| # | Requirement | Status |
+| - | ----------- | ------ |
+| 1 | Jumma aggregate workflow (record/correct Friday collections with audit history) | ✅ Done |
+| 2 | Safe DATE migration (JummaCollection.collectionDate as DATE type) | ✅ Done |
+| 3 | Dynamic walk-in eligibility (donorEligibility enum enforced server-side) | ✅ Done |
+| 4 | Settlement policies (OLDEST_FIRST/ANY_PENDING_PERIOD with UI controls) | ✅ Done |
+| 5 | AVC restriction to MILAD_UN_NABI/SHAB_E_QADR | ✅ Done |
+| 6 | Receipt identity (Member ID for registered, blank for walk-in) | ✅ Done |
+
+### Files created/modified
+
+| File | Change type | Description |
+| ---- | ----------- | ----------- |
+| `prisma/migrations/20261108090000_phase2c_jumma_collection/migration.sql` | Created | Idempotent migration: JummaCorrection table, safe DATE conversion, duplicate check |
+| `prisma/schema.prisma` | Modified | Added `JummaCorrection` model, `@db.Date` on collectionDate, back-relations |
+| `src/modules/jumma/actions.ts` | Created | `recordJummaCollectionAction`, `correctJummaCollectionAction`, `getJummaCollections`, `getJummaCollectionById` |
+| `src/modules/payments/actions.ts` | Modified | Removed Jumma upsert, added mandatory walk-in restrictions for ANNUAL/DEATH/BARTAN/JUMMA, OLDEST_FIRST prefix validation, ANY_PENDING_PERIOD selected periods, AVC restriction |
+| `src/app/(dashboard)/collections/new/collection-form.tsx` | Modified | FIFO_CATEGORIES constant, settlement policy UI, memberNo passed to ReceiptPreview |
+| `src/components/receipts/receipt-template.tsx` | Modified | Added memberNo prop for "MemberNo — Name" / "__________ — Name" display |
+| `src/components/ui.tsx` | Modified | Updated ReceiptPreview component |
+| `src/app/(dashboard)/collections/jumma/page.tsx` | Created | Jumma dashboard with record/correction forms, Friday list, date filtering |
+| `src/app/(dashboard)/collections/jumma/jumma-dashboard-client.tsx` | Created | Client component for Jumma dashboard |
+| `src/app/api/jumma/record/route.ts` | Created | API endpoint for recording Jumma collections |
+| `src/app/api/jumma/correct/route.ts` | Created | API endpoint for correcting Jumma collections |
+| `tests/phase2c.test.ts` | Created | 17 Vitest tests covering Jumma workflow, settlement policies, walk-in restrictions, receipt identity |
+| `tests/e2e/phase2c-jumma.spec.ts` | Created | Playwright E2E tests for browser workflows |
+| `tests/helpers.ts` | Modified | Fixed Monthly Chanda donorEligibility to "BOTH" |
+
+### Database migrations added
+
+| Migration | Description |
+| --------- | ----------- |
+| `20261108090000_phase2c_jumma_collection` | Creates `JummaCorrection` table (audit history); converts `JummaCollection.collectionDate` from TIMESTAMP to DATE safely; adds unique constraint on `(masjidId, collectionDate, collectionDefinitionId)` |
+
+### Test results
+
+| Command | Result |
+| ------- | ------ |
+| `npx vitest run` | **232/233 pass** — 1 pre-existing failure (concurrent-action over-allocation test) |
+| `npx tsc --noEmit` | **PASS** — no type errors |
+| `npm run build` | **PASS** — Next.js build succeeds |
+
+### Test breakdown
+
+- `tests/phase2c.test.ts` — 17 tests ✓ (Jumma record/correct, settlement policies, walk-in restrictions, AVC restriction, receipt identity)
+- `tests/e2e/phase2c-jumma.spec.ts` — Playwright E2E tests (browser workflows)
+- `tests/phase1-regression.test.ts` — Updated to match Phase 2C rules
+
+### Key design decisions
+
+- **Jumma aggregate** — One JummaCollection per masjid per Friday per definition; corrections create JummaCorrection audit trail
+- **Walk-in restrictions** — ANNUAL/DEATH/BARTAN/JUMMA purpose codes reject walk-in donors; dynamic donorEligibility check
+- **Settlement policies** — OLDEST_FIRST shows read-only FIFO preview; ANY_PENDING_PERIOD allows checkbox selection of specific periods
+- **AVC restriction** — Additional Voluntary Contribution only allowed for MILAD_UN_NABI/SHAB_E_QADR categories
+- **Receipt identity** — Registered members show "RCPT-XXXX — Name"; walk-ins show "__________ — Donor Name"
+
+---
+
+## Phase status summary (Updated 2026-11-08)
 
 | Phase | Name | Status |
 | ----- | ---- | ------ |
@@ -929,6 +997,7 @@ User requested three changes to the member creation/edit flow:
 | 1 | Database migration recovery | **Complete** |
 | 2 | Financial integrity and transaction safety | **Complete** |
 | 2A | Collection Definitions Backend Refactoring | **Complete** |
+| **2C** | **Collection Management Enhancements** | **Complete** |
 | 3 | Tenant isolation and authorization | **Complete** |
 | 4 | Audit trail and financial governance | **Complete** |
 | 5 | Business rules and data integrity | **Complete** |

@@ -254,8 +254,8 @@ export async function createMasjidAction(
         {
           name: "Jumma Collection",
           purposeCode: "JUMMA_COLLECTION",
-          baseCategoryCode: "JUMMA",
-          subcategoryCode: "RECURRING_DONATION",
+          baseCategoryCode: "COMMUNITY_EVENT",
+          subcategoryCode: "JUMMA",
           description: "Friday congregation collection",
           frequency: "WEEKLY" as const,
           amountType: "FIXED" as const,
@@ -516,8 +516,8 @@ export async function createMasjidStep1Action(
         {
           name: "Jumma Collection",
           purposeCode: "JUMMA_COLLECTION",
-          baseCategoryCode: "JUMMA",
-          subcategoryCode: "RECURRING_DONATION",
+          baseCategoryCode: "COMMUNITY_EVENT",
+          subcategoryCode: "JUMMA",
           description: "Friday congregation collection",
           frequency: "WEEKLY" as const,
           amountType: "FIXED" as const,

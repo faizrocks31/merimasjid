@@ -216,10 +216,32 @@ export function CollectionDefinitionsTab({
 
   const isEditing = !!editingDefinition;
 
-  // We need to get baseCategoryId from the item
-  const editingBaseCategoryId = isEditing && editingDefinition
+  // Map base category code to database ID for proper form value matching
+  const baseCategoryCodeToId = useMemo(() => {
+    const map: Record<string, string> = {};
+    baseCategories.forEach(bc => { map[bc.code] = bc.id; });
+    return map;
+  }, [baseCategories]);
+
+  // Map subcategory code to database ID
+  const subcategoryCodeToId = useMemo(() => {
+    const map: Record<string, string> = {};
+    subcategories.forEach(sc => { map[sc.code] = sc.id; });
+    return map;
+  }, [subcategories]);
+
+  // Get the base category code from the item's meta (which stores the code)
+  // We need to convert the code to the database ID for the form select
+  const editingBaseCategoryCode = isEditing && editingDefinition
     ? items.find(i => i.id === editingDefinition.id)?.meta.split(" · ")[0]
     : "";
+  const editingBaseCategoryId = editingBaseCategoryCode ? baseCategoryCodeToId[editingBaseCategoryCode] : "";
+
+  // Get subcategory code and convert to database ID
+  const editingSubcategoryCode = isEditing && editingDefinition
+    ? items.find(i => i.id === editingDefinition.id)?.meta.split(" · ")[1]
+    : "";
+  const editingSubcategoryId = editingSubcategoryCode ? subcategoryCodeToId[editingSubcategoryCode] : "";
 
   const validSubcategories = useMemo(
     () => subcategories.filter((sc) => {
@@ -232,11 +254,11 @@ export function CollectionDefinitionsTab({
         COMMUNITY_EVENT: ["EID", "MILAD", "ISRA_MIRAJ", "SHAB_E_QADR", "RAMADAN", "JUMMA"],
         GENERAL_DONATION: ["UNRESTRICTED"],
       };
-      const baseCode = editingBaseCategoryId;
+      const baseCode = editingBaseCategoryCode;
       if (!baseCode) return true; // Show all if no base category selected
       return validCombos[baseCode]?.includes(sc.code) ?? false;
     }),
-    [subcategories, editingBaseCategoryId]
+    [subcategories, editingBaseCategoryCode]
   );
 
   const fields = useMemo(
@@ -252,7 +274,7 @@ export function CollectionDefinitionsTab({
           value: bc.id,
           label: baseCategoryLabels[bc.code] || bc.name,
         })),
-        defaultValue: isEditing && editingDefinition ? editingDefinition.meta.split(" · ")[0] : undefined,
+        defaultValue: editingBaseCategoryId || undefined,
       },
       {
         name: "subcategoryId",
@@ -263,7 +285,7 @@ export function CollectionDefinitionsTab({
           value: sc.id,
           label: subcategoryLabels[sc.code] || sc.name,
         })),
-        defaultValue: isEditing && editingDefinition ? editingDefinition.meta.split(" · ")[1] : undefined,
+        defaultValue: editingSubcategoryId || undefined,
       },
       { name: "active", label: labels.active, type: "checkbox" as const, required: false, defaultValue: isEditing ? editingDefinition?.active : true },
       { name: "showInPaymentReceived", label: labels.showInPaymentReceived ?? "Show in Payment Received", type: "checkbox" as const, required: false, defaultValue: isEditing ? editingDefinition?.showInPaymentReceived : true },

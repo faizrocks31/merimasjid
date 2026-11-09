@@ -10,6 +10,7 @@ interface ReceiptTemplateProps {
   receiptNo: string;
   date: string; // formatted date like "24 Oct 2026"
   donorName: string;
+  memberNo?: string; // Member number for registered members (walk-in donors have no memberNo)
   amountPaise: number;
   amountWords: string; // Hindi words from paiseToHindiWords
   categoryName: string;
@@ -28,6 +29,7 @@ export function ReceiptTemplate({
   receiptNo,
   date,
   donorName,
+  memberNo,
   amountPaise,
   amountWords,
   categoryName,
@@ -127,7 +129,9 @@ export function ReceiptTemplate({
           <div className="flex-1">
             <label className="block text-[13px] sm:text-[15px] font-bold text-[var(--brand-primary)]">मोहतरम जनाब</label>
             <div className="mt-1 border-b-2 border-dotted border-[var(--brand-primary)] min-h-[28px] flex items-end">
-              <span className="font-manrope font-semibold text-[14px] sm:text-[15px] text-[var(--ink-primary)]">{donorName}</span>
+              <span className="font-manrope font-semibold text-[14px] sm:text-[15px] text-[var(--ink-primary)]">
+                {memberNo ? `${memberNo} — ${donorName}` : `__________ — ${donorName}`}
+              </span>
             </div>
           </div>
         </div>

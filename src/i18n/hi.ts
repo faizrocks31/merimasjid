@@ -554,6 +554,7 @@ export const hi: Dictionary = {
   quarterly: "त्रैमासिक",
   semiAnnual: "छमाही",
   annual: "वार्षिक",
+  monthly: "मासिक",
   // Frequency descriptions
   weeklyDesc: "साप्ताहिक अवधियाँ (सोमवार-रविवार)",
   monthlyDesc: "मासिक कैलेंडर अवधियाँ",

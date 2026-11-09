@@ -89,42 +89,37 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
   }
 
   // Validate collection definition exists and belongs to this masjid
-  console.log("[DEBUG createPaymentAction] user.masjidId:", user.masjidId, "input.collectionDefinitionId:", input.collectionDefinitionId);
   const definition = await prisma.collectionDefinition.findFirst({
     where: { id: input.collectionDefinitionId, masjidId: user.masjidId!, active: true },
     include: { baseCategory: { select: { code: true } } },
   });
-  console.log("[DEBUG createPaymentAction] definition found:", definition ? "YES" : "NO", definition?.id, definition?.masjidId);
   if (!definition) return { ok: false, error: "Collection definition not found or inactive in this Masjid." };
 
-  // WALK-IN CATEGORY RESTRICTIONS (server-side enforcement)
-  // Uses stable purposeCode for reliable identification
-  const purposeCode = definition.purposeCode;
+  // DYNAMIC WALK-IN ELIGIBILITY (server-side enforcement)
+  // Uses donorEligibility field instead of hardcoded purpose codes
   if (!input.memberId && input.walkInName) {
-    // Walk-in allowed only for specific purpose codes
-    const ALLOWED_WALKIN_PURPOSE_CODES = [
-      "GENERAL_DONATION",
-      "SADAQAH",
-      "CONSTRUCTION_FUND",
-      "JUMMA_COLLECTION",
-      "MILAD_UN_NABI",
-      "SHAB_E_QADR",
-      "FITRAH",
-      "MADRASA_FUND",
-      "CUSTOM_DONATION",
-    ];
-    if (!purposeCode || !ALLOWED_WALKIN_PURPOSE_CODES.includes(purposeCode)) {
-      return { ok: false, error: "Walk-in donors cannot use this collection definition. Allowed: General Donation, Sadaqah, Construction Fund, Jumma Collection, Milad-un-Nabi, Shab-e-Qadr, Fitrah, Madrasa Fund, Custom Donation." };
-    }
-    // Additional donorEligibility check
+    // Walk-in allowed only for WALKIN_ONLY or BOTH
     if (definition.donorEligibility === "MEMBERS_ONLY") {
       return { ok: false, error: "Walk-in donors are not allowed for this collection definition (Members Only)." };
     }
+    // WALKIN_ONLY and BOTH are allowed
   }
 
   // For member payments: check donorEligibility
   if (input.memberId && definition.donorEligibility === "WALKIN_ONLY") {
     return { ok: false, error: "This collection definition is for walk-in donors only." };
+  }
+
+  // MANDATORY PURPOSE-CODE-BASED RESTRICTIONS (server-side enforcement)
+  // These must be enforced regardless of donorEligibility configuration
+  const mandatoryRestrictedCodes = ["ANNUAL_CHANDA", "DEATH_COLLECTION", "BARTAN_COLLECTION", "JUMMA_COLLECTION"];
+  if (!input.memberId && input.walkInName && definition.purposeCode && mandatoryRestrictedCodes.includes(definition.purposeCode)) {
+    return { ok: false, error: "Walk-in donors are not allowed for this collection type." };
+  }
+
+  // JUMMA_COLLECTION must use dedicated aggregate workflow (not individual payments)
+  if (definition.purposeCode === "JUMMA_COLLECTION") {
+    return { ok: false, error: "Jumma collections must use the dedicated Jumma aggregate workflow." };
   }
 
   const masjid = await prisma.masjid.findUnique({
@@ -168,19 +163,23 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
       const settlementPolicy = definition.settlementPolicy;
 
       if (isMemberPayment && settlementPolicy === "OLDEST_FIRST") {
-        // Dues-based FIFO allocation
-        const duesPeriods = await tx.duesPeriod.findMany({
+        // Dues-based FIFO allocation (OLDEST_FIRST policy)
+        // Client submits selected duesPeriodIds and/or collectionEventIds
+        // Server validates continuous prefix from oldest pending period
+
+        // First, get ALL pending dues periods and assignments for this member+category, ordered by due date
+        const allPendingDuesPeriods = await tx.duesPeriod.findMany({
           where: {
             memberId: input.memberId,
             masjidId: user.masjidId!,
             status: { in: ["PENDING", "PARTIAL"] },
             collectionDefinitionId: input.collectionDefinitionId,
           },
-          select: { id: true, dueDate: true },
+          select: { id: true, dueDate: true, expectedAmountPaise: true },
           orderBy: { dueDate: "asc" },
         });
 
-        const assignments = await tx.collectionEventAssignment.findMany({
+        const allPendingAssignments = await tx.collectionEventAssignment.findMany({
           where: {
             memberId: input.memberId,
             masjidId: user.masjidId!,
@@ -191,128 +190,160 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
           orderBy: { event: { dueDate: "asc" } },
         }) as Array<{ id: string; eventId: string; expectedAmountPaise: number; event: { dueDate: Date } }>;
 
-        const duesPeriodIdsToLock = duesPeriods.map(d => d.id).sort();
-        if (duesPeriodIdsToLock.length > 0) {
-          await tx.$queryRaw`
-            SELECT id FROM "DuesPeriod"
-            WHERE id IN (${Prisma.join(duesPeriodIdsToLock)})
-            FOR UPDATE
-          `;
-        }
-
-        const assignmentIdsToLock = assignments.map(a => a.id).sort();
-        if (assignmentIdsToLock.length > 0) {
-          const eventIds = [...new Set(assignments.map(a => a.eventId))].sort();
-          if (eventIds.length > 0) {
-            await tx.$queryRaw`
-              SELECT id FROM "CollectionEvent"
-              WHERE id IN (${Prisma.join(eventIds)})
-              FOR UPDATE
-            `;
-          }
-          await tx.$queryRaw`
-            SELECT id FROM "CollectionEventAssignment"
-            WHERE id IN (${Prisma.join(assignmentIdsToLock)})
-            FOR UPDATE
-          `;
-        }
-
-        let outstandingDues: Array<{
+        // Merge and sort by dueDate
+        const allPendingDues: Array<{
           type: "duesPeriod" | "collectionEventAssignment";
           id: string;
           dueDate: Date;
           expectedAmountPaise: number;
-          allocatedAmountPaise: number;
-          remainingAmountPaise: number;
-        }> = [];
+        }> = [
+          ...allPendingDuesPeriods.map(d => ({
+            type: "duesPeriod" as const,
+            id: d.id,
+            dueDate: d.dueDate,
+            expectedAmountPaise: d.expectedAmountPaise,
+          })),
+          ...allPendingAssignments.map(a => ({
+            type: "collectionEventAssignment" as const,
+            id: a.id,
+            dueDate: a.event.dueDate,
+            expectedAmountPaise: a.expectedAmountPaise,
+          })),
+        ].sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
 
-        const lockedDuesPeriods = await tx.duesPeriod.findMany({
-          where: { id: { in: duesPeriodIdsToLock } },
-          include: {
-            allocations: { include: { payment: { select: { status: true } } } },
-          },
-          orderBy: { dueDate: "asc" },
-        });
+        // Client-submitted selected IDs (from form allocations)
+        const selectedDuesPeriodIds = [...new Set(input.allocations
+          .filter((a: any) => a.duesPeriodId)
+          .map((a: any) => a.duesPeriodId))].sort();
+        const selectedAssignmentIds = [...new Set(input.allocations
+          .filter((a: any) => a.collectionEventId)
+          .map((a: any) => a.collectionEventId))].sort();
 
-        for (const period of lockedDuesPeriods) {
-          const allocated = period.allocations
-            .filter(a => a.payment.status === "SUCCESS")
-            .reduce((sum, a) => sum + a.allocatedAmountPaise, 0);
-          const remaining = period.expectedAmountPaise - allocated;
-          if (remaining > 0) {
-            outstandingDues.push({
-              type: "duesPeriod",
-              id: period.id,
-              dueDate: period.dueDate,
-              expectedAmountPaise: period.expectedAmountPaise,
-              allocatedAmountPaise: allocated,
-              remainingAmountPaise: remaining,
-            });
-          }
-        }
+        // If no allocations provided, default to all pending (backward compatibility)
+        const useAllPending = input.allocations.length === 0;
 
-        const lockedAssignments = await tx.collectionEventAssignment.findMany({
-          where: { id: { in: assignmentIdsToLock } },
-          include: { event: { select: { id: true, dueDate: true } } },
-          orderBy: { event: { dueDate: "asc" } },
-        });
+        // VALIDATE: Selected IDs must form a continuous prefix from the oldest
+        if (!useAllPending && (selectedDuesPeriodIds.length > 0 || selectedAssignmentIds.length > 0)) {
+          // Build the ordered list of all pending IDs
+          const allPendingIds = allPendingDues.map(d => d.id);
 
-        for (const assignment of lockedAssignments) {
-          const allocated = await sumEventAllocationsForMember(tx, assignment.eventId ?? "", input.memberId ?? "");
-          const remaining = assignment.expectedAmountPaise - allocated;
-          console.log("[DEBUG FIFO event] assignmentId:", assignment.id, "eventId:", assignment.eventId, "expected:", assignment.expectedAmountPaise, "allocated:", allocated, "remaining:", remaining);
-          if (remaining > 0) {
-            outstandingDues.push({
-              type: "collectionEventAssignment",
-              id: assignment.id,
-              dueDate: assignment.event.dueDate,
-              expectedAmountPaise: assignment.expectedAmountPaise,
-              allocatedAmountPaise: allocated,
-              remainingAmountPaise: remaining,
-            });
-          }
-        }
+          // Build the selected IDs list in the same order
+          const selectedIds = allPendingIds.filter(id =>
+            selectedDuesPeriodIds.includes(id) || selectedAssignmentIds.includes(id)
+          );
 
-        outstandingDues.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
-
-        let remainingPaymentAmount = input.amountPaise;
-        const calculatedAllocations: typeof allocationRows = [];
-
-        for (const due of outstandingDues) {
-          if (remainingPaymentAmount <= 0) break;
-
-          const allocateAmount = Math.min(remainingPaymentAmount, due.remainingAmountPaise);
-
-          if (due.type === "duesPeriod") {
-            calculatedAllocations.push({
-              duesPeriodId: due.id,
-              collectionEventId: null,
-              collectionDefinitionId: input.collectionDefinitionId,
-              allocatedAmountPaise: allocateAmount,
-              purposeNote: "Period Due",
-            });
-          } else {
-            const assignment = lockedAssignments.find(a => a.id === due.id);
-            calculatedAllocations.push({
-              duesPeriodId: null,
-              collectionEventId: assignment!.eventId,
-              collectionDefinitionId: input.collectionDefinitionId,
-              allocatedAmountPaise: allocateAmount,
-              purposeNote: "Event Due",
-            });
+          // Check continuous prefix: find first selected index, all before must also be selected
+          const firstSelectedIndex = allPendingIds.findIndex(id => selectedIds.includes(id));
+          if (firstSelectedIndex >= 0) {
+            // Check if any earlier pending ID was NOT selected
+            for (let i = 0; i < firstSelectedIndex; i++) {
+              if (!selectedIds.includes(allPendingIds[i])) {
+                throw new Error("OLDEST_FIRST: Cannot skip earlier pending periods. Select a continuous prefix from the oldest.");
+              }
+            }
           }
 
-          remainingPaymentAmount -= allocateAmount;
-        }
+          // Validate all selected IDs are actually pending and belong to this member/category
+          const selectedDuesPeriods = selectedDuesPeriodIds.length > 0 ? await tx.duesPeriod.findMany({
+            where: { id: { in: selectedDuesPeriodIds }, memberId: input.memberId, masjidId: user.masjidId!, collectionDefinitionId: input.collectionDefinitionId, status: { in: ["PENDING", "PARTIAL"] } },
+            select: { id: true, dueDate: true, expectedAmountPaise: true },
+          }) : [];
 
-        if (remainingPaymentAmount > 0 && definition.baseCategory?.code === "ANNUAL") {
-          const lastDue = outstandingDues[outstandingDues.length - 1];
-          if (lastDue && lastDue.type === "collectionEventAssignment") {
-            const assignment = lockedAssignments.find(a => a.id === lastDue.id);
-            if (assignment) {
+          const selectedAssignments = selectedAssignmentIds.length > 0 ? await tx.collectionEventAssignment.findMany({
+            where: { eventId: { in: selectedAssignmentIds }, memberId: input.memberId, masjidId: user.masjidId!, event: { collectionDefinitionId: input.collectionDefinitionId, status: { in: ["SCHEDULED", "OPEN"] } }, status: { in: ["PENDING", "PARTIAL"] } },
+            select: { id: true, eventId: true, expectedAmountPaise: true, event: { select: { dueDate: true } } },
+          }) : [];
+
+          if (selectedDuesPeriods.length !== selectedDuesPeriodIds.length || selectedAssignments.length !== selectedAssignmentIds.length) {
+            throw new Error("One or more selected periods are not available or do not belong to this member.");
+          }
+
+          // Lock selected records for update
+          if (selectedDuesPeriodIds.length > 0) {
+            await tx.$queryRaw`
+              SELECT id FROM "DuesPeriod"
+              WHERE id IN (${Prisma.join(selectedDuesPeriodIds)})
+              FOR UPDATE
+            `;
+          }
+          if (selectedAssignmentIds.length > 0) {
+            const eventIds = [...new Set(selectedAssignments.map(a => a.eventId))].sort();
+            if (eventIds.length > 0) {
+              await tx.$queryRaw`
+                SELECT id FROM "CollectionEvent"
+                WHERE id IN (${Prisma.join(eventIds)})
+                FOR UPDATE
+              `;
+            }
+            await tx.$queryRaw`
+              SELECT id FROM "CollectionEventAssignment"
+              WHERE id IN (${Prisma.join(selectedAssignmentIds)})
+              FOR UPDATE
+            `;
+          }
+
+          // Calculate remaining amounts for selected periods
+          let remainingPaymentAmount = input.amountPaise;
+          const calculatedAllocations: typeof allocationRows = [];
+
+          // Process selected dues periods in order
+          for (const period of selectedDuesPeriods) {
+            if (remainingPaymentAmount <= 0) break;
+            const allocated = await tx.paymentAllocation.aggregate({
+              where: { duesPeriodId: period.id, payment: { status: "SUCCESS" } },
+              _sum: { allocatedAmountPaise: true },
+            });
+            const alreadyAllocated = allocated._sum.allocatedAmountPaise ?? 0;
+            const remaining = period.expectedAmountPaise - alreadyAllocated;
+            if (remaining > 0) {
+              const allocateAmount = Math.min(remainingPaymentAmount, remaining);
+              calculatedAllocations.push({
+                duesPeriodId: period.id,
+                collectionEventId: null,
+                collectionDefinitionId: input.collectionDefinitionId,
+                allocatedAmountPaise: allocateAmount,
+                purposeNote: "Period Due",
+              });
+              remainingPaymentAmount -= allocateAmount;
+            }
+          }
+
+          // Process selected assignments in order
+          for (const assignment of selectedAssignments) {
+            if (remainingPaymentAmount <= 0) break;
+            const allocated = await tx.paymentAllocation.aggregate({
+              where: { collectionEventId: assignment.eventId, payment: { status: "SUCCESS" }, duesPeriodId: null },
+              _sum: { allocatedAmountPaise: true },
+            });
+            const alreadyAllocated = allocated._sum.allocatedAmountPaise ?? 0;
+            const remaining = assignment.expectedAmountPaise - alreadyAllocated;
+            if (remaining > 0) {
+              const allocateAmount = Math.min(remainingPaymentAmount, remaining);
               calculatedAllocations.push({
                 duesPeriodId: null,
                 collectionEventId: assignment.eventId,
+                collectionDefinitionId: input.collectionDefinitionId,
+                allocatedAmountPaise: allocateAmount,
+                purposeNote: "Event Due",
+              });
+              remainingPaymentAmount -= allocateAmount;
+            }
+          }
+
+          // Handle Additional Voluntary Contribution for event-based FIXED amount categories
+          // Only allowed for MILAD_UN_NABI and SHAB_E_QADR
+          const allowedAdditionalCodes = ["MILAD_UN_NABI", "SHAB_E_QADR"];
+          if (remainingPaymentAmount > 0 &&
+              definition.amountType === "FIXED" &&
+              (definition.frequency === "ANNUAL" || definition.frequency === "EVENT_BASED") &&
+              definition.purposeCode &&
+              allowedAdditionalCodes.includes(definition.purposeCode)) {
+            // Find the last selected event allocation
+            const lastEventAlloc = [...calculatedAllocations].reverse().find(a => a.collectionEventId);
+            if (lastEventAlloc) {
+              calculatedAllocations.push({
+                duesPeriodId: null,
+                collectionEventId: lastEventAlloc.collectionEventId,
                 collectionDefinitionId: input.collectionDefinitionId,
                 allocatedAmountPaise: remainingPaymentAmount,
                 purposeNote: "Additional Voluntary Contribution",
@@ -320,21 +351,127 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
               remainingPaymentAmount = 0;
             }
           }
+
+          if (remainingPaymentAmount > 0) {
+            throw new Error(`Payment amount exceeds total outstanding in selected periods. Remaining unallocated: ${remainingPaymentAmount} paise.`);
+          }
+
+          allocationRows = calculatedAllocations;
+
+        } else {
+          // USE ALL PENDING (backward compatibility / default)
+          // Lock all pending records
+          const allDuesPeriodIds = allPendingDuesPeriods.map(d => d.id).sort();
+          const allAssignmentIds = allPendingAssignments.map(a => a.id).sort();
+
+          if (allDuesPeriodIds.length > 0) {
+            await tx.$queryRaw`
+              SELECT id FROM "DuesPeriod"
+              WHERE id IN (${Prisma.join(allDuesPeriodIds)})
+              FOR UPDATE
+            `;
+          }
+          if (allAssignmentIds.length > 0) {
+            const eventIds = [...new Set(allPendingAssignments.map(a => a.eventId))].sort();
+            if (eventIds.length > 0) {
+              await tx.$queryRaw`
+                SELECT id FROM "CollectionEvent"
+                WHERE id IN (${Prisma.join(eventIds)})
+                FOR UPDATE
+              `;
+            }
+            await tx.$queryRaw`
+              SELECT id FROM "CollectionEventAssignment"
+              WHERE id IN (${Prisma.join(allAssignmentIds)})
+              FOR UPDATE
+            `;
+          }
+
+          // Recalculate outstanding amounts with locks held
+          let remainingPaymentAmount = input.amountPaise;
+          const calculatedAllocations: typeof allocationRows = [];
+
+          // Process all pending dues periods in FIFO order
+          for (const due of allPendingDues) {
+            if (remainingPaymentAmount <= 0) break;
+
+            let remaining: number;
+            if (due.type === "duesPeriod") {
+              const period = await tx.duesPeriod.findUnique({ where: { id: due.id } });
+              if (!period) continue;
+              const allocated = await tx.paymentAllocation.aggregate({
+                where: { duesPeriodId: period.id, payment: { status: "SUCCESS" } },
+                _sum: { allocatedAmountPaise: true },
+              });
+              remaining = period.expectedAmountPaise - (allocated._sum.allocatedAmountPaise ?? 0);
+            } else {
+              const allocated = await tx.paymentAllocation.aggregate({
+                where: { collectionEventId: due.id, payment: { status: "SUCCESS" }, duesPeriodId: null },
+                _sum: { allocatedAmountPaise: true },
+              });
+              remaining = due.expectedAmountPaise - (allocated._sum.allocatedAmountPaise ?? 0);
+            }
+
+            if (remaining > 0) {
+              const allocateAmount = Math.min(remainingPaymentAmount, remaining);
+              if (due.type === "duesPeriod") {
+                calculatedAllocations.push({
+                  duesPeriodId: due.id,
+                  collectionEventId: null,
+                  collectionDefinitionId: input.collectionDefinitionId,
+                  allocatedAmountPaise: allocateAmount,
+                  purposeNote: "Period Due",
+                });
+              } else {
+                const assignment = allPendingAssignments.find(a => a.id === due.id);
+                calculatedAllocations.push({
+                  duesPeriodId: null,
+                  collectionEventId: assignment!.eventId,
+                  collectionDefinitionId: input.collectionDefinitionId,
+                  allocatedAmountPaise: allocateAmount,
+                  purposeNote: "Event Due",
+                });
+              }
+              remainingPaymentAmount -= allocateAmount;
+            }
+          }
+
+          // Handle Additional Voluntary Contribution
+          const allowedAdditionalCodes = ["MILAD_UN_NABI", "SHAB_E_QADR"];
+          if (remainingPaymentAmount > 0 &&
+              definition.amountType === "FIXED" &&
+              (definition.frequency === "ANNUAL" || definition.frequency === "EVENT_BASED") &&
+              definition.purposeCode &&
+              allowedAdditionalCodes.includes(definition.purposeCode)) {
+            const lastEventAlloc = [...calculatedAllocations].reverse().find(a => a.collectionEventId);
+            if (lastEventAlloc) {
+              calculatedAllocations.push({
+                duesPeriodId: null,
+                collectionEventId: lastEventAlloc.collectionEventId,
+                collectionDefinitionId: input.collectionDefinitionId,
+                allocatedAmountPaise: remainingPaymentAmount,
+                purposeNote: "Additional Voluntary Contribution",
+              });
+              remainingPaymentAmount = 0;
+            }
+          }
+
+          if (remainingPaymentAmount > 0) {
+            throw new Error(`Payment amount exceeds total outstanding dues. Outstanding: ${input.amountPaise - remainingPaymentAmount} paise.`);
+          }
+
+          allocationRows = calculatedAllocations;
         }
 
-        if (remainingPaymentAmount > 0) {
-          throw new Error(`Payment amount exceeds total outstanding dues. Outstanding: ${input.amountPaise - remainingPaymentAmount} paise.`);
-        }
+      } else if (isMemberPayment && settlementPolicy === "ANY_PENDING_PERIOD") {
+        // Member payment with ANY_PENDING_PERIOD policy - use provided allocations
+        // The client submits specific duesPeriodIds and/or collectionEventIds
+        // Server validates they belong to the member and are outstanding
 
-        allocationRows = calculatedAllocations;
-
-      } else {
-        // Non-FIFO or walk-in payment - use provided allocations
-        // Support both: allocations array OR top-level collectionEventId for event-based walk-in payments
         type NonFifoAllocation = {
           duesPeriodId?: string;
           collectionEventId?: string;
-          collectionDefinitionId?: string; // optional for the synthetic array, we add it later
+          collectionDefinitionId?: string;
           amountPaise: number;
           purposeNote?: string;
         };
@@ -342,6 +479,134 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
         const allocationsToProcess: NonFifoAllocation[] = input.allocations.length > 0
           ? input.allocations
           : (input.collectionEventId ? [{ collectionEventId: input.collectionEventId, amountPaise: input.amountPaise }] : []);
+
+        // Lock all selected dues periods and event assignments
+        const duesPeriodIds = [...new Set(allocationsToProcess.map(a => a.duesPeriodId).filter(Boolean))].sort() as string[];
+        const eventIds = [...new Set(allocationsToProcess.map(a => a.collectionEventId).filter(Boolean))].sort() as string[];
+
+        if (duesPeriodIds.length > 0) {
+          await tx.$queryRaw`
+            SELECT id FROM "DuesPeriod"
+            WHERE id IN (${Prisma.join(duesPeriodIds)})
+            FOR UPDATE
+          `;
+        }
+        if (eventIds.length > 0) {
+          await tx.$queryRaw`
+            SELECT id FROM "CollectionEvent"
+            WHERE id IN (${Prisma.join(eventIds)})
+            FOR UPDATE
+          `;
+          // Also lock the assignments
+          const assignmentIdsToLock = (await tx.collectionEventAssignment.findMany({
+            where: { eventId: { in: eventIds }, memberId: input.memberId },
+            select: { id: true },
+          })).map(a => a.id).sort();
+          if (assignmentIdsToLock.length > 0) {
+            await tx.$queryRaw`
+              SELECT id FROM "CollectionEventAssignment"
+              WHERE id IN (${Prisma.join(assignmentIdsToLock)})
+              FOR UPDATE
+            `;
+          }
+        }
+
+        // If no allocations were provided, allow direct allocation to the collection definition
+        let allocationsToUse = allocationsToProcess;
+        if (allocationsToUse.length === 0) {
+          allocationsToUse = [{ amountPaise: input.amountPaise }];
+        }
+
+        // Validate and process each allocation
+        for (const alloc of allocationsToUse) {
+          let targetEventId: string | null = (alloc.collectionEventId ?? input.collectionEventId) ?? null;
+
+          if (targetEventId) {
+            const event = await tx.collectionEvent.findFirst({
+              where: { id: targetEventId, masjidId: user.masjidId!, collectionDefinitionId: input.collectionDefinitionId },
+              select: { id: true, expectedAmountPaise: true },
+            });
+            if (!event) {
+              throw new Error("Collection event not found for donation.");
+            }
+          }
+
+          if (alloc.duesPeriodId) {
+            const duesPeriod = await tx.duesPeriod.findFirst({
+              where: { id: alloc.duesPeriodId, masjidId: user.masjidId!, collectionDefinitionId: input.collectionDefinitionId, memberId: input.memberId },
+              select: { id: true, expectedAmountPaise: true },
+            });
+            if (!duesPeriod) {
+              throw new Error("A selected due period is not available for this member in this Masjid.");
+            }
+          }
+
+          allocationRows.push({
+            duesPeriodId: alloc.duesPeriodId ?? null,
+            collectionEventId: targetEventId,
+            collectionDefinitionId: input.collectionDefinitionId,
+            allocatedAmountPaise: alloc.amountPaise,
+            purposeNote: targetEventId ? "Event Due" : "Period Due",
+          });
+        }
+
+        // Check for excess (Additional Voluntary Contribution) for FIXED amount categories
+        // Only allowed for MILAD_UN_NABI and SHAB_E_QADR
+        const allowedAdditionalCodes = ["MILAD_UN_NABI", "SHAB_E_QADR"];
+        const totalAllocated = allocationRows.reduce((sum, a) => sum + a.allocatedAmountPaise, 0);
+        if (totalAllocated < input.amountPaise &&
+            definition.amountType === "FIXED" &&
+            (definition.frequency === "ANNUAL" || definition.frequency === "EVENT_BASED") &&
+            definition.purposeCode &&
+            allowedAdditionalCodes.includes(definition.purposeCode)) {
+          // Find the last event/dues period allocated to
+          const lastAlloc = allocationRows[allocationRows.length - 1];
+          if (lastAlloc && lastAlloc.collectionEventId) {
+            allocationRows.push({
+              duesPeriodId: null,
+              collectionEventId: lastAlloc.collectionEventId,
+              collectionDefinitionId: input.collectionDefinitionId,
+              allocatedAmountPaise: input.amountPaise - totalAllocated,
+              purposeNote: "Additional Voluntary Contribution",
+            });
+          }
+        }
+
+        // Validate total
+        const finalTotal = allocationRows.reduce((sum, a) => sum + a.allocatedAmountPaise, 0);
+        if (finalTotal !== input.amountPaise) {
+          throw new Error(`Allocation total (${finalTotal}) does not match payment amount (${input.amountPaise}).`);
+        }
+
+      } else {
+        // Non-member (walk-in) payment - use provided allocations or single event
+        type NonFifoAllocation = {
+          duesPeriodId?: string;
+          collectionEventId?: string;
+          collectionDefinitionId?: string;
+          amountPaise: number;
+          purposeNote?: string;
+        };
+
+        let allocationsToProcess: NonFifoAllocation[] = input.allocations.length > 0
+          ? input.allocations
+          : (input.collectionEventId ? [{ collectionEventId: input.collectionEventId, amountPaise: input.amountPaise }] : []);
+
+        // If no allocations provided and no collectionEventId, find the first open event for this category
+        if (allocationsToProcess.length === 0) {
+          const firstEvent = await tx.collectionEvent.findFirst({
+            where: {
+              masjidId: user.masjidId!,
+              collectionDefinitionId: input.collectionDefinitionId,
+              status: { in: ["SCHEDULED", "OPEN"] },
+            },
+            orderBy: { dueDate: "asc" },
+            select: { id: true },
+          });
+          if (firstEvent) {
+            allocationsToProcess = [{ collectionEventId: firstEvent.id, amountPaise: input.amountPaise }];
+          }
+        }
 
         for (const alloc of allocationsToProcess) {
           let targetEventId: string | null = (alloc.collectionEventId ?? input.collectionEventId) ?? null;
@@ -373,6 +638,45 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
             allocatedAmountPaise: alloc.amountPaise,
             purposeNote: targetEventId ? "Event Due" : "Period Due",
           });
+        }
+
+        // If no allocations could be determined (e.g., ONE_TIME, GENERAL_DONATION without events),
+        // allow direct allocation to the collection definition
+        if (allocationRows.length === 0) {
+          allocationRows.push({
+            duesPeriodId: null,
+            collectionEventId: null,
+            collectionDefinitionId: input.collectionDefinitionId,
+            allocatedAmountPaise: input.amountPaise,
+            purposeNote: "Donation",
+          });
+        }
+
+        // Check for excess (Additional Voluntary Contribution) for FIXED amount categories
+        // Only allowed for MILAD_UN_NABI and SHAB_E_QADR
+        const allowedAdditionalCodes = ["MILAD_UN_NABI", "SHAB_E_QADR"];
+        const totalAllocated = allocationRows.reduce((sum, a) => sum + a.allocatedAmountPaise, 0);
+        if (totalAllocated < input.amountPaise &&
+            definition.amountType === "FIXED" &&
+            (definition.frequency === "ANNUAL" || definition.frequency === "EVENT_BASED") &&
+            definition.purposeCode &&
+            allowedAdditionalCodes.includes(definition.purposeCode)) {
+          const lastAlloc = allocationRows[allocationRows.length - 1];
+          if (lastAlloc && lastAlloc.collectionEventId) {
+            allocationRows.push({
+              duesPeriodId: null,
+              collectionEventId: lastAlloc.collectionEventId,
+              collectionDefinitionId: input.collectionDefinitionId,
+              allocatedAmountPaise: input.amountPaise - totalAllocated,
+              purposeNote: "Additional Voluntary Contribution",
+            });
+          }
+        }
+
+        // Validate total
+        const finalTotal = allocationRows.reduce((sum, a) => sum + a.allocatedAmountPaise, 0);
+        if (finalTotal !== input.amountPaise) {
+          throw new Error(`Allocation total (${finalTotal}) does not match payment amount (${input.amountPaise}).`);
         }
       }
 
@@ -407,6 +711,8 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
           },
         });
       }
+
+      // REMOVED: JummaCollection upsert logic - Jumma now uses dedicated recordJummaCollectionAction
 
       for (const a of allocationRows) {
         if (a.duesPeriodId) await recomputePeriodStatus(tx, a.duesPeriodId);
@@ -461,6 +767,7 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
     revalidatePath("/dashboard");
     revalidatePath("/transactions");
     revalidatePath("/members");
+    // REMOVED: revalidatePath("/collections/jumma"); - Jumma now has its own workflow
     return { ok: true, paymentId: result.paymentId, receiptNo: result.receiptNo, duplicate: result.duplicate ?? false };
   } catch (err) {
     if (err instanceof Error) {
@@ -471,10 +778,12 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
         "Collection event not found for donation.",
         "Collection definition not found or inactive in this Masjid.",
         "A selected due period is not available in this Masjid.",
+        "A selected due period is not available for this member in this Masjid.",
         "Member not found in this Masjid.",
         "This Masjid is suspended; payments are read-only.",
         "Payment not found in this Masjid.",
         "This payment is already reversed.",
+        "OLDEST_FIRST: Cannot skip earlier pending periods. Select a continuous prefix from the oldest.",
         "UNAUTHENTICATED",
         "FORBIDDEN",
       ];

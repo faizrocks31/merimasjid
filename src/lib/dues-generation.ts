@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { addMonths, istParts, monthPeriod, addWeeks, addDays, startOfDay, endOfDay } from "@/lib/dates";
+import { addMonths, istParts, monthPeriod, addWeeks, addDays, startOfDay, endOfDay, parseISODate } from "@/lib/dates";
 import { COLLECTION_FREQUENCY, DUE_GENERATION, MEMBER_ASSIGNMENT, SETTLEMENT_POLICY, FREQUENCIES } from "@/lib/constants";
 import { writeAudit } from "@/modules/audit/write";
 
@@ -61,6 +61,7 @@ export function buildPeriods(
   horizon: Date = addMonths(new Date(), 12),
   defaultDueDay = 10,
   defaultGraceDays = 0,
+  fromDate?: Date,
 ): Array<{ periodStart: Date; periodEnd: Date; dueDate: Date; expectedAmountPaise: number }> {
   const out: Array<{ periodStart: Date; periodEnd: Date; dueDate: Date; expectedAmountPaise: number }> = [];
 
@@ -77,7 +78,8 @@ export function buildPeriods(
 
   const limit = horizon;
 
-  let cursor = startOfDay(new Date()); // Start from today
+  // Start from fromDate if provided, otherwise from today
+  let cursor = fromDate ? startOfDay(new Date(fromDate)) : startOfDay(new Date());
   let guard = 0;
   while (cursor <= limit && guard < 240) {
     guard++;
@@ -291,12 +293,13 @@ export function buildAllPeriods(
   horizon: Date = addMonths(new Date(), 12),
   defaultDueDay = 10,
   defaultGraceDays = 0,
+  fromDate?: Date,
 ): Array<{ periodStart: Date; periodEnd: Date; dueDate: Date; expectedAmountPaise: number }> {
   switch (definition.frequency) {
     case COLLECTION_FREQUENCY.WEEKLY:
       return buildWeeklyPeriods(definition, horizon, defaultDueDay, defaultGraceDays);
     case COLLECTION_FREQUENCY.MONTHLY:
-      return buildPeriods(definition, horizon, defaultDueDay, defaultGraceDays);
+      return buildPeriods(definition, horizon, defaultDueDay, defaultGraceDays, fromDate);
     case COLLECTION_FREQUENCY.QUARTERLY:
       return buildQuarterlyPeriods(definition, horizon, defaultDueDay, defaultGraceDays);
     case COLLECTION_FREQUENCY.SEMI_ANNUAL:
@@ -316,6 +319,7 @@ export interface GenerationOptions {
   memberIds?: string[];        // For SELECTED assignment
   skipExisting?: boolean;      // Default true
   forceRegenerate?: boolean;   // Admin override
+  actorUserId?: string | null; // Actor user ID for audit log (optional, defaults to null for system)
 }
 
 /**
@@ -395,12 +399,27 @@ export async function generateDuesForCategory(
   // Use defaultDueDay and defaultGraceDays from definition if available, otherwise defaults
   const defaultDueDay = definition.defaultDueDay ?? 10;
   const defaultGraceDays = definition.defaultGraceDays ?? 0;
-  const periods = buildAllPeriods(definition, horizon, defaultDueDay, defaultGraceDays);
+  const periods = buildAllPeriods(definition, horizon, defaultDueDay, defaultGraceDays, options.startDate);
+
+  console.log(`DEBUG: Generated ${periods.length} periods from ${options.startDate.toISOString()} to ${options.endDate.toISOString()}`);
+  periods.forEach(p => console.log(`  Period: ${p.periodStart.toISOString()} to ${p.periodEnd.toISOString()}, due: ${p.dueDate.toISOString()}`));
 
   // Filter periods to the requested range
+  // Convert options.startDate/endDate (naive UTC dates) to IST midnight for proper comparison
+  // periodStart is generated at IST midnight, so we compare in IST timezone
+  const startDateIst = options.startDate
+    ? new Date(`${options.startDate.toISOString().split("T")[0]}T00:00:00+05:30`)
+    : options.startDate;
+  const endDateIst = options.endDate
+    ? new Date(`${options.endDate.toISOString().split("T")[0]}T00:00:00+05:30`)
+    : options.endDate;
+
   const filteredPeriods = periods.filter(p =>
-    p.periodStart >= options.startDate && p.periodStart <= options.endDate
+    p.periodStart >= startDateIst && p.periodStart <= endDateIst
   );
+
+  console.log(`DEBUG: Filtered to ${filteredPeriods.length} periods`);
+  filteredPeriods.forEach(p => console.log(`  Period: ${p.periodStart.toISOString()} to ${p.periodEnd.toISOString()}, due: ${p.dueDate.toISOString()}`));
 
   if (filteredPeriods.length === 0) {
     return { created: 0, skipped: 0, errors: ["No periods in the specified date range"] };
@@ -423,6 +442,7 @@ export async function generateDuesForCategory(
         for (const member of batch) {
           for (const period of filteredPeriods) {
             try {
+              console.log("DEBUG: Creating dues period for member:", member.id, "periodStart:", period.periodStart.toISOString());
               await tx.duesPeriod.create({
                 data: {
                   masjidId,
@@ -437,8 +457,15 @@ export async function generateDuesForCategory(
               });
               batchCreated++;
             } catch (err: any) {
-              if (err.code === "P2002" && err.meta?.target?.includes("collectionDefinitionId")) {
-                batchSkipped++;
+              if (err.code === "P2002") {
+                console.log("P2002 error meta:", JSON.stringify(err.meta));
+                console.log("Attempting to create for member:", member.id, "period:", period.periodStart.toISOString(), "to", period.periodEnd.toISOString());
+                const target = err.meta?.target;
+                if (target && (Array.isArray(target) ? target.includes("collectionDefinitionId") : target.includes("collectionDefinitionId"))) {
+                  batchSkipped++;
+                } else {
+                  throw err;
+                }
               } else {
                 throw err;
               }
@@ -460,7 +487,7 @@ export async function generateDuesForCategory(
   await prisma.$transaction(async (tx) => {
     await writeAudit(tx, {
       masjidId,
-      actorUserId: "system", // Will be overwritten by caller
+      actorUserId: options.actorUserId ?? null, // null for system/cron jobs, valid user ID for admin actions
       action: "dues.generate.category",
       entityType: "DuesPeriod",
       entityId: definition.id,
