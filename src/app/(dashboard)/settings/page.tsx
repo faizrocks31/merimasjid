@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const SETTINGS_TAB_KEYS = [
   "masjid",
-  "collectionDefinitions",
+  "collections",
   "contributionCategories",
   "expenseCategories",
   "notifications",
@@ -34,7 +34,19 @@ export default async function SettingsPage({
     ? (tab as (typeof SETTINGS_TAB_KEYS)[number])
     : "masjid";
 
-  const [masjid, expenseCategories, memberships, notificationSettings, collectionEvents, members, assignments, collectionDefinitions, baseCategories, subcategories] = await Promise.all([
+  const [
+    masjid,
+    expenseCategories,
+    memberships,
+    notificationSettings,
+    collectionEvents,
+    members,
+    assignments,
+    collectionDefinitions,
+    baseCategories,
+    subcategories,
+    baseCategorySubcategories,
+  ] = await Promise.all([
     prisma.masjid.findUnique({
       where: { id: masjidId },
       select: {
@@ -85,6 +97,9 @@ export default async function SettingsPage({
     }),
     prisma.baseCategory.findMany({ orderBy: { name: "asc" } }),
     prisma.subcategory.findMany({ orderBy: { name: "asc" } }),
+    prisma.baseCategorySubcategory.findMany({
+      include: { baseCategory: true, subcategory: true }
+    }),
   ]);
   if (!masjid) redirect("/dashboard");
 
@@ -331,6 +346,13 @@ export default async function SettingsPage({
     code: sc.code,
   }));
 
+  const baseCategorySubcategoryItems = baseCategorySubcategories.map((bcs) => ({
+    baseCategoryId: bcs.baseCategoryId,
+    subcategoryId: bcs.subcategoryId,
+    baseCategory: { code: bcs.baseCategory.code },
+    subcategory: { code: bcs.subcategory.code },
+  }));
+
   const expenseCategoryItems = expenseCategories.map((c) => ({
     id: c.id,
     name: c.name,
@@ -435,6 +457,7 @@ export default async function SettingsPage({
       collectionDefinitionItems={collectionDefinitionItems}
       baseCategories={baseCategoryItems}
       subcategories={subcategoryItems}
+      baseCategorySubcategories={baseCategorySubcategoryItems}
       staffMembers={staffMembers}
       staffLabels={staffLabels}
       roleLabels={roleLabels}

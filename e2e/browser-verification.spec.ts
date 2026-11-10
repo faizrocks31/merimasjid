@@ -41,8 +41,8 @@ test.describe.serial("Browser Verification - Phase 3", () => {
     await expect(page.locator("h1").first()).toBeVisible({ timeout: 10000 });
   });
 
-  test("2. Settings - Contribution Categories tab loads", async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings?tab=contributionCategories`);
+  test("2. Settings - Collections tab loads", async ({ page }) => {
+    await page.goto(`${BASE_URL}/settings?tab=collections`);
 
     // Debug: check page content
     console.log('Current URL:', page.url());
@@ -59,11 +59,11 @@ test.describe.serial("Browser Verification - Phase 3", () => {
     }
 
     // The tab is a TabsTrigger with icon + tooltip, not visible text
-    await expect(page.locator('button[title="Contribution Categories"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('button[title="Collections"]').first()).toBeVisible({ timeout: 10000 });
   });
 
   test("3. Ensure a TESTMONTH category exists for subsequent tests", async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings?tab=contributionCategories`);
+    await page.goto(`${BASE_URL}/settings?tab=collections`);
     await page.waitForTimeout(500);
 
     // Locate existing TESTMONTH categories
@@ -85,18 +85,24 @@ test.describe.serial("Browser Verification - Phase 3", () => {
       const uniqueCode = `TESTMONTH${String(Date.now()).slice(-6)}`;
 
       // Click add category button - it's a toggle button
-      await page.click('button:has-text("Add Category")');
+      await page.click('button:has-text("Add Collection Definition")');
       await page.waitForTimeout(500);
 
-      // Fill category form
+      // Fill collection definition form
       await page.fill('input[name="name"]', uniqueName);
-      await page.fill('input[name="code"]', uniqueCode);
-      await page.fill('input[name="reportingGroup"]', "DONATIONS");
+      await page.selectOption('select[name="baseCategoryId"]', { index: 1 });
+      await page.waitForTimeout(1000);
+      const subOptionsCount = await page.locator('select[name="subcategoryId"] option').count();
+      console.log('Subcategory options count:', subOptionsCount);
+      if (subOptionsCount === 0) throw new Error('Subcategory options empty after base category selection');
+      await page.selectOption('select[name="subcategoryId"]', { index: 1 });
       await page.selectOption('select[name="frequency"]', "MONTHLY");
-      await page.selectOption('select[name="collectionMode"]', "HOUSEHOLD_WISE");
-      await page.fill('input[name="defaultAmountPaise"]', "10000"); // 100 INR
-      await page.fill('input[name="defaultDueDay"]', "5");
-      await page.fill('input[name="defaultGraceDays"]', "10");
+      await page.selectOption('select[name="amountType"]', "FIXED");
+      await page.fill('input[name="defaultAmountPaise"]', "100");
+      await page.selectOption('select[name="donorEligibility"]', "MEMBERS_ONLY");
+      await page.selectOption('select[name="memberAssignment"]', "ALL_ELIGIBLE");
+      await page.selectOption('select[name="dueGeneration"]', "AUTOMATIC");
+      await page.selectOption('select[name="settlementPolicy"]', "OLDEST_FIRST");
 
       // Save the new category
       await page.click('button:has-text("Save")');
@@ -113,7 +119,7 @@ test.describe.serial("Browser Verification - Phase 3", () => {
   });
 
   test("4. Generate events from category scheduling rules", async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings?tab=contributionCategories`);
+    await page.goto(`${BASE_URL}/settings?tab=collections`);
     await page.waitForTimeout(500);
 
     // Find the dynamically created category's "Generate events" button
@@ -137,7 +143,7 @@ test.describe.serial("Browser Verification - Phase 3", () => {
   });
 
   test("5. Create manual event", async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings?tab=contributionCategories`);
+    await page.goto(`${BASE_URL}/settings?tab=collections`);
     await page.waitForTimeout(500);
 
     // Click Add Event for dynamically created category
@@ -159,7 +165,7 @@ test.describe.serial("Browser Verification - Phase 3", () => {
   });
 
   test("6. Assign households to event", async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings?tab=contributionCategories`);
+    await page.goto(`${BASE_URL}/settings?tab=collections`);
     await page.waitForTimeout(500);
 
     // The "Assign households" button is icon-only with aria-label.
@@ -207,7 +213,7 @@ test.describe.serial("Browser Verification - Phase 3", () => {
       await page.waitForTimeout(2000);
 
       // Go back to settings and re-open assign form
-      await page.goto(`${BASE_URL}/settings?tab=contributionCategories`);
+      await page.goto(`${BASE_URL}/settings?tab=collections`);
       await page.waitForTimeout(500);
       const assignBtn2 = page.getByRole("button", { name: "Assign households" }).first();
       await expect(assignBtn2).toBeVisible({ timeout: 10000 });
@@ -411,7 +417,7 @@ test.describe.serial("Regression Tests - Phase 4", () => {
     await page.click('button:has-text("Test Member Browser")');
     await page.waitForTimeout(300);
 
-    await page.selectOption('select[name="categoryId"]', { index: 1 });
+    await page.selectOption('select[name="collectionDefinitionId"]', { index: 1 });
     await page.fill('input[name="amountPaise"]', "100");
     await page.selectOption('select[name="frequency"]', "MONTHLY");
     await page.fill('input[name="startDate"]', "2026-01-01");
@@ -514,7 +520,7 @@ test.describe.serial("Regression Tests - Phase 4", () => {
     await page.click('button:has-text("Test Member For Dues")');
     await page.waitForTimeout(300);
 
-    await page.selectOption('select[name="categoryId"]', { index: 1 });
+    await page.selectOption('select[name="collectionDefinitionId"]', { index: 1 });
     await page.fill('input[name="amountPaise"]', "10000"); // 100 INR
     await page.selectOption('select[name="frequency"]', "MONTHLY");
     await page.fill('input[name="startDate"]', "2026-01-01");

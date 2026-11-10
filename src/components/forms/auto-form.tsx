@@ -483,7 +483,10 @@ export function SimpleForm({
             <Field key={field.name} label={field.label} htmlFor={field.name} error={error}>
               <GenericSelect
                 id={field.name} name={field.name}
-                {...(uncontrolled ? { defaultValue: value } : { value, onChange: (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); } })}
+                {...(uncontrolled
+                  ? { defaultValue: value, onChange: (e) => onFieldChange?.(field.name, e.target.value) }
+                  : { value, onChange: (e) => { onChange?.(field.name, e.target.value); onFieldChange?.(field.name, e.target.value); } }
+                )}
                 disabled={isDisabled}
                 required={field.required}
                 options={field.options}

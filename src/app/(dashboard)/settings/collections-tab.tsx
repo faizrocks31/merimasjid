@@ -48,6 +48,12 @@ interface CollectionDefinitionsTabProps {
   items: CollectionDefinitionItem[];
   baseCategories: { id: string; name: string; code: string }[];
   subcategories: { id: string; name: string; code: string }[];
+  baseCategorySubcategories: {
+    baseCategoryId: string;
+    subcategoryId: string;
+    baseCategory: { code: string };
+    subcategory: { code: string };
+  }[];
   onDelete: (item: any) => void;
 }
 
@@ -127,6 +133,7 @@ export function CollectionDefinitionsTab({
   items,
   baseCategories,
   subcategories,
+  baseCategorySubcategories,
   onDelete,
 }: CollectionDefinitionsTabProps) {
   const router = useRouter();
@@ -134,6 +141,9 @@ export function CollectionDefinitionsTab({
   const [editingDefinition, setEditingDefinition] = useState<CollectionDefinitionItem | null>(null);
   const [formState, setFormState] = useState<CollectionState>(undefined);
   const [isPending, startTransition] = useTransition();
+
+  // Reload page on successful create/update/delete to keep list in sync
+  useReloadOnSuccess(formState);
 
   const frequencyLabels: Record<string, string> = {
     WEEKLY: labels.weekly ?? "Weekly",
@@ -172,36 +182,19 @@ export function CollectionDefinitionsTab({
   };
 
   const baseCategoryLabels: Record<string, string> = {
-    ZAKAT: labels.zakat ?? "Zakat",
+    CONSTRUCTION: labels.construction ?? "Construction",
+    GENERAL: labels.general ?? "General",
     SADAQAH: labels.sadaqah ?? "Sadaqah",
-    INFAQ: labels.infaq ?? "Infaq",
-    CHANDA: labels.chanda ?? "Chanda",
-    FUNDRAISING: labels.fundraising ?? "Fundraising",
-    COMMUNITY_EVENT: labels.communityEvent ?? "Community Event",
-    GENERAL_DONATION: labels.generalDonation ?? "General Donation",
+    ZAKAT: labels.zakat ?? "Zakat",
+    JUMMA: labels.jumma ?? "Jumma",
+    MONTHLY: labels.monthly ?? "Monthly",
+    ANNUAL: labels.annual ?? "Annual",
   };
 
   const subcategoryLabels: Record<string, string> = {
-    ZAKAT_FITR: labels.zakatFitr ?? "Zakat al-Fitr",
-    ZAKAT_MAAL: labels.zakatMaal ?? "Zakat al-Maal",
     GENERAL: labels.general ?? "General",
-    FIDYAH: labels.fidyah ?? "Fidyah",
-    KAFFARAH: labels.kaffarah ?? "Kaffarah",
-    CONSTRUCTION: labels.construction ?? "Construction",
-    MAINTENANCE: labels.maintenance ?? "Maintenance",
-    OPERATIONS: labels.operations ?? "Operations",
-    MONTHLY: labels.monthlySub ?? "Monthly",
-    ANNUAL: labels.annualSub ?? "Annual",
-    CAMPAIGN: labels.campaign ?? "Campaign",
-    PROJECT: labels.project ?? "Project",
-    EMERGENCY: labels.emergency ?? "Emergency",
-    EID: labels.eid ?? "Eid",
-    MILAD: labels.milad ?? "Milad un-Nabi",
-    ISRA_MIRAJ: labels.israMiraj ?? "Isra wal Miraj",
-    SHAB_E_QADR: labels.shabEQadr ?? "Shab-e-Qadr",
-    RAMADAN: labels.ramadan ?? "Ramadan",
-    JUMMA: labels.jumma ?? "Jumma",
-    UNRESTRICTED: labels.unrestricted ?? "Unrestricted",
+    RESTRICTED: labels.restricted ?? "Restricted",
+    RECURRING_DONATION: labels.recurringDonation ?? "Recurring Donation",
   };
 
   const handleEdit = (item: CollectionDefinitionItem) => {
@@ -212,6 +205,7 @@ export function CollectionDefinitionsTab({
   const handleCancelAdd = () => {
     setShowAddForm(false);
     setEditingDefinition(null);
+    setSelectedBaseCategoryId("");
   };
 
   const isEditing = !!editingDefinition;
@@ -230,6 +224,13 @@ export function CollectionDefinitionsTab({
     return map;
   }, [subcategories]);
 
+  // Map base category ID to code (for onChange handler)
+  const baseCategoryIdToCode = useMemo(() => {
+    const map: Record<string, string> = {};
+    baseCategories.forEach(bc => { map[bc.id] = bc.code; });
+    return map;
+  }, [baseCategories]);
+
   // Get the base category code from the item's meta (which stores the code)
   // We need to convert the code to the database ID for the form select
   const editingBaseCategoryCode = isEditing && editingDefinition
@@ -243,28 +244,32 @@ export function CollectionDefinitionsTab({
     : "";
   const editingSubcategoryId = editingSubcategoryCode ? subcategoryCodeToId[editingSubcategoryCode] : "";
 
+  // State to track selected base category ID
+  const [selectedBaseCategoryId, setSelectedBaseCategoryId] = useState(
+    isEditing ? editingBaseCategoryId : ""
+  );
+  const selectedBaseCategoryCode = selectedBaseCategoryId ? baseCategoryIdToCode[selectedBaseCategoryId] : "";
+
   const validSubcategories = useMemo(
     () => subcategories.filter((sc) => {
-      const validCombos: Record<string, string[]> = {
-        ZAKAT: ["ZAKAT_FITR", "ZAKAT_MAAL"],
-        SADAQAH: ["GENERAL", "FIDYAH", "KAFFARAH"],
-        INFAQ: ["CONSTRUCTION", "MAINTENANCE", "OPERATIONS"],
-        CHANDA: ["MONTHLY", "ANNUAL"],
-        FUNDRAISING: ["CAMPAIGN", "PROJECT", "EMERGENCY"],
-        COMMUNITY_EVENT: ["EID", "MILAD", "ISRA_MIRAJ", "SHAB_E_QADR", "RAMADAN", "JUMMA"],
-        GENERAL_DONATION: ["UNRESTRICTED"],
-      };
-      const baseCode = editingBaseCategoryCode;
+      // Use baseCategorySubcategories from database as single source of truth
+      // Get valid subcategory IDs for the selected/editing base category
+      const baseCode = selectedBaseCategoryCode || editingBaseCategoryCode;
       if (!baseCode) return true; // Show all if no base category selected
-      return validCombos[baseCode]?.includes(sc.code) ?? false;
+
+      const validSubcategoryIds = baseCategorySubcategories
+        .filter(bcs => bcs.baseCategory.code === baseCode)
+        .map(bcs => bcs.subcategoryId);
+
+      return validSubcategoryIds.includes(sc.id);
     }),
-    [subcategories, editingBaseCategoryCode]
+    [subcategories, baseCategorySubcategories, selectedBaseCategoryCode, editingBaseCategoryCode]
   );
 
   const fields = useMemo(
     () => [
-      { name: "name", label: labels.name, type: "text" as const, required: true, placeholder: "e.g. Monthly Chanda" },
-      { name: "description", label: labels.description, type: "textarea" as const, required: false, placeholder: labels.descriptionHint ?? "" },
+      { name: "name", label: labels.name, type: "text" as const, required: true, placeholder: "e.g. Monthly Chanda", defaultValue: isEditing ? editingDefinition?.name : "" },
+      { name: "description", label: labels.description, type: "textarea" as const, required: false, placeholder: labels.descriptionHint ?? "", defaultValue: "" },
       {
         name: "baseCategoryId",
         label: labels.baseCategory ?? "Base Category",
@@ -274,7 +279,7 @@ export function CollectionDefinitionsTab({
           value: bc.id,
           label: baseCategoryLabels[bc.code] || bc.name,
         })),
-        defaultValue: editingBaseCategoryId || undefined,
+        defaultValue: isEditing ? editingBaseCategoryId : "",
       },
       {
         name: "subcategoryId",
@@ -285,7 +290,7 @@ export function CollectionDefinitionsTab({
           value: sc.id,
           label: subcategoryLabels[sc.code] || sc.name,
         })),
-        defaultValue: editingSubcategoryId || undefined,
+        defaultValue: isEditing ? editingSubcategoryId : "",
       },
       { name: "active", label: labels.active, type: "checkbox" as const, required: false, defaultValue: isEditing ? editingDefinition?.active : true },
       { name: "showInPaymentReceived", label: labels.showInPaymentReceived ?? "Show in Payment Received", type: "checkbox" as const, required: false, defaultValue: isEditing ? editingDefinition?.showInPaymentReceived : true },
@@ -295,7 +300,7 @@ export function CollectionDefinitionsTab({
         type: "select" as const,
         required: true,
         options: Object.entries(frequencyLabels).map(([value, label]) => ({ value, label })),
-        defaultValue: isEditing ? editingDefinition?.frequency : undefined,
+        defaultValue: isEditing ? editingDefinition?.frequency : "MONTHLY",
       },
       {
         name: "amountType",
@@ -303,16 +308,17 @@ export function CollectionDefinitionsTab({
         type: "select" as const,
         required: true,
         options: Object.entries(amountTypeLabels).map(([value, label]) => ({ value, label })),
-        defaultValue: isEditing ? editingDefinition?.amountType : undefined,
+        defaultValue: isEditing ? editingDefinition?.amountType : "VARIABLE",
       },
       {
         name: "defaultAmountPaise",
-        label: labels.defaultAmount ?? "Default Amount (Paise)",
+        label: labels.defaultAmount ?? "Default Amount (₹)",
         type: "number" as const,
         required: false,
         min: 1,
-        placeholder: "e.g. 50000 for ₹500",
-        defaultValue: isEditing && editingDefinition?.defaultAmountPaise ? String(editingDefinition.defaultAmountPaise) : undefined,
+        step: 1,
+        placeholder: "e.g. 500 for ₹500",
+        defaultValue: isEditing && editingDefinition?.defaultAmountPaise ? String(editingDefinition.defaultAmountPaise / 100) : "",
       },
       {
         name: "donorEligibility",
@@ -367,6 +373,12 @@ export function CollectionDefinitionsTab({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    // Convert defaultAmount from rupees to paise
+    const defaultAmountRupees = formData.get("defaultAmountPaise");
+    if (defaultAmountRupees) {
+      const paise = Math.round(Number(defaultAmountRupees) * 100);
+      formData.set("defaultAmountPaise", String(paise));
+    }
     if (isEditing) {
       formData.set("definitionId", editingDefinition!.id);
     }
@@ -388,10 +400,20 @@ export function CollectionDefinitionsTab({
               <SimpleForm
                 key={isEditing ? editingDefinition!.id : "new"}
                 fields={fields.slice(0, 6)}
-                values={{}}
+                values={{ baseCategoryId: selectedBaseCategoryId }}
                 disabled={formState?.ok === true}
                 fieldsOnly={true}
-                uncontrolled={true}
+                uncontrolled={false}
+                onChange={(name, value) => {
+                  if (name === "baseCategoryId") {
+                    setSelectedBaseCategoryId(value as string);
+                  }
+                }}
+                onFieldChange={(name, value) => {
+                  if (name === "baseCategoryId") {
+                    setSelectedBaseCategoryId(value as string);
+                  }
+                }}
               />
               <SimpleForm
                 fields={fields.slice(6)}
@@ -433,11 +455,21 @@ export function CollectionDefinitionsTab({
             <span>{showAddForm ? labels.cancel : labels.addCollectionDefinition ?? "Add Collection Definition"}</span>
           </Button>
         </CardHeader>
-        <ul className="divide-y divide-[var(--border-subtle)]">
-          {items.length === 0 && (
-            <li className="px-5 py-6 text-xs text-[var(--ink-muted)]">—</li>
-          )}
-          {items.map((item) => (
+        {/* Sort: showInPaymentReceived=true first, then false */}
+        {(() => {
+          const sortedItems = useMemo(
+            () => [...items].sort((a, b) => {
+              if (a.showInPaymentReceived === b.showInPaymentReceived) return 0;
+              return a.showInPaymentReceived ? -1 : 1;
+            }),
+            [items]
+          );
+          return (
+            <ul className="divide-y divide-[var(--border-subtle)]">
+              {sortedItems.length === 0 && (
+                <li className="px-5 py-6 text-xs text-[var(--ink-muted)]">—</li>
+              )}
+              {sortedItems.map((item) => (
             <li key={item.id} className="px-5 py-2.5">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
@@ -470,7 +502,7 @@ export function CollectionDefinitionsTab({
                   )}
                   {item.defaultAmountPaise && (
                     <Badge tone="neutral">
-                      ₹{(item.defaultAmountPaise / 100).toFixed(2)}
+                      ₹{item.defaultAmountPaise / 100}
                     </Badge>
                   )}
                   <div className="flex items-center gap-1">
@@ -498,8 +530,10 @@ export function CollectionDefinitionsTab({
                 </div>
               </div>
             </li>
-          ))}
-        </ul>
+              ))}
+            </ul>
+          );
+        })()}
       </Card>
     </div>
   );
@@ -818,6 +852,7 @@ export function CollectionsTab({
   collectionDefinitionItems,
   baseCategories,
   subcategories,
+  baseCategorySubcategories,
   collectionEventItems,
   memberOptions,
   assignmentItems,
@@ -827,6 +862,7 @@ export function CollectionsTab({
   collectionDefinitionItems: CollectionDefinitionsTabProps["items"];
   baseCategories: CollectionDefinitionsTabProps["baseCategories"];
   subcategories: CollectionDefinitionsTabProps["subcategories"];
+  baseCategorySubcategories: CollectionDefinitionsTabProps["baseCategorySubcategories"];
   collectionEventItems: CollectionEventItem[];
   memberOptions: MemberOption[];
   assignmentItems: AssignmentsTabProps["assignmentItems"];
@@ -855,6 +891,7 @@ export function CollectionsTab({
           items={collectionDefinitionItems}
           baseCategories={baseCategories}
           subcategories={subcategories}
+          baseCategorySubcategories={baseCategorySubcategories}
           onDelete={onDeleteCollectionDefinition}
         />
       </TabsContent>

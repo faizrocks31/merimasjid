@@ -118,6 +118,12 @@ interface SettingsPageClientProps {
   collectionDefinitionItems: CollectionDefinitionListItem[];
   baseCategories: BaseCategoryItem[];
   subcategories: SubcategoryItem[];
+  baseCategorySubcategories: {
+    baseCategoryId: string;
+    subcategoryId: string;
+    baseCategory: { code: string };
+    subcategory: { code: string };
+  }[];
   staffMembers: {
     id: string;
     user: { id: string; name: string; email: string; lastLoginAt: string | null };
@@ -146,6 +152,7 @@ export function SettingsPageClient({
   collectionDefinitionItems,
   baseCategories,
   subcategories,
+  baseCategorySubcategories,
   staffMembers,
   staffLabels,
   roleLabels,
@@ -247,6 +254,7 @@ export function SettingsPageClient({
             collectionDefinitionItems={collectionDefinitionItems}
             baseCategories={baseCategories}
             subcategories={subcategories}
+            baseCategorySubcategories={baseCategorySubcategories}
             collectionEventItems={collectionEventItems}
             memberOptions={memberOptions}
             assignmentItems={assignmentItems}

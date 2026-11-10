@@ -36,7 +36,7 @@ export function PlanForm({
   const fields = useMemo(
     () => getFormFields("plan").map((f) => {
       const mapped = { ...f, label: labels[f.name] ?? f.label };
-      if (mapped.name === "categoryId") {
+      if (mapped.name === "collectionDefinitionId") {
         mapped.options = categories.map((c) => ({ value: c.id, label: c.name }));
       }
       if (mapped.name === "frequency") {

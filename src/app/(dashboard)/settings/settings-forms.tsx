@@ -709,6 +709,7 @@ export function CollectionDefinitionForm({
   labels,
   baseCategories,
   subcategories,
+  baseCategorySubcategories,
   editingDefinition,
   onCancel,
   redirectTo,
@@ -716,6 +717,12 @@ export function CollectionDefinitionForm({
   labels: Labels;
   baseCategories: { id: string; name: string; code: string }[];
   subcategories: { id: string; name: string; code: string }[];
+  baseCategorySubcategories: {
+    baseCategoryId: string;
+    subcategoryId: string;
+    baseCategory: { code: string };
+    subcategory: { code: string };
+  }[];
   editingDefinition?: EditingCollectionDefinition;
   onCancel?: () => void;
   redirectTo?: string;
@@ -733,52 +740,33 @@ export function CollectionDefinitionForm({
 
   const validSubcategories = useMemo(
     () => subcategories.filter((sc) => {
-      // Valid combinations from the system taxonomy
-      const validCombos: Record<string, string[]> = {
-        ZAKAT: ["ZAKAT_FITR", "ZAKAT_MAAL"],
-        SADAQAH: ["GENERAL", "FIDYAH", "KAFFARAH"],
-        INFAQ: ["CONSTRUCTION", "MAINTENANCE", "OPERATIONS"],
-        CHANDA: ["MONTHLY", "ANNUAL"],
-        FUNDRAISING: ["CAMPAIGN", "PROJECT", "EMERGENCY"],
-        COMMUNITY_EVENT: ["EID", "MILAD", "ISRA_MIRAJ", "SHAB_E_QADR", "RAMADAN", "JUMMA"],
-        GENERAL_DONATION: ["UNRESTRICTED"],
-      };
-      return validCombos[selectedBaseCategoryId]?.includes(sc.code) ?? false;
+      // Use baseCategorySubcategories from database as single source of truth
+      const baseCode = baseCategories.find(bc => bc.id === selectedBaseCategoryId)?.code;
+      if (!baseCode) return true; // Show all if no base category selected
+
+      const validSubcategoryIds = baseCategorySubcategories
+        .filter(bcs => bcs.baseCategory.code === baseCode)
+        .map(bcs => bcs.subcategoryId);
+
+      return validSubcategoryIds.includes(sc.id);
     }),
-    [subcategories, selectedBaseCategoryId]
+    [subcategories, baseCategories, baseCategorySubcategories, selectedBaseCategoryId]
   );
 
   const baseCategoryLabels: Record<string, string> = {
-    ZAKAT: labels.zakat ?? "Zakat",
+    CONSTRUCTION: labels.construction ?? "Construction",
+    GENERAL: labels.general ?? "General",
     SADAQAH: labels.sadaqah ?? "Sadaqah",
-    INFAQ: labels.infaq ?? "Infaq",
-    CHANDA: labels.chanda ?? "Chanda",
-    FUNDRAISING: labels.fundraising ?? "Fundraising",
-    COMMUNITY_EVENT: labels.communityEvent ?? "Community Event",
-    GENERAL_DONATION: labels.generalDonation ?? "General Donation",
+    ZAKAT: labels.zakat ?? "Zakat",
+    JUMMA: labels.jumma ?? "Jumma",
+    MONTHLY: labels.monthly ?? "Monthly",
+    ANNUAL: labels.annual ?? "Annual",
   };
 
   const subcategoryLabels: Record<string, string> = {
-    ZAKAT_FITR: labels.zakatFitr ?? "Zakat al-Fitr",
-    ZAKAT_MAAL: labels.zakatMaal ?? "Zakat al-Maal",
     GENERAL: labels.general ?? "General",
-    FIDYAH: labels.fidyah ?? "Fidyah",
-    KAFFARAH: labels.kaffarah ?? "Kaffarah",
-    CONSTRUCTION: labels.construction ?? "Construction",
-    MAINTENANCE: labels.maintenance ?? "Maintenance",
-    OPERATIONS: labels.operations ?? "Operations",
-    MONTHLY: labels.monthly ?? "Monthly",
-    ANNUAL: labels.annual ?? "Annual",
-    CAMPAIGN: labels.campaign ?? "Campaign",
-    PROJECT: labels.project ?? "Project",
-    EMERGENCY: labels.emergency ?? "Emergency",
-    EID: labels.eid ?? "Eid",
-    MILAD: labels.milad ?? "Milad un-Nabi",
-    ISRA_MIRAJ: labels.israMiraj ?? "Isra wal Miraj",
-    SHAB_E_QADR: labels.shabEQadr ?? "Shab-e-Qadr",
-    RAMADAN: labels.ramadan ?? "Ramadan",
-    JUMMA: labels.jumma ?? "Jumma",
-    UNRESTRICTED: labels.unrestricted ?? "Unrestricted",
+    RESTRICTED: labels.restricted ?? "Restricted",
+    RECURRING_DONATION: labels.recurringDonation ?? "Recurring Donation",
   };
 
   const frequencyLabels: Record<string, string> = {
@@ -957,6 +945,12 @@ interface CollectionDefinitionsPanelProps {
   labels: Labels;
   baseCategories: { id: string; name: string; code: string }[];
   subcategories: { id: string; name: string; code: string }[];
+  baseCategorySubcategories: {
+    baseCategoryId: string;
+    subcategoryId: string;
+    baseCategory: { code: string };
+    subcategory: { code: string };
+  }[];
   onDelete: (item: CollectionDefinitionListItem) => void;
 }
 
@@ -965,6 +959,7 @@ export function CollectionDefinitionsPanel({
   labels,
   baseCategories,
   subcategories,
+  baseCategorySubcategories,
   onDelete,
 }: CollectionDefinitionsPanelProps) {
   const router = useRouter();
@@ -1002,6 +997,7 @@ export function CollectionDefinitionsPanel({
             labels={labels}
             baseCategories={baseCategories}
             subcategories={subcategories}
+            baseCategorySubcategories={baseCategorySubcategories}
             onCancel={handleCancelAdd}
           />
         </Card>

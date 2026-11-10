@@ -294,7 +294,7 @@ export function CollectionForm({
 
   // For walk-in Milad/Shab-e-Qadr, show available events
   const availableEventsForCategory = useMemo(() => {
-    if (!selectedCategoryId || !selectedCategory?.code || !["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code)) {
+    if (!selectedCategoryId || !selectedCategory?.code || !["MILAD_UN_NABI", "SHAB_E_QADR"].includes(selectedCategory.code)) {
       return [];
     }
     return collectionEvents
@@ -419,7 +419,7 @@ export function CollectionForm({
     if (donorMode === "walkin" && !walkIn.trim()) return false;
     if (!selectedCategoryId) return false;
     // For walk-in Milad/Shab-e-Qadr, event must be selected
-    if (donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && !selectedEventId) {
+    if (donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD_UN_NABI", "SHAB_E_QADR"].includes(selectedCategory.code) && !selectedEventId) {
       return false;
     }
     // Non-cash modes need reference
@@ -447,7 +447,7 @@ export function CollectionForm({
       setError(labels.chooseCategory);
       return;
     }
-    if (donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && !selectedEventId) {
+    if (donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD_UN_NABI", "SHAB_E_QADR"].includes(selectedCategory.code) && !selectedEventId) {
       setError("Please select a collection event for this category.");
       return;
     }
@@ -683,7 +683,7 @@ export function CollectionForm({
             </div>
 
             {/* EVENT SELECTOR (for walk-in Milad/Shab-e-Qadr) */}
-            {donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && (
+            {donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD_UN_NABI", "SHAB_E_QADR"].includes(selectedCategory.code) && (
               <div>
                 <p className="mb-3 text-[12px] font-manrope font-extrabold uppercase tracking-[0.08em] text-[var(--ink-muted-new)]">
                   {labels.purpose} Event
@@ -1042,7 +1042,7 @@ export function CollectionForm({
           </div>
 
           {/* Event Selection (for walk-in Milad/Shab-e-Qadr) */}
-          {donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD", "SHAB_E_QADR"].includes(selectedCategory.code) && (
+          {donorMode === "walkin" && selectedCategory && selectedCategory.code && ["MILAD_UN_NABI", "SHAB_E_QADR"].includes(selectedCategory.code) && (
             <div>
               <h3 className="font-manrope font-semibold text-[var(--ink-primary)] mb-3">Collection Event</h3>
               <div className="flex flex-wrap gap-2">

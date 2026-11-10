@@ -272,85 +272,86 @@ async function main() {
   // (see createMasjidAction) — not sample business data.
   // Seed default collection definitions for this masjid
 
-  // First, ensure the system taxonomy is seeded
-  const baseCategoryTaxonomy = [
-    { code: "ZAKAT", name: "Zakat", description: "Obligatory alms" },
-    { code: "SADAQAH", name: "Sadaqah", description: "Voluntary charity" },
-    { code: "INFAQ", name: "Infaq", description: "Obligatory spending" },
-    { code: "CHANDA", name: "Chanda", description: "Regular contributions" },
-    { code: "FUNDRAISING", name: "Fundraising", description: "Fund campaigns" },
-    { code: "COMMUNITY_EVENT", name: "Community Event", description: "Community events" },
-    { code: "GENERAL_DONATION", name: "General Donation", description: "General donations" },
+  // First, ensure the system taxonomy is seeded (Phase 2A approved taxonomy)
+  // 7 Base Categories
+  const BASE_CATEGORIES = [
+    { code: "CONSTRUCTION", name: "Construction", description: "Construction and infrastructure projects" },
+    { code: "GENERAL", name: "General", description: "General donations and purposes" },
+    { code: "SADAQAH", name: "Sadaqah", description: "Voluntary charity (Sadaqah)" },
+    { code: "ZAKAT", name: "Zakat", description: "Obligatory alms (Zakat)" },
+    { code: "JUMMA", name: "Jumma", description: "Friday congregation collections" },
+    { code: "MONTHLY", name: "Monthly", description: "Regular monthly recurring collections" },
+    { code: "ANNUAL", name: "Annual", description: "Annual recurring collections" },
   ];
 
-  for (const bc of baseCategoryTaxonomy) {
+  // 3 Subcategories
+  const SUBCATEGORIES = [
+    { code: "GENERAL", name: "General", description: "General purpose donations" },
+    { code: "RESTRICTED", name: "Restricted", description: "Restricted purpose (Zakat, Construction, etc.)" },
+    { code: "RECURRING_DONATION", name: "Recurring Donation", description: "Regular recurring contributions" },
+  ];
+
+  // Valid BaseCategory-Subcategory combinations (exactly 9)
+  const VALID_COMBINATIONS: Array<{ baseCategoryCode: string; subcategoryCode: string }> = [
+    { baseCategoryCode: "CONSTRUCTION", subcategoryCode: "RESTRICTED" },
+    { baseCategoryCode: "GENERAL", subcategoryCode: "GENERAL" },
+    { baseCategoryCode: "GENERAL", subcategoryCode: "RESTRICTED" },
+    { baseCategoryCode: "SADAQAH", subcategoryCode: "GENERAL" },
+    { baseCategoryCode: "ZAKAT", subcategoryCode: "RESTRICTED" },
+    { baseCategoryCode: "JUMMA", subcategoryCode: "RECURRING_DONATION" },
+    { baseCategoryCode: "MONTHLY", subcategoryCode: "RECURRING_DONATION" },
+    { baseCategoryCode: "ANNUAL", subcategoryCode: "GENERAL" },
+    { baseCategoryCode: "ANNUAL", subcategoryCode: "RECURRING_DONATION" },
+  ];
+
+  // Clean up obsolete taxonomy records (regression protection)
+  // Only keep the approved 7 base categories and 3 subcategories
+  const validBaseCodes = BASE_CATEGORIES.map(c => c.code);
+  await prisma.baseCategory.deleteMany({
+    where: { code: { notIn: validBaseCodes } }
+  });
+
+  const validSubCodes = SUBCATEGORIES.map(s => s.code);
+  await prisma.subcategory.deleteMany({
+    where: { code: { notIn: validSubCodes } }
+  });
+
+  // Seed base categories with isSystem: true
+  for (const cat of BASE_CATEGORIES) {
     await prisma.baseCategory.upsert({
-      where: { code: bc.code },
-      update: {},
-      create: bc,
+      where: { code: cat.code },
+      update: { isSystem: true },
+      create: { ...cat, isSystem: true },
     });
   }
 
-  const subcategoryTaxonomy = [
-    { code: "ZAKAT_FITR", name: "Zakat al-Fitr" },
-    { code: "ZAKAT_MAAL", name: "Zakat al-Maal" },
-    { code: "GENERAL", name: "General" },
-    { code: "FIDYAH", name: "Fidyah" },
-    { code: "KAFFARAH", name: "Kaffarah" },
-    { code: "CONSTRUCTION", name: "Construction" },
-    { code: "MAINTENANCE", name: "Maintenance" },
-    { code: "OPERATIONS", name: "Operations" },
-    { code: "MONTHLY", name: "Monthly" },
-    { code: "ANNUAL", name: "Annual" },
-    { code: "CAMPAIGN", name: "Campaign" },
-    { code: "PROJECT", name: "Project" },
-    { code: "EMERGENCY", name: "Emergency" },
-    { code: "EID", name: "Eid" },
-    { code: "MILAD", name: "Milad un-Nabi" },
-    { code: "ISRA_MIRAJ", name: "Isra wal Miraj" },
-    { code: "SHAB_E_QADR", name: "Shab-e-Qadr" },
-    { code: "RAMADAN", name: "Ramadan" },
-    { code: "JUMMA", name: "Jumma" },
-    { code: "UNRESTRICTED", name: "Unrestricted" },
-    { code: "RECURRING_DONATION", name: "Recurring Donation" },
-    { code: "RESTRICTED", name: "Restricted" },
-  ];
-
-  for (const sc of subcategoryTaxonomy) {
+  // Seed subcategories with isSystem: true
+  for (const sub of SUBCATEGORIES) {
     await prisma.subcategory.upsert({
-      where: { code: sc.code },
-      update: {},
-      create: sc,
+      where: { code: sub.code },
+      update: { isSystem: true },
+      create: { ...sub, isSystem: true },
     });
   }
 
-  // Seed base-category to subcategory associations
-  const baseCategorySubcategoryTaxonomy: Array<{ baseCode: string; subCode: string }> = [
-    { baseCode: "ZAKAT", subCode: "ZAKAT_FITR" },
-    { baseCode: "ZAKAT", subCode: "ZAKAT_MAAL" },
-    { baseCode: "SADAQAH", subCode: "GENERAL" },
-    { baseCode: "SADAQAH", subCode: "FIDYAH" },
-    { baseCode: "SADAQAH", subCode: "KAFFARAH" },
-    { baseCode: "INFAQ", subCode: "CONSTRUCTION" },
-    { baseCode: "INFAQ", subCode: "MAINTENANCE" },
-    { baseCode: "INFAQ", subCode: "OPERATIONS" },
-    { baseCode: "CHANDA", subCode: "MONTHLY" },
-    { baseCode: "CHANDA", subCode: "ANNUAL" },
-    { baseCode: "FUNDRAISING", subCode: "CAMPAIGN" },
-    { baseCode: "FUNDRAISING", subCode: "PROJECT" },
-    { baseCode: "FUNDRAISING", subCode: "EMERGENCY" },
-    { baseCode: "COMMUNITY_EVENT", subCode: "EID" },
-    { baseCode: "COMMUNITY_EVENT", subCode: "MILAD" },
-    { baseCode: "COMMUNITY_EVENT", subCode: "ISRA_MIRAJ" },
-    { baseCode: "COMMUNITY_EVENT", subCode: "SHAB_E_QADR" },
-    { baseCode: "COMMUNITY_EVENT", subCode: "RAMADAN" },
-    { baseCode: "COMMUNITY_EVENT", subCode: "JUMMA" },
-    { baseCode: "GENERAL_DONATION", subCode: "UNRESTRICTED" },
-  ];
+  // Clean up invalid BaseCategorySubcategory combinations
+  const validComboKeys = VALID_COMBINATIONS.map(c => `${c.baseCategoryCode}:${c.subcategoryCode}`);
+  const allCombos = await prisma.baseCategorySubcategory.findMany({
+    include: { baseCategory: true, subcategory: true }
+  });
+  for (const combo of allCombos) {
+    const key = `${combo.baseCategory.code}:${combo.subcategory.code}`;
+    if (!validComboKeys.includes(key)) {
+      await prisma.baseCategorySubcategory.delete({
+        where: { baseCategoryId_subcategoryId: { baseCategoryId: combo.baseCategoryId, subcategoryId: combo.subcategoryId } }
+      });
+    }
+  }
 
-  for (const combo of baseCategorySubcategoryTaxonomy) {
-    const baseCategory = await prisma.baseCategory.findUnique({ where: { code: combo.baseCode } });
-    const subcategory = await prisma.subcategory.findUnique({ where: { code: combo.subCode } });
+  // Seed valid combinations via join table
+  for (const combo of VALID_COMBINATIONS) {
+    const baseCategory = await prisma.baseCategory.findUnique({ where: { code: combo.baseCategoryCode } });
+    const subcategory = await prisma.subcategory.findUnique({ where: { code: combo.subcategoryCode } });
     if (baseCategory && subcategory) {
       await prisma.baseCategorySubcategory.upsert({
         where: { baseCategoryId_subcategoryId: { baseCategoryId: baseCategory.id, subcategoryId: subcategory.id } },
@@ -369,12 +370,13 @@ async function main() {
   const baseCategoryMap = new Map(baseCategories.map(bc => [bc.code, bc.id]));
   const subcategoryMap = new Map(subcategories.map(sc => [sc.code, sc.id]));
 
+  // Default Collection Definitions for new masjids (Phase 2A approved + Death Collection)
   const defaultCollectionDefinitions = [
     {
       name: "Monthly Chanda",
       purposeCode: "MONTHLY_CHANDA",
-      baseCategoryCode: "CHANDA",
-      subcategoryCode: "MONTHLY",
+      baseCategoryCode: "MONTHLY",
+      subcategoryCode: "RECURRING_DONATION",
       description: "Regular monthly contribution from members",
       frequency: "MONTHLY" as const,
       amountType: "VARIABLE" as const,
@@ -387,8 +389,8 @@ async function main() {
     {
       name: "Annual Chanda",
       purposeCode: "ANNUAL_CHANDA",
-      baseCategoryCode: "CHANDA",
-      subcategoryCode: "ANNUAL",
+      baseCategoryCode: "ANNUAL",
+      subcategoryCode: "RECURRING_DONATION",
       description: "Annual contribution from members",
       frequency: "ANNUAL" as const,
       amountType: "VARIABLE" as const,
@@ -401,8 +403,8 @@ async function main() {
     {
       name: "General Donation",
       purposeCode: "GENERAL_DONATION",
-      baseCategoryCode: "GENERAL_DONATION",
-      subcategoryCode: "UNRESTRICTED",
+      baseCategoryCode: "GENERAL",
+      subcategoryCode: "GENERAL",
       description: "General purpose donations from members and walk-ins",
       frequency: "ONE_TIME" as const,
       amountType: "VARIABLE" as const,
@@ -416,7 +418,7 @@ async function main() {
       name: "Zakat",
       purposeCode: "ZAKAT",
       baseCategoryCode: "ZAKAT",
-      subcategoryCode: "ZAKAT_MAAL",
+      subcategoryCode: "RESTRICTED",
       description: "Obligatory Zakat collections (restricted purpose)",
       frequency: "ANNUAL" as const,
       amountType: "VARIABLE" as const,
@@ -429,8 +431,8 @@ async function main() {
     {
       name: "Construction Fund",
       purposeCode: "CONSTRUCTION_FUND",
-      baseCategoryCode: "INFAQ",
-      subcategoryCode: "CONSTRUCTION",
+      baseCategoryCode: "CONSTRUCTION",
+      subcategoryCode: "RESTRICTED",
       description: "Building and infrastructure fund (restricted purpose)",
       frequency: "EVENT_BASED" as const,
       amountType: "VARIABLE" as const,
@@ -443,8 +445,8 @@ async function main() {
     {
       name: "Jumma Collection",
       purposeCode: "JUMMA_COLLECTION",
-      baseCategoryCode: "COMMUNITY_EVENT",
-      subcategoryCode: "JUMMA",
+      baseCategoryCode: "JUMMA",
+      subcategoryCode: "RECURRING_DONATION",
       description: "Friday congregation collection",
       frequency: "WEEKLY" as const,
       amountType: "FIXED" as const,
@@ -457,8 +459,8 @@ async function main() {
     {
       name: "Milad-un-Nabi",
       purposeCode: "MILAD_UN_NABI",
-      baseCategoryCode: "COMMUNITY_EVENT",
-      subcategoryCode: "MILAD",
+      baseCategoryCode: "ANNUAL",
+      subcategoryCode: "GENERAL",
       description: "Annual Milad-un-Nabi celebration collection",
       frequency: "ANNUAL" as const,
       amountType: "VARIABLE" as const,
@@ -471,13 +473,27 @@ async function main() {
     {
       name: "Shab-e-Qadr",
       purposeCode: "SHAB_E_QADR",
-      baseCategoryCode: "COMMUNITY_EVENT",
-      subcategoryCode: "SHAB_E_QADR",
+      baseCategoryCode: "ANNUAL",
+      subcategoryCode: "GENERAL",
       description: "Shab-e-Qadr night collection",
       frequency: "EVENT_BASED" as const,
       amountType: "VARIABLE" as const,
       defaultAmountPaise: null,
       donorEligibility: "BOTH" as const,
+      memberAssignment: "SELECTED" as const,
+      dueGeneration: "ADMIN" as const,
+      settlementPolicy: "ANY_PENDING_PERIOD" as const,
+    },
+    {
+      name: "Death Collection",
+      purposeCode: "DEATH_COLLECTION",
+      baseCategoryCode: "GENERAL",
+      subcategoryCode: "RESTRICTED",
+      description: "Death collection for deceased family support",
+      frequency: "EVENT_BASED" as const,
+      amountType: "FIXED" as const,
+      defaultAmountPaise: 20000, // ₹200 default
+      donorEligibility: "MEMBERS_ONLY" as const,
       memberAssignment: "SELECTED" as const,
       dueGeneration: "ADMIN" as const,
       settlementPolicy: "ANY_PENDING_PERIOD" as const,
