@@ -36,14 +36,23 @@ type CollectionDefinition = {
   subcategory?: { name: string; code: string } | null;
 };
 
+type Member = {
+  id: string;
+  memberNo: string;
+  fullName: string;
+  phone?: string | null;
+};
+
 export function DueGenerationWizard({
   labels,
   masjidId,
   collectionDefinitions,
+  members = [],
 }: {
   labels: Record<string, string>;
   masjidId: string;
   collectionDefinitions: CollectionDefinition[];
+  members?: Member[];
 }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -85,6 +94,9 @@ export function DueGenerationWizard({
     formData.set("startDate", fromDate);
     formData.set("endDate", toDate);
     formData.set("forceRegenerate", "true");
+    if (memberAssignmentMode === "SELECTED") {
+      formData.set("memberIds", JSON.stringify(selectedMemberIds));
+    }
 
     startTransition(async () => {
       try {
@@ -353,6 +365,37 @@ export function DueGenerationWizard({
                 <p className="text-xs text-[var(--ink-muted-new)]">
                   {selectedMemberIds.length} {labels.memberCount}
                 </p>
+                <div className="max-h-64 overflow-y-auto space-y-2">
+                  {members
+                    .filter((m) =>
+                      m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      m.memberNo.toLowerCase().includes(searchTerm.toLowerCase())
+                    )
+                    .map((member) => (
+                      <label key={member.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-[var(--surface-card)] cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={selectedMemberIds.includes(member.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedMemberIds((prev) => [...prev, member.id]);
+                            } else {
+                              setSelectedMemberIds((prev) => prev.filter((id) => id !== member.id));
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-[var(--border-tile)] text-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-soft)]"
+                        />
+                        <span className="text-sm text-[var(--ink-primary)]">{member.fullName}</span>
+                        <span className="text-xs text-[var(--ink-muted-new)] ml-auto">{member.memberNo}</span>
+                        {member.phone && (
+                          <span className="text-xs text-[var(--ink-muted-new)]">{member.phone}</span>
+                        )}
+                      </label>
+                    ))}
+                  {members.length === 0 && (
+                    <p className="text-center text-sm text-[var(--ink-muted-new)] py-4">{labels.noMembers}</p>
+                  )}
+                </div>
               </div>
             )}
 

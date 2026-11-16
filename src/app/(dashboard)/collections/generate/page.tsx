@@ -34,6 +34,13 @@ export default async function DueGenerationWizardPage() {
     },
   });
 
+  // Fetch active members for member selection in Step 4
+  const members = await prisma.member.findMany({
+    where: { masjidId, status: "ACTIVE" },
+    select: { id: true, memberNo: true, fullName: true, phone: true },
+    orderBy: { fullName: "asc" },
+  });
+
   const labels: Record<string, string> = {
     // Step 1
     selectCategory: t("selectCategory"),
@@ -95,6 +102,7 @@ export default async function DueGenerationWizardPage() {
         labels={labels}
         masjidId={masjidId}
         collectionDefinitions={collectionDefinitions}
+        members={members}
       />
     </>
   );

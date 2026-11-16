@@ -140,10 +140,7 @@ export function CollectionDefinitionsTab({
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingDefinition, setEditingDefinition] = useState<CollectionDefinitionItem | null>(null);
   const [formState, setFormState] = useState<CollectionState>(undefined);
-  const [isPending, startTransition] = useTransition();
-
-  // Reload page on successful create/update/delete to keep list in sync
-  useReloadOnSuccess(formState);
+  const [isPending, setIsPending] = useState(false);
 
   const frequencyLabels: Record<string, string> = {
     WEEKLY: labels.weekly ?? "Weekly",
@@ -206,6 +203,9 @@ export function CollectionDefinitionsTab({
     setShowAddForm(false);
     setEditingDefinition(null);
     setSelectedBaseCategoryId("");
+    setSelectedSubcategoryId("");
+    setNameValue("");
+    setDescriptionValue("");
   };
 
   const isEditing = !!editingDefinition;
@@ -245,10 +245,62 @@ export function CollectionDefinitionsTab({
   const editingSubcategoryId = editingSubcategoryCode ? subcategoryCodeToId[editingSubcategoryCode] : "";
 
   // State to track selected base category ID
+  // In create mode, default to the first base category (Annual) to ensure proper subcategory filtering
+  const defaultBaseCategoryId = !isEditing && baseCategories.length > 0 ? baseCategories[0].id : "";
   const [selectedBaseCategoryId, setSelectedBaseCategoryId] = useState(
-    isEditing ? editingBaseCategoryId : ""
+    isEditing ? editingBaseCategoryId : defaultBaseCategoryId
   );
   const selectedBaseCategoryCode = selectedBaseCategoryId ? baseCategoryIdToCode[selectedBaseCategoryId] : "";
+
+  // State to track selected subcategory ID so the controlled select keeps the user's choice
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState(
+    isEditing ? editingSubcategoryId : ""
+  );
+
+  // State for checkbox values in create mode (controlled mode)
+  const [activeValue, setActiveValue] = useState(isEditing ? editingDefinition?.active : true);
+  const [showInPaymentReceivedValue, setShowInPaymentReceivedValue] = useState(isEditing ? editingDefinition?.showInPaymentReceived : true);
+  const [nameValue, setNameValue] = useState(isEditing ? editingDefinition?.name : "");
+  const [descriptionValue, setDescriptionValue] = useState("");
+
+  // State for remaining fields in create mode (controlled mode)
+  const [frequencyValue, setFrequencyValue] = useState(isEditing ? editingDefinition?.frequency : "MONTHLY");
+  const [amountTypeValue, setAmountTypeValue] = useState(isEditing ? editingDefinition?.amountType : "VARIABLE");
+  const [defaultAmountPaiseValue, setDefaultAmountPaiseValue] = useState(isEditing && editingDefinition?.defaultAmountPaise ? String(editingDefinition.defaultAmountPaise / 100) : "");
+  const [donorEligibilityValue, setDonorEligibilityValue] = useState(isEditing ? editingDefinition?.donorEligibility : "BOTH");
+  const [memberAssignmentValue, setMemberAssignmentValue] = useState(isEditing ? editingDefinition?.memberAssignment : "ALL_ELIGIBLE");
+  const [dueGenerationValue, setDueGenerationValue] = useState(isEditing ? editingDefinition?.dueGeneration : "ADMIN");
+  const [settlementPolicyValue, setSettlementPolicyValue] = useState(isEditing ? editingDefinition?.settlementPolicy : "OLDEST_FIRST");
+
+  // Sync checkbox state when editing definition changes
+  useEffect(() => {
+    if (isEditing && editingDefinition) {
+      setActiveValue(editingDefinition.active);
+      setShowInPaymentReceivedValue(editingDefinition.showInPaymentReceived);
+      setNameValue(editingDefinition.name || "");
+    }
+  }, [isEditing, editingDefinition]);
+
+  // Sync state when editing definition changes (e.g., when user clicks Edit on a different item)
+  useEffect(() => {
+    if (isEditing && editingDefinition) {
+      // Use editingDefinition.meta directly since editingDefinition IS the item from the list
+      const metaParts = editingDefinition.meta.split(" · ");
+      const baseCode = metaParts[0] || "";
+      const subCode = metaParts[1] || "";
+      console.log('Syncing edit state:', { baseCode, subCode, editingDefinitionId: editingDefinition.id });
+      setSelectedBaseCategoryId(baseCode ? baseCategoryCodeToId[baseCode] : "");
+      setSelectedSubcategoryId(subCode ? subcategoryCodeToId[subCode] : "");
+      setFrequencyValue(editingDefinition.frequency || "MONTHLY");
+      setAmountTypeValue(editingDefinition.amountType || "VARIABLE");
+      setDefaultAmountPaiseValue(editingDefinition.defaultAmountPaise ? String(editingDefinition.defaultAmountPaise / 100) : "");
+      setDonorEligibilityValue(editingDefinition.donorEligibility || "BOTH");
+      setMemberAssignmentValue(editingDefinition.memberAssignment || "ALL_ELIGIBLE");
+      setDueGenerationValue(editingDefinition.dueGeneration || "ADMIN");
+      setSettlementPolicyValue(editingDefinition.settlementPolicy || "OLDEST_FIRST");
+    }
+    // In create mode, don't reset - keep the default base category selected
+  }, [isEditing, editingDefinition, baseCategoryCodeToId, subcategoryCodeToId]);
 
   const validSubcategories = useMemo(
     () => subcategories.filter((sc) => {
@@ -265,6 +317,15 @@ export function CollectionDefinitionsTab({
     }),
     [subcategories, baseCategorySubcategories, selectedBaseCategoryCode, editingBaseCategoryCode]
   );
+
+  // Reset subcategory when the base category changes (valid options shift)
+  useEffect(() => {
+    if (!selectedBaseCategoryId) return;
+    const validIds = validSubcategories.map((sc) => sc.id);
+    if (selectedSubcategoryId && !validIds.includes(selectedSubcategoryId)) {
+      setSelectedSubcategoryId("");
+    }
+  }, [selectedBaseCategoryId, validSubcategories, selectedSubcategoryId]);
 
   const fields = useMemo(
     () => [
@@ -292,8 +353,8 @@ export function CollectionDefinitionsTab({
         })),
         defaultValue: isEditing ? editingSubcategoryId : "",
       },
-      { name: "active", label: labels.active, type: "checkbox" as const, required: false, defaultValue: isEditing ? editingDefinition?.active : true },
-      { name: "showInPaymentReceived", label: labels.showInPaymentReceived ?? "Show in Payment Received", type: "checkbox" as const, required: false, defaultValue: isEditing ? editingDefinition?.showInPaymentReceived : true },
+      { name: "active", label: labels.active, type: "checkbox" as const, required: false, defaultValue: "" },
+      { name: "showInPaymentReceived", label: labels.showInPaymentReceived ?? "Show in Payment Received", type: "checkbox" as const, required: false, defaultValue: "" },
       {
         name: "frequency",
         label: labels.frequency,
@@ -371,7 +432,9 @@ export function CollectionDefinitionsTab({
   );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    console.log('>>> handleSubmit called!');
     e.preventDefault();
+    setIsPending(true);
     const formData = new FormData(e.currentTarget);
     // Convert defaultAmount from rupees to paise
     const defaultAmountRupees = formData.get("defaultAmountPaise");
@@ -382,11 +445,22 @@ export function CollectionDefinitionsTab({
     if (isEditing) {
       formData.set("definitionId", editingDefinition!.id);
     }
+    console.log('FormData entries:', Array.from(formData.entries()));
+    // Debug: check if name field is in form
+    const nameInput = e.currentTarget.querySelector('input[name="name"]') as HTMLInputElement;
+    console.log('Name input value:', nameInput?.value);
     const action = isEditing ? updateCollectionDefinitionAction : createCollectionDefinitionAction;
-    startTransition(async () => {
-      const result = await action(undefined, formData);
-      setFormState(result);
-    });
+    const result = await action(undefined, formData);
+    console.log('Action result:', result);
+    setFormState(result);
+    setIsPending(false);
+    // Trigger reload on success
+    if (result?.ok) {
+      console.log('Reloading page...');
+      window.location.reload();
+    } else {
+      console.log('Form submission failed:', result?.error);
+    }
   };
 
   return (
@@ -394,33 +468,67 @@ export function CollectionDefinitionsTab({
       {/* Add/Edit Form */}
       {(showAddForm || isEditing) && (
         <Card>
-          <form onSubmit={handleSubmit} className="space-y-3 p-5">
+          <form onSubmit={handleSubmit} method="POST" className="space-y-3 p-5">
             {isEditing && <input type="hidden" name="definitionId" value={editingDefinition!.id} />}
             <div className="grid gap-4 sm:grid-cols-2">
               <SimpleForm
                 key={isEditing ? editingDefinition!.id : "new"}
                 fields={fields.slice(0, 6)}
-                values={{ baseCategoryId: selectedBaseCategoryId }}
+                values={{
+                  name: nameValue,
+                  description: descriptionValue,
+                  baseCategoryId: selectedBaseCategoryId,
+                  subcategoryId: selectedSubcategoryId,
+                  active: activeValue,
+                  showInPaymentReceived: showInPaymentReceivedValue,
+                }}
                 disabled={formState?.ok === true}
                 fieldsOnly={true}
                 uncontrolled={false}
-                onChange={(name, value) => {
-                  if (name === "baseCategoryId") {
-                    setSelectedBaseCategoryId(value as string);
-                  }
-                }}
                 onFieldChange={(name, value) => {
                   if (name === "baseCategoryId") {
                     setSelectedBaseCategoryId(value as string);
+                  }
+                  if (name === "subcategoryId") {
+                    setSelectedSubcategoryId(value as string);
+                  }
+                  if (name === "active") {
+                    setActiveValue(value as boolean);
+                  }
+                  if (name === "showInPaymentReceived") {
+                    setShowInPaymentReceivedValue(value as boolean);
+                  }
+                  if (name === "name") {
+                    setNameValue(value as string);
+                  }
+                  if (name === "description") {
+                    setDescriptionValue(value as string);
                   }
                 }}
               />
               <SimpleForm
                 fields={fields.slice(6)}
-                values={{}}
+                values={{
+                  frequency: frequencyValue,
+                  amountType: amountTypeValue,
+                  defaultAmountPaise: defaultAmountPaiseValue,
+                  donorEligibility: donorEligibilityValue,
+                  memberAssignment: memberAssignmentValue,
+                  dueGeneration: dueGenerationValue,
+                  settlementPolicy: settlementPolicyValue,
+                }}
                 disabled={formState?.ok === true}
                 fieldsOnly={true}
-                uncontrolled={true}
+                uncontrolled={false}
+                onFieldChange={(name, value) => {
+                  if (name === "frequency") setFrequencyValue(value as string);
+                  else if (name === "amountType") setAmountTypeValue(value as string);
+                  else if (name === "defaultAmountPaise") setDefaultAmountPaiseValue(value as string);
+                  else if (name === "donorEligibility") setDonorEligibilityValue(value as string);
+                  else if (name === "memberAssignment") setMemberAssignmentValue(value as string);
+                  else if (name === "dueGeneration") setDueGenerationValue(value as string);
+                  else if (name === "settlementPolicy") setSettlementPolicyValue(value as string);
+                }}
               />
             </div>
             <Notice state={formState} saved={labels.saved} />

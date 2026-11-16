@@ -328,13 +328,23 @@ export async function createCollectionDefinitionAction(_prev: SettingsState, for
   const user = await requireStaff();
   assertCan(user.role, "settings:write");
 
+  // Debug: Log all form data entries
+  console.log('=== FormData entries ===');
+  for (const [key, value] of formData.entries()) {
+    console.log(`${key}: ${value}`);
+  }
+  console.log('getAll active:', formData.getAll("active"));
+  console.log('getAll showInPaymentReceived:', formData.getAll("showInPaymentReceived"));
+
   const parsed = collectionDefinitionSchema.safeParse({
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? ""),
     baseCategoryId: String(formData.get("baseCategoryId") ?? ""),
     subcategoryId: String(formData.get("subcategoryId") ?? ""),
-    active: formData.get("active") === "on",
-    showInPaymentReceived: formData.get("showInPaymentReceived") === "on" || formData.get("showInPaymentReceived") === "true",
+    // Checkbox handling: formData.has() returns true if checkbox was checked (value present), false if unchecked (not present)
+    // This works with the hidden input pattern where checkbox value="true" comes AFTER hidden input value="false"
+    active: formData.getAll("active").includes("true"),
+    showInPaymentReceived: formData.getAll("showInPaymentReceived").includes("true"),
     frequency: String(formData.get("frequency") ?? ""),
     amountType: String(formData.get("amountType") ?? ""),
     defaultAmountPaise: formData.get("defaultAmountPaise") ? Number(formData.get("defaultAmountPaise")) : undefined,
@@ -346,6 +356,8 @@ export async function createCollectionDefinitionAction(_prev: SettingsState, for
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid collection definition" };
 
   const input = parsed.data;
+
+  console.log('Parsed input:', JSON.stringify(input));
 
   // Amount configuration rules
   if (input.amountType === "FIXED" && !input.defaultAmountPaise) {
@@ -425,8 +437,10 @@ export async function updateCollectionDefinitionAction(_prev: SettingsState, for
     description: String(formData.get("description") ?? ""),
     baseCategoryId: String(formData.get("baseCategoryId") ?? ""),
     subcategoryId: String(formData.get("subcategoryId") ?? ""),
-    active: formData.get("active") === "on",
-    showInPaymentReceived: formData.get("showInPaymentReceived") === "on" || formData.get("showInPaymentReceived") === "true",
+    // Checkbox handling: formData.has() returns true if checkbox was checked (value present), false if unchecked (not present)
+    // This works with the hidden input pattern where checkbox value="true" comes AFTER hidden input value="false"
+    active: formData.getAll("active").includes("true"),
+    showInPaymentReceived: formData.getAll("showInPaymentReceived").includes("true"),
     frequency: String(formData.get("frequency") ?? ""),
     amountType: String(formData.get("amountType") ?? ""),
     defaultAmountPaise: formData.get("defaultAmountPaise") ? Number(formData.get("defaultAmountPaise")) : undefined,

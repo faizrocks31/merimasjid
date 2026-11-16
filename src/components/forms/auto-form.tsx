@@ -499,9 +499,15 @@ export function SimpleForm({
           const isChecked = typeof value === "boolean" ? value : value === "true";
           return (
             <Field key={field.name} label={field.label} htmlFor={field.name} error={error}>
+              {/* Hidden input FIRST - when unchecked, only "false" is submitted.
+                  Checkbox SECOND - when checked, its "true" value is submitted LAST and wins. */}
+              <input type="hidden" name={field.name} value="false" />
               <GenericCheckbox
                 id={field.name} name={field.name}
-                {...(uncontrolled ? { defaultChecked: isChecked } : { checked: isChecked, onChange: (e) => { onChange?.(field.name, e.target.checked); onFieldChange?.(field.name, e.target.checked); } })}
+                value="true"
+                {...(uncontrolled
+                  ? { defaultChecked: isChecked }
+                  : { checked: isChecked, onChange: (e) => { onChange?.(field.name, e.target.checked); onFieldChange?.(field.name, e.target.checked); } })}
                 disabled={isDisabled}
               />
             </Field>

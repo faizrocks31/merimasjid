@@ -2,14 +2,6 @@ import { test, expect } from "@playwright/test";
 
 const BASE_URL = "http://localhost:3000";
 
-async function loginAsAdmin(page: any) {
-  await page.goto(`${BASE_URL}/login`);
-  await page.fill('input[name="email"]', "localadmin@gmail.com");
-  await page.fill('input[name="password"]', "admin123");
-  await page.click('button[type="submit"]');
-  await page.waitForURL('**/dashboard', { timeout: 30000 });
-}
-
 async function openAddCollectionDefinitionForm(page: any) {
   await page.goto(`${BASE_URL}/settings?tab=collections`);
   await page.waitForTimeout(1000);
@@ -65,7 +57,10 @@ async function selectSubcategory(page: any, subcategoryLabel: string) {
 
 test.describe("Collection Definition Taxonomy Validation", () => {
   test.beforeEach(async ({ page }) => {
-    await loginAsAdmin(page);
+    // Auth state is provided via storageState in playwright.config.ts (e2e project)
+    // Just navigate to settings tab
+    await page.goto(`${BASE_URL}/settings?tab=collections`);
+    await page.waitForTimeout(1000);
   });
 
   test("Test A - Base Category Options: Exactly 7 approved options, no obsolete options", async ({ page }) => {
@@ -243,9 +238,52 @@ test.describe("Collection Definition Taxonomy Validation", () => {
     const subLabels = await getSubcategoryOptions(page);
     expect(subLabels).toContain("Restricted");
     expect(subLabels).not.toContain("General");
+
+    // Clean up: Delete the test definition to avoid hitting the limit for the next test
+    console.log('Starting cleanup of test definition from Test F - Invalid Selection Cleared...');
+    await page.goto(`${BASE_URL}/settings?tab=collections`);
+    await page.waitForTimeout(500);
+    const testItem = page.locator('li:has-text("Taxonomy Edit Test")').first();
+    const isVisible = await testItem.isVisible({ timeout: 2000 }).catch(() => false);
+    console.log('Test item visible for cleanup:', isVisible);
+    if (isVisible) {
+      const deleteBtn = testItem.locator('button[aria-label="Delete"]').first();
+      if (await deleteBtn.isVisible({ timeout: 1000 })) {
+        console.log('Clicking delete button...');
+        page.once('dialog', async dialog => {
+          console.log('Dialog message:', dialog.message());
+          await dialog.accept();
+        });
+        await deleteBtn.click();
+        await page.waitForTimeout(2000); // Wait for deletion to complete
+        console.log('Cleanup completed');
+      } else {
+        console.log('Delete button not visible!');
+      }
+    }
   });
 
   test("Test F - Edit Mode: Base Category and Subcategory pre-filled correctly", async ({ page }) => {
+    // First clean up any existing test definition
+    await page.goto(`${BASE_URL}/settings?tab=collections`);
+    await page.waitForTimeout(1000);
+    const existingItems = page.locator('li:has-text("Taxonomy Edit Test")');
+    if (await existingItems.count() > 0) {
+      console.log('Found existing Taxonomy Edit Test, cleaning up...');
+      const deleteBtn = existingItems.first().locator('button[aria-label="Delete"]').first();
+      if (await deleteBtn.isVisible({ timeout: 1000 })) {
+        console.log('Clicking delete button...');
+        // Handle native window.confirm() dialog
+        page.once('dialog', async dialog => {
+          console.log('Dialog message:', dialog.message());
+          await dialog.accept();
+        });
+        await deleteBtn.click();
+        await page.waitForTimeout(2000); // Wait for deletion to complete
+        console.log('Cleanup completed');
+      }
+    }
+
     // First create a test definition
     await openAddCollectionDefinitionForm(page);
     await selectBaseCategory(page, "Monthly");
@@ -262,12 +300,18 @@ test.describe("Collection Definition Taxonomy Validation", () => {
     const saveBtn = page.locator('button[type="submit"]:has-text("Save")').first();
     await expect(saveBtn).toBeVisible();
     await saveBtn.click();
+
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Reload to see the new item in the list (server component props won't update without reload)
+    await page.goto(`${BASE_URL}/settings?tab=collections`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
 
     // Now edit the created definition
     const editBtn = page.locator('li:has-text("Taxonomy Edit Test") button[aria-label="Edit"]').first();
-    await expect(editBtn).toBeVisible({ timeout: 5000 });
+    await expect(editBtn).toBeVisible({ timeout: 10000 });
     await editBtn.click();
     await page.waitForTimeout(500);
 
@@ -290,5 +334,16 @@ test.describe("Collection Definition Taxonomy Validation", () => {
     // Cancel edit
     const cancelBtn = page.locator('button:has-text("Cancel")').first();
     await cancelBtn.click();
+    await page.waitForTimeout(1000);
+
+    // Clean up so the next run doesn't hit the 10-category limit
+    const rowForCleanup = page.locator('li:has-text("Taxonomy Edit Test")').first();
+    if (await rowForCleanup.isVisible({ timeout: 2000 }).catch(() => false)) {
+      page.once('dialog', async dialog => {
+        await dialog.accept();
+      });
+      await rowForCleanup.locator('button[aria-label="Delete"]').first().click();
+      await page.waitForTimeout(2000);
+    }
   });
 });

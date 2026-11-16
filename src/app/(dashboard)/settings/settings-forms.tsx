@@ -733,24 +733,49 @@ export function CollectionDefinitionForm({
   const [, startTransition] = useTransition();
   useReloadOnSuccess(state, redirectTo);
 
-  // Filter valid subcategories based on selected baseCategory
-  const [selectedBaseCategoryId, setSelectedBaseCategoryId] = useState(
-    isEditing ? editingDefinition.baseCategoryId : ""
-  );
+  const [formValues, setFormValues] = useState<Record<string, any>>({
+    name: isEditing ? editingDefinition.name : "",
+    description: isEditing ? editingDefinition.description ?? "" : "",
+    baseCategoryId: isEditing ? editingDefinition.baseCategoryId : "",
+    subcategoryId: isEditing ? editingDefinition.subcategoryId : "",
+    active: isEditing ? editingDefinition.active : true,
+    showInPaymentReceived: isEditing ? editingDefinition.showInPaymentReceived : true,
+    frequency: isEditing ? editingDefinition.frequency : "",
+    amountType: isEditing ? editingDefinition.amountType : "",
+    defaultAmountPaise: isEditing && editingDefinition.defaultAmountPaise ? editingDefinition.defaultAmountPaise : "",
+    donorEligibility: isEditing ? editingDefinition.donorEligibility : "",
+    memberAssignment: isEditing ? editingDefinition.memberAssignment : "",
+    dueGeneration: isEditing ? editingDefinition.dueGeneration : "",
+    settlementPolicy: isEditing ? editingDefinition.settlementPolicy : "",
+  });
+
+  // Reset subcategory when baseCategoryId changes and the current subcategory is not valid for the new base category
+  useEffect(() => {
+    if (!formValues.baseCategoryId) return;
+    const baseCode = baseCategories.find((bc) => bc.id === formValues.baseCategoryId)?.code;
+    if (!baseCode) return;
+
+    const validSubIds = baseCategorySubcategories
+      .filter((bcs) => bcs.baseCategory.code === baseCode)
+      .map((bcs) => bcs.subcategoryId);
+
+    if (formValues.subcategoryId && !validSubIds.includes(formValues.subcategoryId)) {
+      setFormValues((prev) => ({ ...prev, subcategoryId: "" }));
+    }
+  }, [formValues.baseCategoryId, baseCategories, baseCategorySubcategories]);
 
   const validSubcategories = useMemo(
-    () => subcategories.filter((sc) => {
-      // Use baseCategorySubcategories from database as single source of truth
-      const baseCode = baseCategories.find(bc => bc.id === selectedBaseCategoryId)?.code;
-      if (!baseCode) return true; // Show all if no base category selected
+    () => {
+      const baseCode = baseCategories.find((bc) => bc.id === formValues.baseCategoryId)?.code;
+      if (!baseCode) return subcategories; // Show all if no base category selected
 
-      const validSubcategoryIds = baseCategorySubcategories
-        .filter(bcs => bcs.baseCategory.code === baseCode)
-        .map(bcs => bcs.subcategoryId);
+      const validSubIds = baseCategorySubcategories
+        .filter((bcs) => bcs.baseCategory.code === baseCode)
+        .map((bcs) => bcs.subcategoryId);
 
-      return validSubcategoryIds.includes(sc.id);
-    }),
-    [subcategories, baseCategories, baseCategorySubcategories, selectedBaseCategoryId]
+      return subcategories.filter((sc) => validSubIds.includes(sc.id));
+    },
+    [subcategories, baseCategories, baseCategorySubcategories, formValues.baseCategoryId]
   );
 
   const baseCategoryLabels: Record<string, string> = {
@@ -805,12 +830,18 @@ export function CollectionDefinitionForm({
     ANY_PENDING_PERIOD: labels.anyPendingPeriod ?? "Any Pending Period",
   };
 
+  const handleFieldChange = (name: string, val: any) => {
+    setFormValues((prev) => ({ ...prev, [name]: val }));
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     if (isEditing) {
       formData.set("definitionId", editingDefinition.id);
     }
+    // Native FormData from controlled inputs already has correct values
+    // Just call the server action with the captured formData
     startTransition(() => formAction(formData));
   };
 
@@ -834,7 +865,6 @@ export function CollectionDefinitionForm({
                 value: bc.id,
                 label: baseCategoryLabels[bc.code] || bc.name,
               })),
-              defaultValue: selectedBaseCategoryId || undefined,
             },
             {
               name: "subcategoryId",
@@ -845,15 +875,16 @@ export function CollectionDefinitionForm({
                 value: sc.id,
                 label: subcategoryLabels[sc.code] || sc.name,
               })),
-              defaultValue: isEditing ? editingDefinition.subcategoryId : undefined,
             },
-            { name: "active", label: labels.active, type: "checkbox", required: false, defaultValue: isEditing ? editingDefinition.active : true },
-            { name: "showInPaymentReceived", label: labels.showInPaymentReceived ?? "Show in Payment Received", type: "checkbox", required: false, defaultValue: isEditing ? editingDefinition.showInPaymentReceived : true },
+            { name: "active", label: labels.active, type: "checkbox", required: false },
+            { name: "showInPaymentReceived", label: labels.showInPaymentReceived ?? "Show in Payment Received", type: "checkbox", required: false },
           ]}
-          values={{}}
+          values={formValues}
+          onChange={handleFieldChange}
+          onFieldChange={handleFieldChange}
           disabled={pending}
           fieldsOnly={true}
-          uncontrolled={true}
+          uncontrolled={false}
         />
         <SimpleForm
           fields={[
@@ -863,7 +894,6 @@ export function CollectionDefinitionForm({
               type: "select",
               required: true,
               options: Object.entries(frequencyLabels).map(([value, label]) => ({ value, label })),
-              defaultValue: isEditing ? editingDefinition.frequency : undefined,
             },
             {
               name: "amountType",
@@ -871,7 +901,6 @@ export function CollectionDefinitionForm({
               type: "select",
               required: true,
               options: Object.entries(amountTypeLabels).map(([value, label]) => ({ value, label })),
-              defaultValue: isEditing ? editingDefinition.amountType : undefined,
             },
             {
               name: "defaultAmountPaise",
@@ -880,7 +909,6 @@ export function CollectionDefinitionForm({
               required: false,
               min: 1,
               placeholder: "e.g. 50000 for ₹500",
-              defaultValue: isEditing && editingDefinition.defaultAmountPaise ? String(editingDefinition.defaultAmountPaise) : undefined,
             },
             {
               name: "donorEligibility",
@@ -888,7 +916,6 @@ export function CollectionDefinitionForm({
               type: "select",
               required: true,
               options: Object.entries(donorEligibilityLabels).map(([value, label]) => ({ value, label })),
-              defaultValue: isEditing ? editingDefinition.donorEligibility : undefined,
             },
             {
               name: "memberAssignment",
@@ -896,7 +923,6 @@ export function CollectionDefinitionForm({
               type: "select",
               required: true,
               options: Object.entries(memberAssignmentLabels).map(([value, label]) => ({ value, label })),
-              defaultValue: isEditing ? editingDefinition.memberAssignment : undefined,
             },
             {
               name: "dueGeneration",
@@ -904,7 +930,6 @@ export function CollectionDefinitionForm({
               type: "select",
               required: true,
               options: Object.entries(dueGenerationLabels).map(([value, label]) => ({ value, label })),
-              defaultValue: isEditing ? editingDefinition.dueGeneration : undefined,
             },
             {
               name: "settlementPolicy",
@@ -912,13 +937,14 @@ export function CollectionDefinitionForm({
               type: "select",
               required: true,
               options: Object.entries(settlementPolicyLabels).map(([value, label]) => ({ value, label })),
-              defaultValue: isEditing ? editingDefinition.settlementPolicy : undefined,
             },
           ]}
-          values={{}}
+          values={formValues}
+          onChange={handleFieldChange}
+          onFieldChange={handleFieldChange}
           disabled={pending}
           fieldsOnly={true}
-          uncontrolled={true}
+          uncontrolled={false}
         />
       </div>
       <Notice state={state} saved={labels.saved} />
