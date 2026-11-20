@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode, HTMLAttributes, LabelHTMLAttributes, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, ChangeEvent, FocusEvent, KeyboardEvent } from "react";
-import { useState } from "react";
+import { useState, useRef, useEffect, createContext, useContext, useId, useCallback, useMemo } from "react";
 import { cn } from "@/lib/cn";
 import { X, Minus, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { formatPaise, formatPaisePlain } from "@/lib/money";
@@ -26,12 +26,16 @@ export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingEle
   return <h2 className={cn("text-base font-semibold tracking-wide text-[var(--ink)]", className)} {...props} />;
 }
 
+export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("p-5", className)} {...props} />;
+}
+
 export function CardBody({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("p-5", className)} {...props} />;
 }
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "gold";
-type ButtonSize = "sm" | "md";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "gold" | "outline";
+type ButtonSize = "sm" | "md" | "icon";
 
 const variants: Record<ButtonVariant, string> = {
   primary: "bg-[var(--brand)] text-white hover:bg-[var(--brand-deep)] border-transparent",
@@ -39,11 +43,13 @@ const variants: Record<ButtonVariant, string> = {
   ghost: "bg-transparent text-[var(--ink-muted)] border-transparent hover:bg-[var(--brand-soft)] hover:text-[var(--brand-deep)]",
   danger: "bg-[var(--danger)] text-white border-transparent hover:opacity-90",
   gold: "bg-[var(--gold-soft)] text-[var(--gold)] border-[#e6d9b4] hover:bg-[#f1e4c6]",
+  outline: "bg-transparent text-[var(--ink)] border-[var(--border-subtle)] hover:bg-[var(--surface)]",
 };
 
 const sizes: Record<ButtonSize, string> = {
   sm: "h-9 px-3.5 text-sm",
   md: "h-11 px-5 text-base",
+  icon: "h-9 w-9",
 };
 
 export function Button({
@@ -76,8 +82,345 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return <input className={cn(fieldBase, "h-11", className)} {...props} />;
 }
 
-export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={cn(fieldBase, "h-11", className)} {...props} />;
+// ============================================
+// Compound Select Component with React Context
+// ============================================
+
+interface SelectContextValue {
+  value: string;
+  onValueChange: (value: string) => void;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  triggerId: string;
+  contentId: string;
+  selectedLabel: string;
+  setSelectedLabel: (label: string) => void;
+  registerItem: (value: string, label: string) => void;
+  unregisterItem: (value: string) => void;
+  itemLabels: Map<string, string>;
+}
+
+const SelectContext = createContext<SelectContextValue | null>(null);
+
+function useSelectContext() {
+  const context = useContext(SelectContext);
+  if (!context) {
+    throw new Error("Select compound components must be used within a Select.Root");
+  }
+  return context;
+}
+
+interface SelectRootProps {
+  value?: string;
+  onValueChange: (value: string) => void;
+  placeholder?: string;
+  children: ReactNode;
+  className?: string;
+}
+
+export function SelectRoot({ value, onValueChange, children, className }: SelectRootProps) {
+  const openRef = useRef(false);
+  const [, forceUpdate] = useState(0);
+  const triggerId = useId();
+  const contentId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const itemLabelsRef = useRef<Map<string, string>>(new Map());
+
+  const setOpen = (newOpen: boolean) => {
+    console.log('[SelectRoot] setOpen called with:', newOpen);
+    openRef.current = newOpen;
+    forceUpdate(n => n + 1);
+  };
+
+  const open = openRef.current;
+
+  // Close on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
+        if (contentRef.current && !contentRef.current.contains(event.target as Node)) {
+          setOpen(false);
+        }
+      }
+    };
+
+    if (openRef.current) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+
+    if (openRef.current) {
+      document.addEventListener("keydown", handleEscape);
+    }
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, []);
+
+  const [selectedLabel, setSelectedLabel] = useState<string | undefined>(undefined);
+
+  const registerItem = useCallback((itemValue: string, label: string) => {
+    itemLabelsRef.current.set(itemValue, label);
+    if (value === itemValue) {
+      setSelectedLabel(label);
+    }
+  }, [value]);
+
+  const unregisterItem = useCallback((itemValue: string) => {
+    itemLabelsRef.current.delete(itemValue);
+  }, []);
+
+  const contextValue: SelectContextValue = {
+    value: value ?? "",
+    onValueChange: (newValue: string) => {
+      console.log('[SelectRoot] onValueChange called with:', newValue, 'open before:', openRef.current);
+      const label = itemLabelsRef.current.get(newValue);
+      if (label) {
+        console.log('[SelectRoot] Setting selectedLabel to:', label);
+        setSelectedLabel(label);
+      } else {
+        console.log('[SelectRoot] No label found for value:', newValue);
+      }
+      onValueChange(newValue);
+      setOpen(false);
+    },
+    open,
+    setOpen,
+    triggerId,
+    contentId,
+    selectedLabel,
+    setSelectedLabel,
+    registerItem,
+    unregisterItem,
+    itemLabels: itemLabelsRef.current,
+  };
+
+  return (
+    <SelectContext.Provider value={contextValue}>
+      <div className={cn("relative inline-block w-full", className)}>{children}</div>
+    </SelectContext.Provider>
+  );
+}
+
+interface SelectTriggerProps {
+  className?: string;
+  children?: ReactNode;
+  placeholder?: string;
+  "aria-label"?: string;
+}
+
+export function SelectTrigger({ className, children, placeholder, "aria-label": ariaLabel }: SelectTriggerProps) {
+  const { value, open, setOpen, triggerId, contentId, selectedLabel } = useSelectContext();
+  const ref = useRef<HTMLButtonElement>(null);
+
+  // Sync the external ref with internal ref
+  useEffect(() => {
+    // We need a way to get the ref externally - but for now we just use internal
+  }, []);
+
+  const handleClick = () => {
+    setOpen(!open);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
+      event.preventDefault();
+      setOpen(true);
+    }
+  };
+
+  // Display the selected label or placeholder
+  const displayValue = children ?? selectedLabel ?? (placeholder && <span className="text-[var(--ink-muted)]">{placeholder}</span>);
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      role="combobox"
+      aria-expanded={open}
+      aria-haspopup="listbox"
+      aria-controls={contentId}
+      aria-label={ariaLabel}
+      id={triggerId}
+      className={cn(fieldBase, "h-11 flex items-center justify-between", className)}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+    >
+      {displayValue}
+      <ChevronDown className={cn("h-4 w-4 opacity-50 transition-transform duration-150", open && "rotate-180")} />
+    </button>
+  );
+}
+
+interface SelectValueProps {
+  className?: string;
+  children?: ReactNode;
+  placeholder?: string;
+}
+
+export function SelectValue({ className, children, placeholder }: SelectValueProps) {
+  // This is a simplified version - in a real implementation,
+  // this would read from context to show the selected value
+  // For now, we just render the children or placeholder
+  return (
+    <span className={cn("truncate flex-1", className)}>
+      {children ?? (placeholder && <span className="text-[var(--ink-muted)]">{placeholder}</span>)}
+    </span>
+  );
+}
+
+interface SelectContentProps {
+  className?: string;
+  children: ReactNode;
+}
+
+export function SelectContent({ className, children }: SelectContentProps) {
+  const { open, contentId, triggerId } = useSelectContext();
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Focus management - must be called unconditionally to satisfy Rules of Hooks
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        // Handled by root
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      ref={ref}
+      id={contentId}
+      role="listbox"
+      aria-labelledby={triggerId}
+      className={cn("absolute z-50 max-h-60 w-full overflow-auto rounded-lg border border-[var(--border-subtle)] bg-white shadow-lg mt-1", className)}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface SelectItemProps {
+  className?: string;
+  value: string;
+  children: ReactNode;
+  disabled?: boolean;
+}
+
+export function SelectItem({ className, value, children, disabled }: SelectItemProps) {
+  const { value: currentValue, onValueChange, setSelectedLabel, registerItem, unregisterItem } = useSelectContext();
+  const isSelected = currentValue === value;
+  const labelRef = useRef(children as string);
+
+  // Register/unregister item label
+  useEffect(() => {
+    registerItem(value, children as string);
+    return () => unregisterItem(value);
+  }, [value, children, registerItem, unregisterItem]);
+
+  const handleClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!disabled) {
+      console.log('[SelectItem] handleClick called with value:', value);
+      onValueChange(value);
+      setSelectedLabel(children as string);
+    }
+  };
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if ((event.key === "Enter" || event.key === " ") && !disabled) {
+      event.preventDefault();
+      onValueChange(value);
+      setSelectedLabel(children as string);
+    }
+  };
+
+  return (
+    <div
+      role="option"
+      aria-selected={isSelected}
+      aria-disabled={disabled}
+      data-value={value}
+      className={cn(
+        "px-3 py-2 cursor-pointer",
+        isSelected && "bg-[var(--brand-soft)] text-[var(--brand)]",
+        !isSelected && "hover:bg-[var(--brand-soft)]",
+        disabled && "opacity-50 cursor-not-allowed",
+        className
+      )}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      tabIndex={isSelected ? 0 : -1}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Export a compound component for easier usage
+// Use namespace merge to properly type the compound components
+export interface SelectComponent {
+  (props: SelectRootProps): React.ReactElement | null;
+  Trigger: typeof SelectTrigger;
+  Value: typeof SelectValue;
+  Content: typeof SelectContent;
+  Item: typeof SelectItem;
+}
+
+export const Select = SelectRoot as SelectComponent;
+Select.Trigger = SelectTrigger;
+Select.Value = SelectValue;
+Select.Content = SelectContent;
+Select.Item = SelectItem;
+
+// Also keep the simple Select for backward compatibility
+export function SimpleSelect({
+  value,
+  onChange,
+  children,
+  className,
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select className={cn(fieldBase, "h-11", className)} {...props} value={value} onChange={onChange}>{children}</select>;
+}
+
+export function Table({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <table className={cn("w-full border-collapse", className)}>{children}</table>;
+}
+
+export function TableHeader({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <thead className={cn("bg-[var(--surface-field)]", className)}>{children}</thead>;
+}
+
+export function TableBody({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <tbody className={cn("divide-y divide-[var(--border-subtle)]", className)}>{children}</tbody>;
+}
+
+export function TableRow({ children, className, onClick }: { children: React.ReactNode; className?: string; onClick?: () => void }) {
+  return <tr className={cn("", className)} onClick={onClick}>{children}</tr>;
+}
+
+export function TableHead({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <th className={cn("px-4 py-3 text-left text-xs font-semibold text-[var(--ink-muted)] uppercase tracking-wider", className)}>{children}</th>;
+}
+
+export function TableCell({ children, className, colSpan, ...props }: { children: React.ReactNode; className?: string; colSpan?: number } & React.HTMLAttributes<HTMLTableCellElement>) {
+  return <td className={cn("px-4 py-3 text-sm text-[var(--ink)]", className)} {...props} colSpan={colSpan}>{children}</td>;
 }
 
 export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
@@ -99,7 +442,7 @@ export function Checkbox({ className, ...props }: InputHTMLAttributes<HTMLInputE
 
 export function Field({ label, error, hint, children, htmlFor }: { label: string; error?: string; hint?: string; children: ReactNode; htmlFor?: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
       {hint && !error ? <p className="mt-1 text-[11px] text-[var(--ink-muted)]">{hint}</p> : null}
