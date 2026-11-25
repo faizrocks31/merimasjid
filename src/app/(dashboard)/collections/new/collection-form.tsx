@@ -22,7 +22,7 @@ import {
   BottomSheet,
 } from "@/components/ui";
 import { formatPaise, parseRupeesToPaise, formatPaisePlain, paiseToWords } from "@/lib/money";
-import { formatDate, todayInput } from "@/lib/dates";
+import { formatDate, formatPeriodLabel, todayInput } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import { newIdempotencyKey } from "./collection-form-helpers";
 
@@ -333,7 +333,7 @@ export function CollectionForm({
     for (const period of memberDuesPeriods) {
       preview.push({
         id: period.id,
-        label: `${formatDate(period.periodStart)} (${period.categoryName})`,
+        label: `${formatPeriodLabel(period.periodStart, period.frequency || period.category?.frequency || "MONTHLY")} (${period.categoryName})`,
         dueDate: period.dueDate,
         outstanding: period.outstandingPaise,
         allocated: 0, // Will be calculated below

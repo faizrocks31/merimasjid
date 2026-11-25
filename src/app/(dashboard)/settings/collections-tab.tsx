@@ -234,13 +234,13 @@ export function CollectionDefinitionsTab({
   // Get the base category code from the item's meta (which stores the code)
   // We need to convert the code to the database ID for the form select
   const editingBaseCategoryCode = isEditing && editingDefinition
-    ? items.find(i => i.id === editingDefinition.id)?.meta.split(" · ")[0]
+    ? editingDefinition.meta.split(" · ")[0]
     : "";
   const editingBaseCategoryId = editingBaseCategoryCode ? baseCategoryCodeToId[editingBaseCategoryCode] : "";
 
   // Get subcategory code and convert to database ID
   const editingSubcategoryCode = isEditing && editingDefinition
-    ? items.find(i => i.id === editingDefinition.id)?.meta.split(" · ")[1]
+    ? editingDefinition.meta.split(" · ")[1]
     : "";
   const editingSubcategoryId = editingSubcategoryCode ? subcategoryCodeToId[editingSubcategoryCode] : "";
 
@@ -329,8 +329,8 @@ export function CollectionDefinitionsTab({
 
   const fields = useMemo(
     () => [
-      { name: "name", label: labels.name, type: "text" as const, required: true, placeholder: "e.g. Monthly Chanda", defaultValue: isEditing ? editingDefinition?.name : "" },
-      { name: "description", label: labels.description, type: "textarea" as const, required: false, placeholder: labels.descriptionHint ?? "", defaultValue: "" },
+      { name: "name", label: labels.name, type: "text" as const, required: true, placeholder: "e.g. Monthly Chanda", defaultValue: isEditing ? editingDefinition?.name : "", className: "max-w-full" },
+      { name: "description", label: labels.description, type: "textarea" as const, required: false, placeholder: labels.descriptionHint ?? "", defaultValue: "", className: "max-w-full" },
       {
         name: "baseCategoryId",
         label: labels.baseCategory ?? "Base Category",
@@ -341,6 +341,7 @@ export function CollectionDefinitionsTab({
           label: baseCategoryLabels[bc.code] || bc.name,
         })),
         defaultValue: isEditing ? editingBaseCategoryId : "",
+        className: "max-w-full",
       },
       {
         name: "subcategoryId",
@@ -352,6 +353,7 @@ export function CollectionDefinitionsTab({
           label: subcategoryLabels[sc.code] || sc.name,
         })),
         defaultValue: isEditing ? editingSubcategoryId : "",
+        className: "max-w-full",
       },
       { name: "active", label: labels.active, type: "checkbox" as const, required: false, defaultValue: "" },
       { name: "showInPaymentReceived", label: labels.showInPaymentReceived ?? "Show in Payment Received", type: "checkbox" as const, required: false, defaultValue: "" },
@@ -362,6 +364,7 @@ export function CollectionDefinitionsTab({
         required: true,
         options: Object.entries(frequencyLabels).map(([value, label]) => ({ value, label })),
         defaultValue: isEditing ? editingDefinition?.frequency : "MONTHLY",
+        className: "max-w-full",
       },
       {
         name: "amountType",
@@ -370,6 +373,7 @@ export function CollectionDefinitionsTab({
         required: true,
         options: Object.entries(amountTypeLabels).map(([value, label]) => ({ value, label })),
         defaultValue: isEditing ? editingDefinition?.amountType : "VARIABLE",
+        className: "max-w-full",
       },
       {
         name: "defaultAmountPaise",
@@ -380,6 +384,7 @@ export function CollectionDefinitionsTab({
         step: 1,
         placeholder: "e.g. 500 for ₹500",
         defaultValue: isEditing && editingDefinition?.defaultAmountPaise ? String(editingDefinition.defaultAmountPaise / 100) : "",
+        className: "max-w-full",
       },
       {
         name: "donorEligibility",
@@ -388,6 +393,7 @@ export function CollectionDefinitionsTab({
         required: true,
         options: Object.entries(donorEligibilityLabels).map(([value, label]) => ({ value, label })),
         defaultValue: isEditing ? editingDefinition?.donorEligibility : undefined,
+        className: "max-w-full",
       },
       {
         name: "memberAssignment",
@@ -396,6 +402,7 @@ export function CollectionDefinitionsTab({
         required: true,
         options: Object.entries(memberAssignmentLabels).map(([value, label]) => ({ value, label })),
         defaultValue: isEditing ? editingDefinition?.memberAssignment : undefined,
+        className: "max-w-full",
       },
       {
         name: "dueGeneration",
@@ -404,6 +411,7 @@ export function CollectionDefinitionsTab({
         required: true,
         options: Object.entries(dueGenerationLabels).map(([value, label]) => ({ value, label })),
         defaultValue: isEditing ? editingDefinition?.dueGeneration : undefined,
+        className: "max-w-full",
       },
       {
         name: "settlementPolicy",
@@ -412,6 +420,7 @@ export function CollectionDefinitionsTab({
         required: true,
         options: Object.entries(settlementPolicyLabels).map(([value, label]) => ({ value, label })),
         defaultValue: isEditing ? editingDefinition?.settlementPolicy : undefined,
+        className: "max-w-full",
       },
     ],
     [
@@ -468,9 +477,9 @@ export function CollectionDefinitionsTab({
       {/* Add/Edit Form */}
       {(showAddForm || isEditing) && (
         <Card>
-          <form onSubmit={handleSubmit} method="POST" className="space-y-3 p-5">
+          <form onSubmit={handleSubmit} method="POST" className="space-y-3 p-5 min-w-0">
             {isEditing && <input type="hidden" name="definitionId" value={editingDefinition!.id} />}
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 min-w-0 overflow-hidden">
               <SimpleForm
                 key={isEditing ? editingDefinition!.id : "new"}
                 fields={fields.slice(0, 6)}

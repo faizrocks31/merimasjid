@@ -102,14 +102,15 @@ export default async function ExpensesPage() {
                         <td className="px-4 py-2.5 text-end">
                           <div className="flex items-center justify-end gap-1.5">
                             <ExpenseStatusBadge status={e.approvalStatus} />
+                            {/* Approve/Reject buttons use server actions directly */}
                             {e.approvalStatus === "PENDING" && can(user.role, "expense:approve") ? (
                               <div className="flex gap-1">
-                                <form action={async (fd) => { await approveExpenseAction(fd); }}>
+                                <form action={approveExpenseAction}>
                                   <input type="hidden" name="expenseId" value={e.id} />
                                   <input type="hidden" name="decision" value="APPROVED" />
                                   <Button type="submit" size="sm" variant="secondary">{t("approved")}</Button>
                                 </form>
-                                <form action={async (fd) => { await approveExpenseAction(fd); }}>
+                                <form action={approveExpenseAction}>
                                   <input type="hidden" name="expenseId" value={e.id} />
                                   <input type="hidden" name="decision" value="REJECTED" />
                                   <Button type="submit" size="sm" variant="ghost">{t("rejected")}</Button>

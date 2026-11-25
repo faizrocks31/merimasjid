@@ -35,7 +35,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const dir = LOCALE_DIR[locale];
 
   return (
-    <html lang={locale} dir={dir} className={`${geist.variable} ${manrope.variable} ${devanagari.variable} ${arabic.variable} h-full`}>
+    <html suppressHydrationWarning lang={locale} dir={dir} className={`${geist.variable} ${manrope.variable} ${devanagari.variable} ${arabic.variable} h-full`}>
       <body className="min-h-full antialiased font-[var(--font-ui)]">{children}</body>
     </html>
   );

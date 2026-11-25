@@ -204,7 +204,7 @@ export function SettingsPageClient({
       <Tabs
         defaultValue={initialTab}
         onValueChange={(v) => router.replace(`/settings?tab=${v}`, { scroll: false })}
-        className="w-full"
+        className="w-full min-w-0"
       >
         <TabsList className="grid w-full grid-cols-6">
           {SETTINGS_TABS.map((tab) => {

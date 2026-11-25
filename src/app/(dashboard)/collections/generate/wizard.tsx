@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Wand2,
@@ -68,6 +68,30 @@ export function DueGenerationWizard({
   const [memberAssignmentMode, setMemberAssignmentMode] = useState("ALL_ELIGIBLE");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Memoized filtered members based on search term (for display only)
+  const filteredMembers = useMemo(() => {
+    return members.filter((m) =>
+      m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.memberNo.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [members, searchTerm]);
+
+  // All eligible members are the full members array (for Select All semantics)
+  const allEligibleMembers = members;
+
+  // Ref for Select All checkbox to handle indeterminate state
+  const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
+
+  // Update indeterminate state when selection changes
+  useEffect(() => {
+    if (selectAllCheckboxRef.current) {
+      const allSelected = allEligibleMembers.length > 0 && selectedMemberIds.length === allEligibleMembers.length;
+      const someSelected = selectedMemberIds.length > 0 && selectedMemberIds.length < allEligibleMembers.length;
+      selectAllCheckboxRef.current.checked = allSelected;
+      selectAllCheckboxRef.current.indeterminate = someSelected;
+    }
+  }, [selectedMemberIds, allEligibleMembers.length]);
 
   // Result state
   const [result, setResult] = useState<{
@@ -362,16 +386,28 @@ export function DueGenerationWizard({
                     className="w-full rounded-lg border border-[var(--border-tile)] bg-[var(--surface-card)] pl-9 pr-3 py-2 text-sm text-[var(--ink-primary)] focus:border-[var(--brand-primary)] focus:outline-none"
                   />
                 </div>
-                <p className="text-xs text-[var(--ink-muted-new)]">
-                  {selectedMemberIds.length} {labels.memberCount}
-                </p>
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-[var(--ink-primary)]">
+                    <input
+                      ref={selectAllCheckboxRef}
+                      type="checkbox"
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedMemberIds(allEligibleMembers.map((m) => m.id));
+                        } else {
+                          setSelectedMemberIds([]);
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-[var(--border-tile)] text-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-soft)]"
+                    />
+                    {labels.selectAllEligible}
+                  </label>
+                  <p className="text-xs text-[var(--ink-muted-new)]">
+                    {selectedMemberIds.length} / {allEligibleMembers.length} {labels.memberCount}
+                  </p>
+                </div>
                 <div className="max-h-64 overflow-y-auto space-y-2">
-                  {members
-                    .filter((m) =>
-                      m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      m.memberNo.toLowerCase().includes(searchTerm.toLowerCase())
-                    )
-                    .map((member) => (
+                  {filteredMembers.map((member) => (
                       <label key={member.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-[var(--surface-card)] cursor-pointer transition-colors">
                         <input
                           type="checkbox"
@@ -392,7 +428,7 @@ export function DueGenerationWizard({
                         )}
                       </label>
                     ))}
-                  {members.length === 0 && (
+                  {filteredMembers.length === 0 && (
                     <p className="text-center text-sm text-[var(--ink-muted-new)] py-4">{labels.noMembers}</p>
                   )}
                 </div>

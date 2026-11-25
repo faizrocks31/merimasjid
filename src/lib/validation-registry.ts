@@ -113,6 +113,7 @@ export const VALIDATION_RULES = {
       mode: { type: "enum", values: [PAYMENT_MODES.CASH, PAYMENT_MODES.UPI, PAYMENT_MODES.BANK_TRANSFER, PAYMENT_MODES.OTHER], required: true },
       referenceNo: { type: "string", required: false, max: 120 },
       description: { rule: "notes", required: false },
+      idempotencyKey: { type: "hidden", required: true, min: 8 },
     },
 
     settings: {
@@ -573,6 +574,8 @@ export interface FormFieldMeta {
   filter?: InputFilter;
   /** A static prefix rendered inside the input (e.g. "+91 " for a mobile number). */
   prefix?: string;
+  /** Optional CSS className for the input element. */
+  className?: string;
 }
 
 /** Human-readable label for a field name when nothing better is declared. */

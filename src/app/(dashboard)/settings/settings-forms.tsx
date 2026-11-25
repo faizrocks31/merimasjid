@@ -20,6 +20,7 @@ import { Badge, Button, Card, CardHeader, CardTitle } from "@/components/ui";
 import { SimpleForm } from "@/components/forms/auto-form";
 import { AnalogTimePicker } from "@/components/forms/AnalogTimePicker";
 import { CategoryEventsPanel, type CollectionEventItem, type MemberOption, type AssignmentItem } from "./collection-event-forms";
+import type { FormValue } from "@/lib/validation-registry";
 
 type Labels = Record<string, string>;
 
@@ -383,16 +384,24 @@ export function ExpenseCategoryForm({
   const [, startTransition] = useTransition();
   useReloadOnSuccess(state, redirectTo);
 
+  // Controlled state for both name and active fields
+  const [formValues, setFormValues] = useState({
+    name: isEditing ? editingCategory!.name : "",
+    active: isEditing ? editingCategory!.active : true,
+  });
+
   const fields = useMemo(
     () => getFormFields("expenseCategory").map((f) => ({
       ...f,
       label: labels[f.name] ?? f.label,
       placeholder: f.name === "name" ? "e.g. Electricity" : f.placeholder,
-      defaultValue: isEditing && f.name === "name" ? editingCategory.name :
-                    isEditing && f.name === "active" ? editingCategory.active : f.defaultValue,
     })),
-    [labels, isEditing, editingCategory]
+    [labels]
   );
+
+  const handleFieldChange = (name: string, value: FormValue) => {
+    setFormValues((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -404,17 +413,18 @@ export function ExpenseCategoryForm({
   };
 
   return (
-    <form action={formAction} method="post" className="space-y-3 p-5">
+    <form onSubmit={handleSubmit} className="space-y-3 p-5">
       {isEditing && (
         <input type="hidden" name="categoryId" value={editingCategory.id} />
       )}
       <SimpleForm
         key={isEditing ? editingCategory.id : "new"}
         fields={fields}
-        values={{}}
+        values={formValues}
         disabled={pending}
         fieldsOnly={true}
-        uncontrolled={true}
+        uncontrolled={false}
+        onFieldChange={handleFieldChange}
       />
       <Notice state={state} saved={labels.saved} />
       <div className="flex gap-2">

@@ -68,6 +68,7 @@ export default async function DueGenerationWizardPage() {
     selectMembersDesc: t("selectMembersDesc"),
     allEligible: t("allEligible"),
     selectedMembers: t("selectedMembers"),
+    selectAllEligible: t("selectAllEligible"),
     memberCount: t("memberCount"),
     searchMembers: t("searchMembers"),
     noMembers: t("noActiveMembers"),

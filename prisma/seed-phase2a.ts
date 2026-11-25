@@ -149,7 +149,7 @@ const DEFAULT_COLLECTION_DEFINITIONS = [
     name: "Shab-e-Qadr",
     purposeCode: "SHAB_E_QADR",
     baseCategoryCode: "ANNUAL",
-    subcategoryCode: "GENERAL",
+    subcategoryCode: "RECURRING_DONATION",
     description: "Shab-e-Qadr night collection",
     frequency: "EVENT_BASED",
     amountType: "VARIABLE",

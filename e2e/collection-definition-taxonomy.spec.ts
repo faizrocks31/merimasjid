@@ -299,10 +299,62 @@ test.describe("Collection Definition Taxonomy Validation", () => {
 
     const saveBtn = page.locator('button[type="submit"]:has-text("Save")').first();
     await expect(saveBtn).toBeVisible();
+
+    // Debug: Intercept the form submission to see what's happening
+    const responsePromise = page.waitForResponse(response => response.url().includes('/settings') && response.request().method() === 'POST', { timeout: 5000 }).catch(() => null);
+
     await saveBtn.click();
 
+    // Wait for the response
+    const response = await responsePromise;
+    if (response) {
+      console.log('Response status:', response.status());
+      const responseBody = await response.text().catch(() => 'could not read');
+      console.log('Response body:', responseBody);
+    } else {
+      console.log('No POST response captured');
+    }
+
+    // Wait for form submission and page reload
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
+
+    // Debug: Check if there's an error notice
+    const errorNotice = page.locator('p:has-text("Could not create"), p:has-text("Invalid"), p:has-text("error")').first();
+    if (await errorNotice.isVisible({ timeout: 2000 }).catch(() => false)) {
+      const errorText = await errorNotice.textContent();
+      console.log('Error notice:', errorText);
+    }
+
+    // Debug: Check if we're still on the form page
+    const currentUrl = page.url();
+    console.log('Current URL after submit:', currentUrl);
+
+    // Debug: Check if the form is still visible (meaning submission failed silently)
+    const formVisible = await page.locator('input[name="name"]').isVisible({ timeout: 2000 }).catch(() => false);
+    if (formVisible) {
+      console.log('Form is still visible - submission may have failed silently');
+
+      // Check for any visible error messages in the form
+      const formError = await page.locator('form p[role="alert"], form .text-red, form .text-[var(--danger)]').first().textContent().catch(() => null);
+      if (formError) {
+        console.log('Form error message:', formError);
+      }
+
+      // Debug: Check what the Notice component shows (it shows state.error or state.ok)
+      const notice = await page.locator('form > div > p').first().textContent().catch(() => null);
+      console.log('Notice text:', notice);
+
+      // Debug: Check if form fields are properly filled
+      const nameVal = await page.locator('input[name="name"]').inputValue();
+      const baseCategoryVal = await page.locator('select[name="baseCategoryId"]').inputValue();
+      const subcategoryVal = await page.locator('select[name="subcategoryId"]').inputValue();
+      console.log('Form values:', { name: nameVal, baseCategoryId: baseCategoryVal, subcategoryId: subcategoryVal });
+    }
+
+    // Debug: Get all list items to see what's there
+    const allItems = await page.locator('ul > li').allTextContents();
+    console.log('All list items:', allItems);
 
     // Reload to see the new item in the list (server component props won't update without reload)
     await page.goto(`${BASE_URL}/settings?tab=collections`);

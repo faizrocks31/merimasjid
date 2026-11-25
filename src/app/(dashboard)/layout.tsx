@@ -20,6 +20,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     members: t("members"),
     plans: t("plans"),
     receivePayment: t("receivePayment"),
+    dueStatusOverview: t("dueStatusOverview"),
     transactions: t("transactions"),
     expenses: t("expenses"),
     reports: t("reports"),

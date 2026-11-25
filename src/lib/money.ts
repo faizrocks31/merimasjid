@@ -6,20 +6,20 @@
 const INR = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
 });
 
-/** Format paise as ₹1,23,456.00 */
+/** Format paise as ₹1,23,456 (whole rupees only) */
 export function formatPaise(paise: number): string {
   return INR.format(paise / 100);
 }
 
-/** Format paise without the currency symbol, e.g. 1,23,456.00 */
+/** Format paise without the currency symbol, e.g. 1,23,456 */
 export function formatPaisePlain(paise: number): string {
   return (paise / 100).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 }
 
@@ -28,17 +28,17 @@ export function formatINR(paise: number): string {
   return formatPaisePlain(paise);
 }
 
-/** Convert paise to a plain rupee string suitable for a form input. */
+/** Convert paise to a plain rupee string suitable for a form input (whole rupees only). */
 export function paiseToInput(paise: number): string {
-  return (paise / 100).toFixed(2);
+  return (paise / 100).toString();
 }
 
-/** Parse a user-entered rupee string ("1,250.50") into integer paise. Returns null if invalid. */
+/** Parse a user-entered rupee string ("1,250") into integer paise. Returns null if invalid.
+ * Only whole rupee amounts are accepted - decimals are rejected. */
 export function parseRupeesToPaise(input: string): number | null {
   const cleaned = input.replace(/[₹,\s]/g, "");
-  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
-  const [whole, frac = ""] = cleaned.split(".");
-  const paise = Number(whole) * 100 + Number(frac.padEnd(2, "0"));
+  if (!/^\d+$/.test(cleaned)) return null;
+  const paise = Number(cleaned) * 100;
   if (!Number.isSafeInteger(paise)) return null;
   return paise;
 }

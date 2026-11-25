@@ -129,14 +129,14 @@ export function MemberSearch({
 
 function GenericSelect({ options, ...props }: { options: { value: string; label: string }[] } & React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select {...props} className="w-full rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-2.5 text-base text-[var(--ink)] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)] h-11">
+    <select {...props} className={cn("w-full min-w-0 max-w-full rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-2.5 text-base text-[var(--ink)] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)] h-11", props.className)}>
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   );
 }
 
 function GenericInput({ type = "text", className, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { type?: string }) {
-  return <input type={type} {...props} className={cn("w-full rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-2.5 text-base text-[var(--ink)] placeholder:text-[#9aa69f] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)] h-11", className)} />;
+  return <input type={type} {...props} className={cn("w-full min-w-0 max-w-full rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-2.5 text-base text-[var(--ink)] placeholder:text-[#9aa69f] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)] h-11", className)} />;
 }
 
 function PrefixInput({ type = "text", prefix, className, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { type?: string; prefix?: string }) {
@@ -154,7 +154,7 @@ function PrefixInput({ type = "text", prefix, className, ...props }: React.Input
 }
 
 function GenericTextarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cn("w-full rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-2.5 text-base text-[var(--ink)] placeholder:text-[#9aa69f] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)]", className)} />;
+  return <textarea {...props} className={cn("w-full min-w-0 rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-2.5 text-base text-[var(--ink)] placeholder:text-[#9aa69f] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)]", className)} />;
 }
 
 function GenericCheckbox({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
@@ -490,6 +490,7 @@ export function SimpleForm({
                 disabled={isDisabled}
                 required={field.required}
                 options={field.options}
+                className={field.className}
               />
             </Field>
           );
@@ -524,6 +525,7 @@ export function SimpleForm({
                 disabled={isDisabled}
                 maxLength={field.maxLength}
                 rows={3}
+                className={field.className}
               />
             </Field>
           );

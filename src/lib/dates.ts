@@ -49,6 +49,48 @@ export function toISODate(date: Date): string {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+/**
+ * Human-readable period label for FIFO allocation preview and receipts.
+ * Returns localized period labels based on frequency and period start date.
+ * Handles monthly, quarterly, semi-annual, annual, event-based, and one-time frequencies.
+ */
+export function formatPeriodLabel(
+  periodStart: Date | string,
+  frequency: string,
+  locale: string = "en-IN"
+): string {
+  if (!periodStart) return "—";
+  const d = typeof periodStart === "string" ? new Date(periodStart) : periodStart;
+  if (Number.isNaN(d.getTime())) return "—";
+
+  const year = d.getFullYear();
+  const month = d.getMonth(); // 0-indexed
+
+  // Use Intl.DateTimeFormat for localized month names
+  const monthName = new Intl.DateTimeFormat(locale, {
+    timeZone: APP_TIMEZONE,
+    month: "long",
+  }).format(d);
+
+  switch (frequency) {
+    case "WEEKLY":
+      return `Week of ${monthName} ${d.getDate()}, ${year}`;
+    case "MONTHLY":
+      return `${monthName} ${year}`;
+    case "QUARTERLY":
+      const quarter = Math.floor(month / 3) + 1;
+      return `Q${quarter} ${year}`;
+    case "SEMI_ANNUAL":
+      return month < 6 ? `First Half ${year}` : `Second Half ${year}`;
+    case "ANNUAL":
+      return `Annual ${year}`;
+    case "EVENT_BASED":
+    case "ONE_TIME":
+    default:
+      return `${monthName} ${year}`;
+  }
+}
+
 /** DD-MM-YYYY display format. */
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "—";

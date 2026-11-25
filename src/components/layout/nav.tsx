@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, CalendarClock, HandCoins, ReceiptText, Wallet,
-  BarChart3, Settings, ShieldCheck, ScrollText,
+  BarChart3, Settings, ShieldCheck, ScrollText, Database,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ROLES, type Role } from "@/lib/constants";
@@ -29,6 +29,7 @@ function items(labels: Labels): NavItem[] {
     { href: "/members", label: labels.members, icon: Users, permission: "member:read", color: "text-emerald-400", hoverBg: "hover:bg-emerald-500/15", activeBg: "bg-emerald-500/20" },
     { href: "/plans", label: labels.plans, icon: CalendarClock, permission: "plan:write", color: "text-blue-400", hoverBg: "hover:bg-blue-500/15", activeBg: "bg-blue-500/20" },
     { href: "/collections/new", label: labels.receivePayment, icon: HandCoins, permission: "payment:create", color: "text-amber-400", hoverBg: "hover:bg-amber-500/15", activeBg: "bg-amber-500/20" },
+    { href: "/collections/due-status", label: labels.dueStatusOverview, icon: Database, permission: "collection:read", color: "text-cyan-400", hoverBg: "hover:bg-cyan-500/15", activeBg: "bg-cyan-500/20" },
     { href: "/transactions", label: labels.transactions, icon: ReceiptText, permission: "payment:read", color: "text-violet-400", hoverBg: "hover:bg-violet-500/15", activeBg: "bg-violet-500/20" },
     { href: "/expenses", label: labels.expenses, icon: Wallet, permission: "expense:create", color: "text-rose-400", hoverBg: "hover:bg-rose-500/15", activeBg: "bg-rose-500/20" },
     { href: "/reports", label: labels.reports, icon: BarChart3, permission: "report:read", color: "text-cyan-400", hoverBg: "hover:bg-cyan-500/15", activeBg: "bg-cyan-500/20" },

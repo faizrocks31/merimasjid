@@ -97,7 +97,7 @@ interface TabsContentProps {
 export function TabsContent({ value, children, className }: TabsContentProps) {
   const { value: activeValue } = useTabsContext();
   if (activeValue !== value) return null;
-  return <div className={cn("animate-fade-in", className)}>{children}</div>;
+  return <div className={cn("animate-fade-in min-w-0", className)}>{children}</div>;
 }
 
 export { type TabsProps, type TabsListProps, type TabsTriggerProps, type TabsContentProps };

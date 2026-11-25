@@ -817,24 +817,27 @@ export async function createExpenseCategoryAction(_prev: SettingsState, formData
 
   const parsed = expenseCategorySchema.safeParse({
     name: String(formData.get("name") ?? "").trim(),
+    // Checkbox handling: formData.has() returns true if checkbox was checked (value present), false if unchecked (not present)
+    // This works with the hidden input pattern where checkbox value="true" comes AFTER hidden input value="false"
+    active: formData.getAll("active").includes("true"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid expense category" };
 
-  const name = parsed.data.name;
+  const { name, active } = parsed.data;
 
   try {
     const existing = await prisma.expenseCategory.findFirst({ where: { masjidId: user.masjidId!, name } });
     if (existing) return { error: "That expense category already exists." };
 
     await prisma.$transaction(async (tx) => {
-      const created = await tx.expenseCategory.create({ data: { masjidId: user.masjidId!, name } });
+      const created = await tx.expenseCategory.create({ data: { masjidId: user.masjidId!, name, active } });
       await writeAudit(tx, {
         masjidId: user.masjidId,
         actorUserId: user.id,
         action: "expenseCategory.create",
         entityType: "ExpenseCategory",
         entityId: created.id,
-        after: { name },
+        after: { name, active },
       });
     });
 
@@ -856,7 +859,9 @@ export async function updateExpenseCategoryAction(_prev: SettingsState, formData
 
   const parsed = expenseCategorySchema.safeParse({
     name: String(formData.get("name") ?? "").trim(),
-    active: formData.get("active") === "on",
+    // Checkbox handling: formData.has() returns true if checkbox was checked (value present), false if unchecked (not present)
+    // This works with the hidden input pattern where checkbox value="true" comes AFTER hidden input value="false"
+    active: formData.getAll("active").includes("true"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid expense category" };
 
