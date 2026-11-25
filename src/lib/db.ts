@@ -41,20 +41,41 @@ function createClient(): PrismaClient {
 }
 
 // Re-create client if DATABASE_URL has changed (important for tests)
-const currentUrl = process.env.DATABASE_URL;
-if (globalForPrisma.prisma && globalForPrisma.prismaUrl !== currentUrl) {
-  console.log('[DEBUG db.ts] DATABASE_URL changed, recreating PrismaClient');
-  globalForPrisma.prisma = undefined;
-  globalForPrisma.prismaUrl = undefined;
+function shouldRecreateClient(): boolean {
+  const currentUrl = process.env.DATABASE_URL;
+  return !!(globalForPrisma.prisma && globalForPrisma.prismaUrl !== currentUrl);
 }
 
-export const prisma = globalForPrisma.prisma ?? createClient();
-globalForPrisma.prismaUrl = currentUrl;
-console.log('[DEBUG db.ts] Prisma client exported, isNew:', !globalForPrisma.prisma);
+// Lazy getter - only creates client when actually used
+function getPrismaClient(): PrismaClient {
+  if (shouldRecreateClient()) {
+    console.log('[DEBUG db.ts] DATABASE_URL changed, recreating PrismaClient');
+    globalForPrisma.prisma = undefined;
+    globalForPrisma.prismaUrl = undefined;
+  }
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createClient();
+    globalForPrisma.prismaUrl = process.env.DATABASE_URL;
+    console.log('[DEBUG db.ts] Prisma client exported, isNew: true');
+  }
+  return globalForPrisma.prisma;
+}
+
+// Export a Proxy that lazily initializes the client
+export const prisma = new Proxy({} as PrismaClient, {
+  get(target, prop, receiver) {
+    const client = getPrismaClient();
+    const value = Reflect.get(client, prop, receiver);
+    if (typeof value === "function") {
+      return value.bind(client);
+    }
+    return value;
+  },
+});
 
 // Initialize notifications on server startup
 if (typeof window === "undefined") {
   initNotifications();
 }
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = getPrismaClient();
