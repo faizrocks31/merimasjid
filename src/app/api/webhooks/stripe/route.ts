@@ -11,6 +11,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
  * Stripe webhook handler – verifies signature and processes subscription events.
  * Requires STRIPE_WEBHOOK_SECRET and STRIPE_SECRET_KEY environment variables.
  */
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const signature = req.headers.get("stripe-signature");
   const body = await req.text();

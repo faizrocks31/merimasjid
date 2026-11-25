@@ -7,6 +7,8 @@ import { prisma } from "@/lib/db";
  * Paddle webhook handler – verifies signature and processes subscription events.
  * Requires PADDLE_WEBHOOK_SECRET and PADDLE_API_KEY environment variables.
  */
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const signature = req.headers.get("paddle-signature");
   const body = await req.text();

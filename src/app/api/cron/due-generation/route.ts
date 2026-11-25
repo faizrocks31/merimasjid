@@ -6,6 +6,8 @@ import { generateAllAutomaticDues } from "@/lib/dues-generation";
  * Vercel Cron endpoint – runs daily at 8:30 PM UTC (or scheduled time) to generate automatic dues.
  * Requires Vercel Cron authentication header or bearer token.
  */
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     // Verify Vercel Cron secret if configured

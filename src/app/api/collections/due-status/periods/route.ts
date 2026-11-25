@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { COLLECTION_FREQUENCY } from "@/lib/constants";
 import { formatPeriodLabel } from "@/lib/dates";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireStaff();

@@ -4,6 +4,8 @@ import { formatDate } from "@/lib/dates";
 import { PAYMENT_MODE_LABELS } from "@/lib/constants";
 import { logAudit } from "@/modules/audit/write";
 
+export const dynamic = "force-dynamic";
+
 function csvCell(value: string | number | null | undefined): string {
   const s = value == null ? "" : String(value);
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;

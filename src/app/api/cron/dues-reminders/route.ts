@@ -5,6 +5,8 @@ import { sendDuesReminders } from "@/lib/dues";
  * Vercel Cron endpoint – runs daily to send dues reminders for periods due within 3 days.
  * Returns a simple JSON report of how many reminders were sent.
  */
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     // This endpoint should only be called by Vercel Cron

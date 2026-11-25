@@ -5,6 +5,8 @@ import { syncAllSubscriptionStatuses } from "@/lib/subscription";
  * Vercel Cron endpoint – runs periodically to update subscription status and denormalized fields.
  * Returns a simple JSON report of how many masjids were updated and any errors.
  */
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const { updated, errors } = await syncAllSubscriptionStatuses();

@@ -4,6 +4,8 @@ import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { COLLECTION_FREQUENCY } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireStaff();

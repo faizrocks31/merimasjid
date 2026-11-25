@@ -5,6 +5,9 @@ import { prisma } from "@/lib/db";
 import { COLLECTION_FREQUENCY } from "@/lib/constants";
 import { formatPeriodLabel } from "@/lib/dates";
 
+// Force dynamic rendering - this route requires DATABASE_URL at runtime
+export const dynamic = "force-dynamic";
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ periodKey: string }> }
