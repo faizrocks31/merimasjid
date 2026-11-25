@@ -1,0 +1,67 @@
+Global setup complete - auth state saved
+
+Running 1 test using 1 worker
+
+  ✘  1 [e2e] › e2e\shab-e-qadr-subcategory-update.spec.ts:15:7 › Shab-e-Qadr and Collection Definition Subcategory Update Workflow › Test A, B, C, D, E - Shab-e-Qadr subcategory update and persistence (20.8s)
+  ✘  2 [e2e] › e2e\shab-e-qadr-subcategory-update.spec.ts:15:7 › Shab-e-Qadr and Collection Definition Subcategory Update Workflow › Test A, B, C, D, E - Shab-e-Qadr subcategory update and persistence (retry #1) (23.4s)
+
+=== Global Teardown: Cleaning up test Jumma data ===
+No test records to clean up
+
+
+  1) [e2e] › e2e\shab-e-qadr-subcategory-update.spec.ts:15:7 › Shab-e-Qadr and Collection Definition Subcategory Update Workflow › Test A, B, C, D, E - Shab-e-Qadr subcategory update and persistence 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator:  locator('select[name="subcategoryId"]').locator('option:checked')
+    Expected: "Recurring Donation"
+    Received: "General"
+    Timeout:  15000ms
+
+    Call log:
+      - Expect "toHaveText" locator('select[name="subcategoryId"]').locator('option:checked') with timeout 15000ms
+      - waiting for locator('select[name="subcategoryId"]').locator('option:checked')
+        31 × locator resolved to <option value="4799180d-33a5-4217-ad3a-10a938737c0c">General</option>
+           - unexpected value "General"
+
+
+      50 |     await page.waitForTimeout(500);
+      51 |     // Verify the selection stuck
+    > 52 |     await expect(subSelect.locator('option:checked')).toHaveText("Recurring Donation");
+         |                                                       ^
+      53 |
+      54 |     // 4. Test state persistence during re-render (toggle a checkbox)
+      55 |     const activeCheckbox = page.locator('input[name="active"]');
+        at C:\Users\hp\Documents\Claude Project\Masjid Collection\e2e\shab-e-qadr-subcategory-update.spec.ts:52:55
+
+    Error Context: test-results\shab-e-qadr-subcategory-up-882f4-gory-update-and-persistence-e2e\error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator:  locator('select[name="subcategoryId"]').locator('option:checked')
+    Expected: "Recurring Donation"
+    Received: "General"
+    Timeout:  15000ms
+
+    Call log:
+      - Expect "toHaveText" locator('select[name="subcategoryId"]').locator('option:checked') with timeout 15000ms
+      - waiting for locator('select[name="subcategoryId"]').locator('option:checked')
+        31 × locator resolved to <option value="4799180d-33a5-4217-ad3a-10a938737c0c">General</option>
+           - unexpected value "General"
+
+
+      50 |     await page.waitForTimeout(500);
+      51 |     // Verify the selection stuck
+    > 52 |     await expect(subSelect.locator('option:checked')).toHaveText("Recurring Donation");
+         |                                                       ^
+      53 |
+      54 |     // 4. Test state persistence during re-render (toggle a checkbox)
+      55 |     const activeCheckbox = page.locator('input[name="active"]');
+        at C:\Users\hp\Documents\Claude Project\Masjid Collection\e2e\shab-e-qadr-subcategory-update.spec.ts:52:55
+
+    Error Context: test-results\shab-e-qadr-subcategory-up-882f4-gory-update-and-persistence-e2e-retry1\error-context.md
+
+  1 failed
+    [e2e] › e2e\shab-e-qadr-subcategory-update.spec.ts:15:7 › Shab-e-Qadr and Collection Definition Subcategory Update Workflow › Test A, B, C, D, E - Shab-e-Qadr subcategory update and persistence 

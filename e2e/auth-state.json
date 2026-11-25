@@ -1,0 +1,15 @@
+{
+  "cookies": [
+    {
+      "name": "masjid_session",
+      "value": "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJjbXc2MXliODIwMDBkNHN1ZjA5aG95NGtnIiwibWFzamlkSWQiOiJjbXc2MXlhOXkwMDAwNHN1ZjAxd292aTR3Iiwicm9sZSI6IkFETUlOIiwiaXNQbGF0Zm9ybUFkbWluIjpmYWxzZSwiaWF0IjoxNzk0MzE2NDgyLCJleHAiOjE3OTQzNTk2ODJ9.BrmcKAc8vL3jhilBx8od8WcP6_55qGepzjcJaPZLRvo",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1794359682.491174,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}

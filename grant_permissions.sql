@@ -1,0 +1,1 @@
+GRANT ALL ON TABLE "JummaCorrection" TO masjid_app;
