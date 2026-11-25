@@ -48,7 +48,10 @@ if (!existsSync(envPath)) {
   }
 
   const url = process.env.DATABASE_URL ?? "";
-  if (!url) {
+  // Skip DATABASE_URL check during build (VERCEL=1 is set during Vercel build)
+  if (process.env.VERCEL === "1") {
+    console.log("Running on Vercel — skipping DATABASE_URL check during build.");
+  } else if (!url) {
     console.warn("DATABASE_URL is not set in .env — the app will not start.");
   } else if (!/^postgres(ql)?:\/\//i.test(url)) {
     console.warn(
