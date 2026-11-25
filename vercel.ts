@@ -1,7 +1,7 @@
 import { routes, deploymentEnv, type VercelConfig } from '@vercel/config/v1';
 
 export const config: VercelConfig = {
-  buildCommand: 'next build --no-lint',
+  buildCommand: 'NEXT_DISABLE_LINT=1 next build',
   framework: 'nextjs',
   devCommand: 'npm run dev',
   installCommand: 'npm install',
