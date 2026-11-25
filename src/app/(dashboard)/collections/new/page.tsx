@@ -96,12 +96,18 @@ export default async function NewCollectionPage({
   const periodOptions = duesPeriods
     .map((p) => {
       const allocated = p.allocations.reduce((s, a) => s + a.allocatedAmountPaise, 0);
+      // Robust category ID resolution with multiple fallbacks
+      const resolvedCategoryId =
+        p.collectionDefinition?.id ??
+        p.plan?.collectionDefinition?.id ??
+        p.collectionDefinitionId ??
+        "";
       return {
         id: p.id,
         type: "duesPeriod" as const,
         memberId: p.memberId,
         planId: p.planId ?? "",
-        categoryId: (p.collectionDefinition?.id ?? p.plan?.collectionDefinition.id) ?? "",
+        categoryId: resolvedCategoryId,
         categoryName: (p.collectionDefinition?.name ?? p.plan?.collectionDefinition.name) ?? "",
         periodStart: p.periodStart.toISOString(),
         periodEnd: p.periodEnd?.toISOString() ?? null,

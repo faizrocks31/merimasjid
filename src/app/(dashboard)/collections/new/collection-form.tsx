@@ -292,6 +292,16 @@ export function CollectionForm({
   // Selected category
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
 
+  // Debug logging for category selection
+  useEffect(() => {
+    console.log('[Category Debug] Selected category:', selectedCategory ? {
+      id: selectedCategory.id,
+      name: selectedCategory.name,
+      settlementPolicy: selectedCategory.settlementPolicy,
+      code: selectedCategory.code
+    } : 'None');
+  }, [selectedCategoryId, selectedCategory]);
+
   // For walk-in Milad/Shab-e-Qadr, show available events
   const availableEventsForCategory = useMemo(() => {
     if (!selectedCategoryId || !selectedCategory?.code || !["MILAD_UN_NABI", "SHAB_E_QADR"].includes(selectedCategory.code)) {
@@ -319,7 +329,22 @@ export function CollectionForm({
 
   // Build FIFO preview for member payments in FIFO categories (OLDEST_FIRST settlement policy)
   const fifoPreview = useMemo((): FIFOPreviewItem[] => {
+    // Debug logging
+    console.log('[FIFO Debug]', {
+      memberId,
+      selectedCategoryId,
+      selectedCategory: selectedCategory ? {
+        id: selectedCategory.id,
+        name: selectedCategory.name,
+        settlementPolicy: selectedCategory.settlementPolicy,
+        code: selectedCategory.code
+      } : null,
+      duesPeriodsTotal: duesPeriods.length,
+      memberDuesPeriodsCount: duesPeriods.filter((p) => p.memberId === memberId && p.categoryId === selectedCategoryId && p.outstandingPaise > 0).length
+    });
+
     if (!memberId || !selectedCategoryId || !selectedCategory || selectedCategory.settlementPolicy !== "OLDEST_FIRST") {
+      console.log('[FIFO Debug] Early return:', { memberId, selectedCategoryId, hasCategory: !!selectedCategory, policy: selectedCategory?.settlementPolicy });
       return [];
     }
 
@@ -329,6 +354,8 @@ export function CollectionForm({
     const memberDuesPeriods = duesPeriods
       .filter((p) => p.memberId === memberId && p.categoryId === selectedCategoryId && p.outstandingPaise > 0)
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+    console.log('[FIFO Debug] Member dues periods found:', memberDuesPeriods.length, memberDuesPeriods.map(p => ({ id: p.id, dueDate: p.dueDate, outstanding: p.outstandingPaise })));
 
     for (const period of memberDuesPeriods) {
       preview.push({
