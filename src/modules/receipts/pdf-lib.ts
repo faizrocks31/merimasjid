@@ -147,6 +147,9 @@ export async function renderReceiptPdfLib(view: ReceiptView, taxNote: string): P
     poppinsBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   }
 
+  // Embed standard Helvetica Bold for status watermark
+  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
   // Background
   page.drawRectangle({
     x: 0,
@@ -161,7 +164,7 @@ export async function renderReceiptPdfLib(view: ReceiptView, taxNote: string): P
 
   // Status watermark (cancelled/duplicate)
   if (view.isDuplicate || view.status === "REVERSED") {
-    drawStatusWatermark(page, view.status === "REVERSED" ? "रद्द" : "नकल");
+    drawStatusWatermark(page, view.status === "REVERSED" ? "रद्द" : "नकल", helveticaBold);
   }
 
   // Double border
@@ -216,7 +219,7 @@ function drawWatermark(page: PDFPage) {
   page.restore();
 }
 
-function drawStatusWatermark(page: PDFPage, text: string) {
+function drawStatusWatermark(page: PDFPage, text: string, helveticaBold: PDFFont) {
   page.save();
   page.translate(A5_WIDTH / 2, A5_HEIGHT / 2);
   page.rotate(-18 * Math.PI / 180);
@@ -224,7 +227,7 @@ function drawStatusWatermark(page: PDFPage, text: string) {
     x: -100,
     y: 0,
     size: 48,
-    font: await page.doc.embedFont(StandardFonts.HelveticaBold),
+    font: helveticaBold,
     color: COLORS.statusWatermark,
   });
   page.restore();
