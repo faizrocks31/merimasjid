@@ -1,10 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { createSession, destroySession, verifyPassword } from "@/lib/auth";
 import { loginSchema } from "@/lib/validation";
 import { ROLES } from "@/lib/constants";
+import { LOCALE_COOKIE } from "@/i18n";
 
 export type PortalLoginState = { error?: string; redirect?: string } | undefined;
 
