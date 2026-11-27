@@ -318,7 +318,6 @@ export default async function SettingsPage({
   const collectionDefinitionItems = collectionDefinitions.map((c) => ({
     id: c.id,
     name: c.name,
-    code: c.purposeCode ?? undefined,
     description: c.description,
     active: c.active,
     showInPaymentReceived: c.showInPaymentReceived,

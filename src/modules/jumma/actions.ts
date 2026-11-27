@@ -118,10 +118,7 @@ export async function recordJummaCollectionAction(formData: FormData): Promise<J
           where: {
             masjidId: user.masjidId!,
             active: true,
-            OR: [
-              { subcategory: { code: "JUMMA" } },
-              { purposeCode: "JUMMA_COLLECTION" },
-            ],
+            baseCategory: { code: "JUMMA" },
           },
           select: { id: true },
         });
@@ -136,10 +133,7 @@ export async function recordJummaCollectionAction(formData: FormData): Promise<J
             id: jummaDefId,
             masjidId: user.masjidId!,
             active: true,
-            OR: [
-              { subcategory: { code: "JUMMA" } },
-              { purposeCode: "JUMMA_COLLECTION" },
-            ],
+            baseCategory: { code: "JUMMA" },
           },
           select: { id: true },
         });

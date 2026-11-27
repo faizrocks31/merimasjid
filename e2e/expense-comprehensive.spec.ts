@@ -178,17 +178,23 @@ test.describe("Expense Management - Comprehensive Tests", () => {
     await page.fill('input[name="name"]', updatedName);
     await page.click('button:has-text("Update")');
 
-    // Wait for the form to close (Add Expense Category button reappears)
+    // Wait for the form submission to complete and page to reload
+    // The form uses useReloadOnSuccess which calls window.location.reload()
+    // Wait for a navigation/reload to occur
+    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Wait for the "Add Expense Category" button to reappear (indicating form closed and page reloaded)
     await page.waitForSelector('button:has-text("Add Expense Category")', { state: 'visible', timeout: 60000 });
 
     // Wait for the page to reload and content to be ready
     await page.waitForLoadState('networkidle');
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
 
     // Force a fresh navigation with cache-busting to ensure server-side data is fresh
     await page.goto(`${BASE_URL}/settings?tab=expenseCategories&_=${Date.now()}`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
 
     // Debug: log category list items
     const listItemsAfterUpdate = await page.locator('ul >> li').allTextContents();

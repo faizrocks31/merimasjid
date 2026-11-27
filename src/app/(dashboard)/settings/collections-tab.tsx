@@ -476,7 +476,7 @@ export function CollectionDefinitionsTab({
     <div className="space-y-4">
       {/* Add/Edit Form */}
       {(showAddForm || isEditing) && (
-        <Card>
+        <Card className="overflow-hidden">
           <form onSubmit={handleSubmit} method="POST" className="space-y-3 p-5 min-w-0">
             {isEditing && <input type="hidden" name="definitionId" value={editingDefinition!.id} />}
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 min-w-0 overflow-hidden">
@@ -555,7 +555,7 @@ export function CollectionDefinitionsTab({
       )}
 
       {/* List */}
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>{labels.collectionDefinitions ?? "Collection Definitions"}</CardTitle>
           <Button
@@ -582,12 +582,12 @@ export function CollectionDefinitionsTab({
             [items]
           );
           return (
-            <ul className="divide-y divide-[var(--border-subtle)]">
+            <ul className="divide-y divide-[var(--border-subtle)] min-w-[600px]">
               {sortedItems.length === 0 && (
                 <li className="px-5 py-6 text-xs text-[var(--ink-muted)]">—</li>
               )}
               {sortedItems.map((item) => (
-            <li key={item.id} className="px-5 py-2.5">
+            <li key={item.id} className="px-5 py-2.5 whitespace-nowrap">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{item.name}</p>
@@ -725,7 +725,7 @@ export function AssignmentsTab({
   return (
     <div className="space-y-4">
       {/* Category Selector */}
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>{labels.memberAssignments ?? "Member Assignments"}</CardTitle>
         </CardHeader>
@@ -747,7 +747,7 @@ export function AssignmentsTab({
       {selectedCategory && isSelectedMode && (
         <>
           {/* Event Selector */}
-          <Card>
+          <Card className="overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>{labels.selectEvent}</CardTitle>
             </CardHeader>
@@ -773,7 +773,7 @@ export function AssignmentsTab({
           </Card>
 
           {/* Member Assignment Matrix */}
-          <Card>
+          <Card className="overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>{labels.assignMembersToCategory ?? "Assign Members to Category"}</CardTitle>
             </CardHeader>
@@ -803,7 +803,7 @@ export function AssignmentsTab({
                   {memberOptions.length === 0 ? (
                     <p className="px-3 py-3 text-[11px] text-[var(--ink-muted)]">{labels.noActiveMembers}</p>
                   ) : (
-                    <ul className="divide-y divide-[var(--border-subtle)]">
+                    <ul className="divide-y divide-[var(--border-subtle)] min-w-[600px]">
                       {memberOptions.map((m) => {
                         // Check if already assigned to any event in this category
                         const assignedEvents = categoryEvents.filter(e =>
@@ -845,7 +845,7 @@ export function AssignmentsTab({
           </Card>
 
           {/* 5-Step Due Generation Wizard */}
-          <Card>
+          <Card className="overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>{labels.generateDues ?? "Generate Dues Periods"}</CardTitle>
               <div className="flex items-center gap-2">
@@ -923,7 +923,7 @@ export function AssignmentsTab({
       )}
 
       {selectedCategory && !isSelectedMode && (
-        <Card>
+        <Card className="overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>{labels.assignmentsInfo}</CardTitle>
           </CardHeader>
@@ -936,7 +936,7 @@ export function AssignmentsTab({
       )}
 
       {/* Bulk Generate All Dues */}
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>{labels.generateAllDues ?? "Generate All Automatic Dues"}</CardTitle>
           <Zap className="h-5 w-5 text-[var(--warning)]" />
@@ -1236,7 +1236,7 @@ function WizardStep3({
         {memberOptions.length === 0 ? (
           <p className="px-3 py-3 text-[11px] text-[var(--ink-muted)]">{labels.noActiveMembers}</p>
         ) : (
-          <ul className="divide-y divide-[var(--border-subtle)]">
+          <ul className="divide-y divide-[var(--border-subtle)] min-w-[600px]">
             {memberOptions.map((m: any) => {
               const isSelected = wizardData.memberIds?.includes(m.id);
               return (

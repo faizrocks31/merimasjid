@@ -10,7 +10,7 @@ import { Logo } from "@/components/logo";
 import { SimpleForm } from "@/components/forms/auto-form";
 import type { Locale } from "@/i18n/config";
 
-export function LoginForm({ locale, labels }: { locale: Locale; labels: Record<string, string> }) {
+export function LoginForm({ locale: initialLocale, labels }: { locale: Locale; labels: Record<string, string> }) {
   const [state, formAction, pending] = useActionState<LoginState, FormData>(loginAction, undefined);
 
   const fields = useMemo(
@@ -53,7 +53,7 @@ export function LoginForm({ locale, labels }: { locale: Locale; labels: Record<s
       </form>
 
       <p className="mt-6 text-center text-[11px] text-[var(--ink-muted)]">
-        {locale === "ur" ? "مقامی سسٹم" : locale === "hi" ? "स्थानीय प्रणाली" : "Local system"} · INR · Asia/Kolkata
+        {initialLocale === "ur" ? "مقامی سسٹم" : initialLocale === "hi" ? "स्थानीय प्रणाली" : "Local system"} · INR · Asia/Kolkata
       </p>
       <p className="mt-2 text-center text-[11px]">
         <Link href="/" className="text-[var(--brand)] underline-offset-2 hover:underline">

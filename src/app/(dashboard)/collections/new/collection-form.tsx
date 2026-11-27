@@ -35,7 +35,6 @@ type CategoryOption = {
   code?: string;
   restrictedPurpose?: boolean;
   defaultAmountPaise: number | null;
-  purposeCode?: string | null;
   donorEligibility?: "MEMBERS_ONLY" | "WALKIN_ONLY" | "BOTH";
   settlementPolicy?: "OLDEST_FIRST" | "ANY_PENDING_PERIOD";
   frequency?: string;

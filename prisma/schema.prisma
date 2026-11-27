@@ -46,6 +46,8 @@ model Masjid {
   expenses                   Expense[]
   expenseCategories          ExpenseCategory[]
   expenseSequences           ExpenseSequence[]
+  jummaCollections           JummaCollection[]
+  jummaCorrections           JummaCorrection[]
   notificationSettings       MasjidNotificationSettings?
   users                      MasjidUser[]
   members                    Member[]
@@ -57,33 +59,31 @@ model Masjid {
   receiptSequences           ReceiptSequence[]
   reversals                  Reversal[]
   subscriptions              Subscription[]
-  jummaCollections           JummaCollection[]
-  jummaCorrections           JummaCorrection[]
 
   @@index([subscriptionStatus])
   @@index([deletedAt])
 }
 
 model User {
-  id              String         @id @default(cuid())
+  id              String            @id @default(cuid())
   name            String
-  email           String         @unique
-  phone           String?        @unique
+  email           String            @unique
+  phone           String?           @unique
   passwordHash    String
-  status          String         @default("ACTIVE")
+  status          String            @default("ACTIVE")
   lastLoginAt     DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
   upiId           String?
   auditLogs       AuditLog[]
-  expensesEntered Expense[]      @relation("ExpenseEnteredBy")
-  memberships     MasjidUser[]
-  memberProfiles  Member[]
-  paymentsEntered Payment[]      @relation("PaymentEnteredBy")
-  receiptEvents   ReceiptEvent[]
+  expensesEntered Expense[]         @relation("ExpenseEnteredBy")
   jummaRecorded   JummaCollection[] @relation("JummaRecordedBy")
   jummaUpdated    JummaCollection[] @relation("JummaUpdatedBy")
   jummaCorrected  JummaCorrection[] @relation("JummaCorrectedBy")
+  memberships     MasjidUser[]
+  memberProfiles  Member[]
+  paymentsEntered Payment[]         @relation("PaymentEnteredBy")
+  receiptEvents   ReceiptEvent[]
 }
 
 model MasjidUser {
@@ -178,32 +178,28 @@ model BaseCategorySubcategory {
 
 /// Masjid-specific configurable collection definition
 model CollectionDefinition {
-  id                     String              @id @default(dbgenerated("(gen_random_uuid())::text"))
-  masjidId               String
-  name                   String
-  baseCategoryId         String
-  subcategoryId          String
-  description            String?
-  active                 Boolean             @default(true)
-  frequency              CollectionFrequency
-  amountType             AmountType
-  defaultAmountPaise     Int?
-  defaultDueDay          Int?                @default(10)
-  defaultGraceDays       Int?                @default(0)
-  donorEligibility       DonorEligibility
-  memberAssignment       MemberAssignment
-  dueGeneration          DueGeneration
-  settlementPolicy       SettlementPolicy
-  purposeCode            String?             // Legacy field for backward compatibility
-  showInPaymentReceived  Boolean             @default(true)
-  baseCategory           BaseCategory        @relation(fields: [baseCategoryId], references: [id])
-  masjid                 Masjid              @relation(fields: [masjidId], references: [id], onDelete: Cascade)
-  subcategory            Subcategory         @relation(fields: [subcategoryId], references: [id])
-  events                 CollectionEvent[]
-  plans                  ContributionPlan[]
-  duesPeriods            DuesPeriod[]
-  paymentAllocations     PaymentAllocation[]
-  jummaCollections       JummaCollection[]
+  id                 String              @id @default(dbgenerated("(gen_random_uuid())::text"))
+  masjidId           String
+  name               String
+  baseCategoryId     String
+  subcategoryId      String
+  description        String?
+  active             Boolean             @default(true)
+  frequency          CollectionFrequency
+  amountType         AmountType
+  defaultAmountPaise Int?
+  donorEligibility   DonorEligibility
+  memberAssignment   MemberAssignment
+  dueGeneration      DueGeneration
+  settlementPolicy   SettlementPolicy
+  baseCategory       BaseCategory        @relation(fields: [baseCategoryId], references: [id])
+  masjid             Masjid              @relation(fields: [masjidId], references: [id], onDelete: Cascade)
+  subcategory        Subcategory         @relation(fields: [subcategoryId], references: [id])
+  events             CollectionEvent[]
+  plans              ContributionPlan[]
+  duesPeriods        DuesPeriod[]
+  jummaCollections   JummaCollection[]
+  paymentAllocations PaymentAllocation[]
 
   @@unique([masjidId, name])
   @@index([masjidId, active])
@@ -389,31 +385,29 @@ model JummaCollection {
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
   updatedBy              String?
+  collectionDefinition   CollectionDefinition @relation(fields: [collectionDefinitionId], references: [id])
+  masjid                 Masjid               @relation(fields: [masjidId], references: [id])
+  recordedByUser         User                 @relation("JummaRecordedBy", fields: [recordedBy], references: [id])
+  updatedByUser          User?                @relation("JummaUpdatedBy", fields: [updatedBy], references: [id])
   corrections            JummaCorrection[]
 
-  masjid                 Masjid               @relation(fields: [masjidId], references: [id], onDelete: Restrict)
-  collectionDefinition   CollectionDefinition @relation(fields: [collectionDefinitionId], references: [id], onDelete: Restrict)
-  recordedByUser         User                 @relation("JummaRecordedBy", fields: [recordedBy], references: [id], onDelete: Restrict)
-  updatedByUser          User?                @relation("JummaUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
-
-  @@unique([masjidId, collectionDate, collectionDefinitionId])
+  @@unique([masjidId, collectionDate, collectionDefinitionId], map: "JummaCollection_masjidId_collectionDate_collectionDefinitionId_")
   @@index([masjidId, collectionDate])
 }
 
 /// Jumma collection correction history — tracks every amount change
 model JummaCorrection {
-  id                    String            @id @default(cuid())
-  masjidId              String
-  jummaCollectionId     String
-  previousAmountPaise   Int
-  newAmountPaise        Int
-  reason                String
-  correctedBy           String
-  createdAt             DateTime          @default(now())
-
-  jummaCollection       JummaCollection   @relation(fields: [jummaCollectionId], references: [id], onDelete: Cascade)
-  masjid                Masjid             @relation(fields: [masjidId], references: [id], onDelete: Restrict)
-  correctedByUser       User              @relation("JummaCorrectedBy", fields: [correctedBy], references: [id], onDelete: Restrict)
+  id                  String          @id @default(cuid())
+  masjidId            String
+  jummaCollectionId   String
+  previousAmountPaise Int
+  newAmountPaise      Int
+  reason              String
+  correctedBy         String
+  createdAt           DateTime        @default(now())
+  correctedByUser     User            @relation("JummaCorrectedBy", fields: [correctedBy], references: [id])
+  jummaCollection     JummaCollection @relation(fields: [jummaCollectionId], references: [id], onDelete: Cascade)
+  masjid              Masjid          @relation(fields: [masjidId], references: [id])
 
   @@index([masjidId, createdAt])
   @@index([jummaCollectionId])

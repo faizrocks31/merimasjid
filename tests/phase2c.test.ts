@@ -703,6 +703,9 @@ describe("Phase 2C: Receipt Identity", () => {
     await prisma.paymentAllocation.deleteMany({ where: { masjidId } });
     await prisma.payment.deleteMany({ where: { masjidId } });
     await prisma.receiptEvent.deleteMany({ where: { masjidId } });
+    await prisma.jummaCollection.deleteMany({ where: { masjidId } });
+    await prisma.collectionEvent.deleteMany({ where: { masjidId } });
+    await prisma.contributionPlan.deleteMany({ where: { masjidId } });
     await prisma.collectionDefinition.deleteMany({ where: { masjidId } });
     await prisma.member.deleteMany({ where: { masjidId } });
     await prisma.masjidUser.deleteMany({ where: { masjidId } });

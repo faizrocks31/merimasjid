@@ -169,7 +169,6 @@ beforeAll(async () => {
       data: {
         masjidId: masjidA,
         name: "General A",
-        purposeCode: "GENA",
         baseCategoryId: baseCategory.id,
         subcategoryId: subcategory.id,
         frequency: "MONTHLY",
@@ -186,7 +185,6 @@ beforeAll(async () => {
       data: {
         masjidId: masjidB,
         name: "General B",
-        purposeCode: "GENB",
         baseCategoryId: baseCategory.id,
         subcategoryId: subcategory.id,
         frequency: "MONTHLY",
@@ -861,7 +859,6 @@ describe("database integrity", () => {
         data: {
           masjidId: tempMasjid,
           name: "Temp",
-          purposeCode: "TMP",
           baseCategoryId: baseCategory.id,
           subcategoryId: subcategory.id,
           frequency: "MONTHLY",

@@ -10,13 +10,13 @@ export const LOCALE_COOKIE = "masjid_locale";
 export type TranslationKey = keyof Dictionary;
 export type Translator = (key: TranslationKey) => string;
 
-/** Server-side dictionary for the active locale. Falls back to English. */
+/** Server-side dictionary for the active locale. Falls back to Hindi. */
 export async function getDictionary(): Promise<{ locale: Locale; t: Translator }> {
   const store = await cookies();
   const value = store.get(LOCALE_COOKIE)?.value;
-  const locale: Locale = isLocale(value) ? value : "en";
+  const locale: Locale = isLocale(value) ? value : "hi";
   const dict = DICTIONARIES[locale];
-  return { locale, t: (key) => dict[key] ?? en[key] ?? String(key) };
+  return { locale, t: (key) => dict[key] ?? hi[key] ?? String(key) };
 }
 
 export function translate(locale: Locale, key: TranslationKey): string {

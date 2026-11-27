@@ -110,15 +110,16 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
     return { ok: false, error: "This collection definition is for walk-in donors only." };
   }
 
-  // MANDATORY PURPOSE-CODE-BASED RESTRICTIONS (server-side enforcement)
+  // MANDATORY RESTRICTIONS (server-side enforcement)
   // These must be enforced regardless of donorEligibility configuration
-  const mandatoryRestrictedCodes = ["ANNUAL_CHANDA", "DEATH_COLLECTION", "BARTAN_COLLECTION", "JUMMA_COLLECTION"];
-  if (!input.memberId && input.walkInName && definition.purposeCode && mandatoryRestrictedCodes.includes(definition.purposeCode)) {
+  // Using name field since purposeCode was removed from schema
+  const mandatoryRestrictedNames = ["Annual Chanda", "Death Collection", "Bartan Collection", "Jumma Collection"];
+  if (!input.memberId && input.walkInName && definition.name && mandatoryRestrictedNames.includes(definition.name)) {
     return { ok: false, error: "Walk-in donors are not allowed for this collection type." };
   }
 
-  // JUMMA_COLLECTION must use dedicated aggregate workflow (not individual payments)
-  if (definition.purposeCode === "JUMMA_COLLECTION") {
+  // Jumma Collection must use dedicated aggregate workflow (not individual payments)
+  if (definition.name === "Jumma Collection") {
     return { ok: false, error: "Jumma collections must use the dedicated Jumma aggregate workflow." };
   }
 
@@ -331,13 +332,13 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
           }
 
           // Handle Additional Voluntary Contribution for event-based FIXED amount categories
-          // Only allowed for MILAD_UN_NABI and SHAB_E_QADR
-          const allowedAdditionalCodes = ["MILAD_UN_NABI", "SHAB_E_QADR"];
+          // Only allowed for Milad-un-Nabi and Shab-e-Qadr
+          const allowedAdditionalNames = ["Milad-un-Nabi", "Shab-e-Qadr"];
           if (remainingPaymentAmount > 0 &&
               definition.amountType === "FIXED" &&
               (definition.frequency === "ANNUAL" || definition.frequency === "EVENT_BASED") &&
-              definition.purposeCode &&
-              allowedAdditionalCodes.includes(definition.purposeCode)) {
+              definition.name &&
+              allowedAdditionalNames.includes(definition.name)) {
             // Find the last selected event allocation
             const lastEventAlloc = [...calculatedAllocations].reverse().find(a => a.collectionEventId);
             if (lastEventAlloc) {
@@ -437,12 +438,12 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
           }
 
           // Handle Additional Voluntary Contribution
-          const allowedAdditionalCodes = ["MILAD_UN_NABI", "SHAB_E_QADR"];
+          const allowedAdditionalNames = ["Milad-un-Nabi", "Shab-e-Qadr"];
           if (remainingPaymentAmount > 0 &&
               definition.amountType === "FIXED" &&
               (definition.frequency === "ANNUAL" || definition.frequency === "EVENT_BASED") &&
-              definition.purposeCode &&
-              allowedAdditionalCodes.includes(definition.purposeCode)) {
+              definition.name &&
+              allowedAdditionalNames.includes(definition.name)) {
             const lastEventAlloc = [...calculatedAllocations].reverse().find(a => a.collectionEventId);
             if (lastEventAlloc) {
               calculatedAllocations.push({
@@ -653,14 +654,14 @@ export async function createPaymentAction(formData: FormData): Promise<PaymentRe
         }
 
         // Check for excess (Additional Voluntary Contribution) for FIXED amount categories
-        // Only allowed for MILAD_UN_NABI and SHAB_E_QADR
-        const allowedAdditionalCodes = ["MILAD_UN_NABI", "SHAB_E_QADR"];
+        // Only allowed for Milad-un-Nabi and Shab-e-Qadr
+        const allowedAdditionalNames = ["Milad-un-Nabi", "Shab-e-Qadr"];
         const totalAllocated = allocationRows.reduce((sum, a) => sum + a.allocatedAmountPaise, 0);
         if (totalAllocated < input.amountPaise &&
             definition.amountType === "FIXED" &&
             (definition.frequency === "ANNUAL" || definition.frequency === "EVENT_BASED") &&
-            definition.purposeCode &&
-            allowedAdditionalCodes.includes(definition.purposeCode)) {
+            definition.name &&
+            allowedAdditionalNames.includes(definition.name)) {
           const lastAlloc = allocationRows[allocationRows.length - 1];
           if (lastAlloc && lastAlloc.collectionEventId) {
             allocationRows.push({

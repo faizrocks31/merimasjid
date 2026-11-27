@@ -167,7 +167,7 @@ test.describe("Expense Form UI Interaction Verification", () => {
     console.log(`Before submit - Category: ${categoryValue}, Date: ${dateValue}`);
 
     // 5. Submit
-    await page.click('button:has-text("Save")');
+    await page.locator('form:has(input[name="date"]) button[type="submit"]').click();
     await page.waitForTimeout(5000);
 
     // Check for success or error

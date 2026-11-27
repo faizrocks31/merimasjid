@@ -2,15 +2,17 @@
 
 import React, { useActionState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { LogIn, UserRound } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { portalLoginAction, type PortalLoginState } from "@/modules/portal/auth-actions";
 import { getFormFields } from "@/lib/validation";
 import { Button } from "@/components/ui";
 import { Logo } from "@/components/logo";
 import { SimpleForm } from "@/components/forms/auto-form";
+import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import type { Locale } from "@/i18n/config";
+import { LOCALES, LOCALE_LABELS } from "@/i18n/config";
 
-export function PortalLoginForm({ locale, labels }: { locale: Locale; labels: Record<string, string> }) {
+export function PortalLoginForm({ locale: initialLocale, labels }: { locale: Locale; labels: Record<string, string> }) {
   const [state, formAction, pending] = useActionState<PortalLoginState, FormData>(portalLoginAction, undefined);
 
   const fields = useMemo(
@@ -39,6 +41,15 @@ export function PortalLoginForm({ locale, labels }: { locale: Locale; labels: Re
       </div>
 
       <form action={formAction} className="space-y-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-sm">
+        {/* Language Selector - accessible on mobile */}
+        <div className="flex justify-end mb-4">
+          <LocaleSwitcher
+            current={initialLocale}
+            label=""
+            compact={true}
+          />
+        </div>
+
         <SimpleForm fields={fields} values={{}} disabled={pending} fieldsOnly={true} uncontrolled={true} />
 
         {state?.error ? (
@@ -54,7 +65,7 @@ export function PortalLoginForm({ locale, labels }: { locale: Locale; labels: Re
       </form>
 
       <p className="mt-6 text-center text-[11px] text-[var(--ink-muted)]">
-        {labels.noAccount} <br /> {labels.contactAdmin}
+        {initialLocale === "ur" ? "مقامی سسٹم" : initialLocale === "hi" ? "स्थानीय प्रणाली" : "Local system"} · INR · Asia/Kolkata
       </p>
       <p className="mt-2 text-center text-[11px]">
         <Link href="/login" className="text-[var(--brand)] underline-offset-2 hover:underline">

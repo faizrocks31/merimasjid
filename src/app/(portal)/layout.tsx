@@ -25,9 +25,7 @@ export default async function PortalLayout({ children }: { children: React.React
             <span className="truncate text-sm font-semibold">{user.masjid?.name ?? t("appName")}</span>
           </Link>
           <div className="flex items-center gap-2">
-            <div className="hidden sm:block">
-              <LocaleSwitcher current={locale} label={t("language")} compact />
-            </div>
+            <LocaleSwitcher current={locale} label={t("language")} compact />
             <UserMenu name={user.name} role={user.role} signOutLabel={t("signOut")} />
           </div>
         </div>

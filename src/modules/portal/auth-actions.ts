@@ -78,6 +78,17 @@ export async function portalLoginAction(_prev: PortalLoginState, formData: FormD
   // Successful login – clear any throttling state
   portalAttempts.delete(email);
 
+  // Set default locale cookie to Hindi if not already set
+  const cookieStore = await cookies();
+  if (!cookieStore.get(LOCALE_COOKIE)?.value) {
+    cookieStore.set(LOCALE_COOKIE, "hi", {
+      httpOnly: false,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+
   // Only ACTIVE memberships are eligible
   const activeMemberships = user.memberships.filter((m) => m.status === "ACTIVE");
   const membership =

@@ -22,7 +22,7 @@ export default async function ReviewPage() {
     prisma.collectionDefinition.findMany({
       where: { masjidId: user.masjidId!, active: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, purposeCode: true },
+      select: { id: true, name: true },
     }),
     prisma.masjidUser.findFirst({
       where: {

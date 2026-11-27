@@ -183,7 +183,6 @@ export async function createMasjidAction(
       const defaultCollectionDefinitions = [
         {
           name: "Monthly Chanda",
-          purposeCode: "MONTHLY_CHANDA",
           baseCategoryCode: "MONTHLY",
           subcategoryCode: "RECURRING_DONATION",
           description: "Regular monthly contribution from members",
@@ -197,7 +196,6 @@ export async function createMasjidAction(
         },
         {
           name: "Annual Chanda",
-          purposeCode: "ANNUAL_CHANDA",
           baseCategoryCode: "ANNUAL",
           subcategoryCode: "RECURRING_DONATION",
           description: "Annual contribution from members",
@@ -211,7 +209,6 @@ export async function createMasjidAction(
         },
         {
           name: "General Donation",
-          purposeCode: "GENERAL_DONATION",
           baseCategoryCode: "GENERAL",
           subcategoryCode: "GENERAL",
           description: "General purpose donations from members and walk-ins",
@@ -225,7 +222,6 @@ export async function createMasjidAction(
         },
         {
           name: "Zakat",
-          purposeCode: "ZAKAT",
           baseCategoryCode: "ZAKAT",
           subcategoryCode: "RESTRICTED",
           description: "Obligatory Zakat collections (restricted purpose)",
@@ -239,7 +235,6 @@ export async function createMasjidAction(
         },
         {
           name: "Construction Fund",
-          purposeCode: "CONSTRUCTION_FUND",
           baseCategoryCode: "CONSTRUCTION",
           subcategoryCode: "RESTRICTED",
           description: "Building and infrastructure fund (restricted purpose)",
@@ -253,7 +248,6 @@ export async function createMasjidAction(
         },
         {
           name: "Jumma Collection",
-          purposeCode: "JUMMA_COLLECTION",
           baseCategoryCode: "JUMMA",
           subcategoryCode: "RECURRING_DONATION",
           description: "Friday congregation collection",
@@ -267,7 +261,6 @@ export async function createMasjidAction(
         },
         {
           name: "Milad-un-Nabi",
-          purposeCode: "MILAD_UN_NABI",
           baseCategoryCode: "ANNUAL",
           subcategoryCode: "GENERAL",
           description: "Annual Milad-un-Nabi celebration collection",
@@ -281,7 +274,6 @@ export async function createMasjidAction(
         },
         {
           name: "Shab-e-Qadr",
-          purposeCode: "SHAB_E_QADR",
           baseCategoryCode: "ANNUAL",
           subcategoryCode: "GENERAL",
           description: "Shab-e-Qadr night collection",
@@ -295,7 +287,6 @@ export async function createMasjidAction(
         },
         {
           name: "Death Collection",
-          purposeCode: "DEATH_COLLECTION",
           baseCategoryCode: "GENERAL",
           subcategoryCode: "RESTRICTED",
           description: "Death collection for deceased family support",
@@ -322,12 +313,10 @@ export async function createMasjidAction(
           data: {
             masjidId: masjid.id,
             name: def.name,
-            purposeCode: def.purposeCode,
             baseCategoryId,
             subcategoryId,
             description: def.description,
             active: true,
-            showInPaymentReceived: true,
             frequency: def.frequency,
             amountType: def.amountType,
             defaultAmountPaise: def.defaultAmountPaise,
@@ -459,7 +448,6 @@ export async function createMasjidStep1Action(
       const defaultCollectionDefinitions = [
         {
           name: "Monthly Chanda",
-          purposeCode: "MONTHLY_CHANDA",
           baseCategoryCode: "MONTHLY",
           subcategoryCode: "RECURRING_DONATION",
           description: "Regular monthly contribution from members",
@@ -473,7 +461,6 @@ export async function createMasjidStep1Action(
         },
         {
           name: "Annual Chanda",
-          purposeCode: "ANNUAL_CHANDA",
           baseCategoryCode: "ANNUAL",
           subcategoryCode: "RECURRING_DONATION",
           description: "Annual contribution from members",
@@ -487,7 +474,6 @@ export async function createMasjidStep1Action(
         },
         {
           name: "General Donation",
-          purposeCode: "GENERAL_DONATION",
           baseCategoryCode: "GENERAL",
           subcategoryCode: "GENERAL",
           description: "General purpose donations from members and walk-ins",
@@ -501,7 +487,6 @@ export async function createMasjidStep1Action(
         },
         {
           name: "Zakat",
-          purposeCode: "ZAKAT",
           baseCategoryCode: "ZAKAT",
           subcategoryCode: "RESTRICTED",
           description: "Obligatory Zakat collections (restricted purpose)",
@@ -515,7 +500,6 @@ export async function createMasjidStep1Action(
         },
         {
           name: "Construction Fund",
-          purposeCode: "CONSTRUCTION_FUND",
           baseCategoryCode: "CONSTRUCTION",
           subcategoryCode: "RESTRICTED",
           description: "Building and infrastructure fund (restricted purpose)",
@@ -529,7 +513,6 @@ export async function createMasjidStep1Action(
         },
         {
           name: "Jumma Collection",
-          purposeCode: "JUMMA_COLLECTION",
           baseCategoryCode: "JUMMA",
           subcategoryCode: "RECURRING_DONATION",
           description: "Friday congregation collection",
@@ -543,7 +526,6 @@ export async function createMasjidStep1Action(
         },
         {
           name: "Milad-un-Nabi",
-          purposeCode: "MILAD_UN_NABI",
           baseCategoryCode: "ANNUAL",
           subcategoryCode: "GENERAL",
           description: "Annual Milad-un-Nabi celebration collection",
@@ -557,7 +539,6 @@ export async function createMasjidStep1Action(
         },
         {
           name: "Shab-e-Qadr",
-          purposeCode: "SHAB_E_QADR",
           baseCategoryCode: "ANNUAL",
           subcategoryCode: "GENERAL",
           description: "Shab-e-Qadr night collection",
@@ -571,7 +552,6 @@ export async function createMasjidStep1Action(
         },
         {
           name: "Death Collection",
-          purposeCode: "DEATH_COLLECTION",
           baseCategoryCode: "GENERAL",
           subcategoryCode: "RESTRICTED",
           description: "Death collection for deceased family support",

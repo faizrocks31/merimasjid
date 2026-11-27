@@ -29,15 +29,12 @@ export default async function JummaPage({
   });
   if (!masjid) redirect("/dashboard");
 
-  // Fetch Jumma collection definitions (JUMMA subcategory or purposeCode JUMMA_COLLECTION for legacy)
+  // Fetch Jumma collection definitions (JUMMA subcategory)
   const collectionDefinitions = await prisma.collectionDefinition.findMany({
     where: {
       masjidId: user.masjidId!,
       active: true,
-      OR: [
-        { subcategory: { code: "JUMMA" } },
-        { purposeCode: "JUMMA_COLLECTION" },
-      ],
+      subcategory: { code: "JUMMA" },
     },
     select: {
       id: true,

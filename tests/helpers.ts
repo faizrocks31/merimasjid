@@ -15,7 +15,6 @@ export async function createDefaultCollectionDefinitions(masjidId: string) {
   const defaultCollectionDefinitions = [
     {
       name: "Monthly Chanda",
-      purposeCode: "MONTHLY_CHANDA",
       baseCategoryCode: "MONTHLY",
       subcategoryCode: "RECURRING_DONATION",
       description: "Regular monthly contribution from members",
@@ -29,7 +28,6 @@ export async function createDefaultCollectionDefinitions(masjidId: string) {
     },
     {
       name: "Annual Chanda",
-      purposeCode: "ANNUAL_CHANDA",
       baseCategoryCode: "ANNUAL",
       subcategoryCode: "RECURRING_DONATION",
       description: "Annual contribution from members",
@@ -43,7 +41,6 @@ export async function createDefaultCollectionDefinitions(masjidId: string) {
     },
     {
       name: "General Donation",
-      purposeCode: "GENERAL_DONATION",
       baseCategoryCode: "GENERAL",
       subcategoryCode: "GENERAL",
       description: "General purpose donations from members and walk-ins",
@@ -57,7 +54,6 @@ export async function createDefaultCollectionDefinitions(masjidId: string) {
     },
     {
       name: "Zakat",
-      purposeCode: "ZAKAT",
       baseCategoryCode: "ZAKAT",
       subcategoryCode: "RESTRICTED",
       description: "Obligatory Zakat collections (restricted purpose)",
@@ -71,7 +67,6 @@ export async function createDefaultCollectionDefinitions(masjidId: string) {
     },
     {
       name: "Construction Fund",
-      purposeCode: "CONSTRUCTION_FUND",
       baseCategoryCode: "CONSTRUCTION",
       subcategoryCode: "RESTRICTED",
       description: "Building and infrastructure fund (restricted purpose)",
@@ -85,7 +80,6 @@ export async function createDefaultCollectionDefinitions(masjidId: string) {
     },
     {
       name: "Jumma Collection",
-      purposeCode: "JUMMA_COLLECTION",
       baseCategoryCode: "JUMMA",
       subcategoryCode: "RECURRING_DONATION",
       description: "Friday congregation collection",
@@ -99,7 +93,6 @@ export async function createDefaultCollectionDefinitions(masjidId: string) {
     },
     {
       name: "Milad-un-Nabi",
-      purposeCode: "MILAD_UN_NABI",
       baseCategoryCode: "ANNUAL",
       subcategoryCode: "GENERAL",
       description: "Annual Milad-un-Nabi celebration collection",
@@ -113,7 +106,6 @@ export async function createDefaultCollectionDefinitions(masjidId: string) {
     },
     {
       name: "Shab-e-Qadr",
-      purposeCode: "SHAB_E_QADR",
       baseCategoryCode: "ANNUAL",
       subcategoryCode: "GENERAL",
       description: "Shab-e-Qadr night collection",
@@ -146,17 +138,17 @@ export async function createDefaultCollectionDefinitions(masjidId: string) {
         data: {
           masjidId,
           name: def.name,
-          purposeCode: def.purposeCode,
           baseCategoryId,
           subcategoryId,
           description: def.description,
           active: true,
-          showInPaymentReceived: true,
           frequency: def.frequency,
           amountType: def.amountType,
           defaultAmountPaise: def.defaultAmountPaise,
-          defaultDueDay: 10,
-          defaultGraceDays: 0,
+          donorEligibility: def.donorEligibility,
+          memberAssignment: def.memberAssignment,
+          dueGeneration: def.dueGeneration,
+          settlementPolicy: def.settlementPolicy,
           donorEligibility: def.donorEligibility,
           memberAssignment: def.memberAssignment,
           dueGeneration: def.dueGeneration,
@@ -206,11 +198,26 @@ export async function getFirstCollectionDefinition(masjidId: string) {
 }
 
 /**
- * Gets a collection definition by purposeCode for a specific masjid
+ * Gets a collection definition by name for a specific masjid
+ * (replaces getCollectionDefinitionByPurposeCode since purposeCode field was removed)
  */
 export async function getCollectionDefinitionByPurposeCode(masjidId: string, purposeCode: string) {
+  // Map old purposeCode values to new name values
+  const purposeCodeToName: Record<string, string> = {
+    "MONTHLY_CHANDA": "Monthly Chanda",
+    "ANNUAL_CHANDA": "Annual Chanda",
+    "GENERAL_DONATION": "General Donation",
+    "ZAKAT": "Zakat",
+    "CONSTRUCTION_FUND": "Construction Fund",
+    "JUMMA_COLLECTION": "Jumma Collection",
+    "MILAD_UN_NABI": "Milad-un-Nabi",
+    "SHAB_E_QADR": "Shab-e-Qadr",
+    "DEATH_COLLECTION": "Death Collection",
+  };
+
+  const name = purposeCodeToName[purposeCode] || purposeCode;
   return prisma.collectionDefinition.findFirst({
-    where: { masjidId, purposeCode, active: true },
+    where: { masjidId, name, active: true },
   });
 }
 

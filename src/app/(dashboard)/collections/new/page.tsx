@@ -32,7 +32,6 @@ export default async function NewCollectionPage({
       select: {
         id: true,
         name: true,
-        purposeCode: true,
         defaultAmountPaise: true,
         donorEligibility: true,
         settlementPolicy: true,

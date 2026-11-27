@@ -21,7 +21,7 @@ type Allocation = {
 };
 
 type MemberOption = { id: string; memberNo: string; fullName: string; phone: string | null };
-type CategoryOption = { id: string; name: string; code?: string; restrictedPurpose?: boolean; purposeCode?: string | null };
+type CategoryOption = { id: string; name: string; code?: string; restrictedPurpose?: boolean };
 
 interface PaymentReviewPageProps {
   labels: Labels;

@@ -29,7 +29,7 @@ test.describe("Browser Verification - Phase 3", () => {
 
     if (testMonthExists === 0) {
       // Click add category button - it's a toggle button
-      await page.click('button:has-text("Add Collection Definition")');
+      await page.click('button:has-text("Add Collection Definition"), button:has-text("संग्रह परिभाषा जोड़ें")');
       await page.waitForTimeout(500);
 
       await page.fill('input[name="name"]', "TESTMONTH");
@@ -39,7 +39,7 @@ test.describe("Browser Verification - Phase 3", () => {
       const subOptionsCount = await page.locator('select[name="subcategoryId"] option').count();
       console.log('Subcategory options count:', subOptionsCount);
       if (subOptionsCount === 0) throw new Error('Subcategory options empty after base category selection');
-      await page.selectOption('select[name="subcategoryId"]', { index: 1 });
+      await page.selectOption('select[name="subcategoryId"]', { index: 0 });
       await page.selectOption('select[name="frequency"]', "MONTHLY");
       await page.selectOption('select[name="amountType"]', "FIXED");
       await page.fill('input[name="defaultAmountPaise"]', "10000"); // 100 INR
@@ -49,7 +49,7 @@ test.describe("Browser Verification - Phase 3", () => {
       await page.selectOption('select[name="settlementPolicy"]', "OLDEST_FIRST");
       await page.selectOption('select[name="showInPaymentReceived"]', "true");
 
-      await page.click('button:has-text("Save")');
+      await page.click('button:has-text("Save"), button:has-text("सहेजें")');
       await page.waitForTimeout(2000);
 
       await expect(page.locator("text=TESTMONTH")).toBeVisible();
@@ -60,8 +60,8 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.goto(`${BASE_URL}/settings?tab=collections`);
     await page.waitForTimeout(500);
 
-    // Click add collection definition button
-    await page.click('button:has-text("Add Collection Definition")');
+    // Click add collection definition button - use aria-label or more robust selector
+    await page.click('button:has-text("Add Collection Definition"), button:has-text("संग्रह परिभाषा जोड़ें")');
     await page.waitForTimeout(500);
 
     // Fill in name
@@ -75,7 +75,8 @@ test.describe("Browser Verification - Phase 3", () => {
     const subOptionsCount = await page.locator('select[name="subcategoryId"] option').count();
     console.log('Subcategory options count:', subOptionsCount);
     if (subOptionsCount === 0) throw new Error('Subcategory options empty after base category selection');
-    await page.selectOption('select[name="subcategoryId"]', { index: 1 });
+    // Select first available option (index 0) since there might be only one option
+    await page.selectOption('select[name="subcategoryId"]', { index: 0 });
 
     await page.selectOption('select[name="frequency"]', "MONTHLY");
     await page.selectOption('select[name="amountType"]', "FIXED");
@@ -85,7 +86,7 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.selectOption('select[name="dueGeneration"]', "ADMIN");
     await page.selectOption('select[name="settlementPolicy"]', "OLDEST_FIRST");
 
-    await page.click('button:has-text("Save")');
+    await page.click('button:has-text("Save"), button:has-text("सहेजें")');
     await page.waitForTimeout(2000);
 
     await expect(page.locator("text=Test Subcategory Filter")).toBeVisible();
@@ -95,10 +96,10 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.goto(`${BASE_URL}/settings?tab=collections`);
     await page.waitForTimeout(500);
 
-    await page.click('button:has-text("Add Collection Definition")');
+    await page.click('button:has-text("Add Collection Definition"), button:has-text("संग्रह परिभाषा जोड़ें")');
     await page.waitForTimeout(500);
 
-    await page.fill('input[name="name"]', "Test Subcategory Filter 2");
+    await page.fill('input[name="name"]', "Test Subcategory Filter TwoWords");
 
     // Select first base category
     await page.selectOption('select[name="baseCategoryId"]', { index: 1 });
@@ -109,17 +110,25 @@ test.describe("Browser Verification - Phase 3", () => {
     if (subOptions1 === 0) throw new Error('Subcategory options empty after base category 1 selection');
 
     // Select a subcategory
-    await page.selectOption('select[name="subcategoryId"]', { index: 1 });
+    await page.selectOption('select[name="subcategoryId"]', { index: 0 });
 
     // Change base category
     await page.selectOption('select[name="baseCategoryId"]', { index: 2 });
     await page.waitForTimeout(500);
 
+    // Wait for subcategory options to update
+    await page.waitForFunction(() => {
+      const select = document.querySelector('select[name="subcategoryId"]');
+      return select && select.options.length > 0;
+    }, { timeout: 5000 });
+
     const subOptions2 = await page.locator('select[name="subcategoryId"] option').count();
     console.log('Subcategory options count for base 2:', subOptions2);
     // Should have different options now
 
-    await page.selectOption('select[name="subcategoryId"]', { index: 1 });
+    if (subOptions2 > 0) {
+      await page.selectOption('select[name="subcategoryId"]', { index: 0 });
+    }
 
     await page.selectOption('select[name="frequency"]', "MONTHLY");
     await page.selectOption('select[name="amountType"]', "FIXED");
@@ -129,10 +138,10 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.selectOption('select[name="dueGeneration"]', "ADMIN");
     await page.selectOption('select[name="settlementPolicy"]', "OLDEST_FIRST");
 
-    await page.click('button:has-text("Save")');
+    await page.click('button:has-text("Save"), button:has-text("सहेजें")');
     await page.waitForTimeout(2000);
 
-    await expect(page.locator("text=Test Subcategory Filter 2")).toBeVisible();
+    await expect(page.locator("text=Test Subcategory Filter TwoWords")).toBeVisible();
   });
 
   test("6. Collection Definition Edit Form - Subcategory Pre-fills Correctly", async ({ page }) => {
@@ -160,7 +169,7 @@ test.describe("Browser Verification - Phase 3", () => {
     }
 
     // Cancel edit
-    await page.click('button:has-text("Cancel")');
+    await page.click('button:has-text("Cancel"), button:has-text("रद्द करें")');
     await page.waitForTimeout(500);
   });
 
@@ -174,7 +183,7 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.fill('input[name="name"]', "Duplicate Test");
     await page.selectOption('select[name="baseCategoryId"]', { index: 1 });
     await page.waitForTimeout(300);
-    await page.selectOption('select[name="subcategoryId"]', { index: 1 });
+    await page.selectOption('select[name="subcategoryId"]', { index: 0 });
     await page.selectOption('select[name="frequency"]', "MONTHLY");
     await page.selectOption('select[name="amountType"]', "FIXED");
     await page.fill('input[name="defaultAmountPaise"]', "10000");
@@ -183,7 +192,7 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.selectOption('select[name="dueGeneration"]', "ADMIN");
     await page.selectOption('select[name="settlementPolicy"]', "OLDEST_FIRST");
 
-    await page.click('button:has-text("Save")');
+    await page.click('button:has-text("Save"), button:has-text("सहेजें")');
     await page.waitForTimeout(2000);
 
     await expect(page.locator("text=Test Subcategory Filter")).toBeVisible();
@@ -195,7 +204,7 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.fill('input[name="name"]', "Duplicate Test");
     await page.selectOption('select[name="baseCategoryId"]', { index: 1 });
     await page.waitForTimeout(300);
-    await page.selectOption('select[name="subcategoryId"]', { index: 1 });
+    await page.selectOption('select[name="subcategoryId"]', { index: 0 });
     await page.selectOption('select[name="frequency"]', "MONTHLY");
     await page.selectOption('select[name="amountType"]', "FIXED");
     await page.fill('input[name="defaultAmountPaise"]', "10000");
@@ -204,7 +213,7 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.selectOption('select[name="dueGeneration"]', "ADMIN");
     await page.selectOption('select[name="settlementPolicy"]', "OLDEST_FIRST");
 
-    await page.click('button:has-text("Save")');
+    await page.click('button:has-text("Save"), button:has-text("सहेजें")');
     await page.waitForTimeout(2000);
 
     // Should show error about duplicate
@@ -237,7 +246,7 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.fill('input[name="name"]', "Modified Name");
 
     // Click cancel
-    await page.click('button:has-text("Cancel")');
+    await page.click('button:has-text("Cancel"), button:has-text("रद्द करें")');
     await page.waitForTimeout(500);
 
     // Original name should still be there (not modified)
@@ -255,7 +264,7 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.fill('input[name="name"]', "Test Clear Subcategory");
     await page.selectOption('select[name="baseCategoryId"]', { index: 1 });
     await page.waitForTimeout(300);
-    await page.selectOption('select[name="subcategoryId"]', { index: 1 });
+    await page.selectOption('select[name="subcategoryId"]', { index: 0 });
 
     // Change base category
     await page.selectOption('select[name="baseCategoryId"]', { index: 2 });
@@ -269,7 +278,7 @@ test.describe("Browser Verification - Phase 3", () => {
     // Should be empty or different options
 
     // Cancel
-    await page.click('button:has-text("Cancel")');
+    await page.click('button:has-text("Cancel"), button:has-text("रद्द करें")');
     await page.waitForTimeout(500);
   });
 
@@ -291,7 +300,7 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.waitForTimeout(300);
 
     await page.fill('input[name="name"]', "Test Expense");
-    await page.click('button:has-text("Save")');
+    await page.click('button:has-text("Save"), button:has-text("सहेजें")');
     await page.waitForTimeout(500);
 
     await expect(page.locator("text=Test Expense")).toBeVisible();
@@ -319,7 +328,7 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.fill('textarea[name="description"]', "Test expense description");
 
     // Submit the expense
-    await page.click('button:has-text("Save")');
+    await page.click('button:has-text("Save"), button:has-text("सहेजें")');
     await page.waitForTimeout(3000);
 
     // Check for error message - if no error, test passes
@@ -462,7 +471,7 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.fill('textarea[name="address"]', "Test Address");
     await page.fill('input[name="joinDate"]', "2026-01-01");
 
-    await page.click('button:has-text("Save")');
+    await page.click('button:has-text("Save"), button:has-text("सहेजें")');
     await page.waitForTimeout(2000);
 
     // Create a contribution plan for this member
@@ -480,7 +489,7 @@ test.describe("Browser Verification - Phase 3", () => {
     await page.fill('input[name="startDate"]', "2026-01-01");
     await page.fill('input[name="dueDay"]', "5");
 
-    await page.click('button:has-text("Save")');
+    await page.click('button:has-text("Save"), button:has-text("सहेजें")');
     await page.waitForTimeout(2000);
   });
 

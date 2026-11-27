@@ -83,6 +83,17 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   // Successful login – clear any throttling state
   attempts.delete(email);
 
+  // Set default locale cookie to Hindi if not already set
+  const cookieStore = await cookies();
+  if (!cookieStore.get(LOCALE_COOKIE)?.value) {
+    cookieStore.set(LOCALE_COOKIE, "hi", {
+      httpOnly: false,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+
   // Only ACTIVE memberships are eligible — deactivated memberships are never
   // used for role/masjid resolution, so removing staff access takes effect on
   // the very next request.

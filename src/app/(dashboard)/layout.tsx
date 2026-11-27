@@ -6,6 +6,7 @@ import { SidebarNav, MobileNav } from "@/components/layout/nav";
 import { UserMenu } from "@/components/layout/user-menu";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { Logo } from "@/components/logo";
+import Link from "next/link";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -30,10 +31,30 @@ export default async function DashboardLayout({ children }: { children: React.Re
     signOut: t("signOut"),
   };
 
+  // Prefetch key navigation routes
+  const prefetchRoutes = [
+    "/dashboard",
+    "/members",
+    "/plans",
+    "/collections/new",
+    "/collections/due-status",
+    "/transactions",
+    "/expenses",
+    "/reports",
+    "/settings",
+    "/staff",
+    "/audit",
+  ];
+
   return (
     <div className="flex min-h-screen">
+      {/* Prefetch key routes for faster navigation */}
+      {prefetchRoutes.map((href) => (
+        <link key={href} rel="prefetch" href={href} />
+      ))}
+
       {/* Slim 112px icon rail sidebar on desktop - only nav icons */}
-      <aside className="no-print sticky top-0 hidden h-screen w-28 shrink-0 flex-col border-e border-[var(--border-tile)] bg-[var(--brand-hero)] lg:flex flex-col justify-center">
+      <aside className="no-print sticky top-0 hidden h-screen w-28 shrink-0 flex-col border-e border-[var(--border-tile)] bg-[var(--brand-hero)] lg:flex flex-col justify-center overflow-y-auto">
         <SidebarNav role={user.role} labels={navLabels} />
       </aside>
 
