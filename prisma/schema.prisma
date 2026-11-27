@@ -185,6 +185,7 @@ model CollectionDefinition {
   subcategoryId      String
   description        String?
   active             Boolean             @default(true)
+  showInPaymentReceived Boolean             @default(true)
   frequency          CollectionFrequency
   amountType         AmountType
   defaultAmountPaise Int?

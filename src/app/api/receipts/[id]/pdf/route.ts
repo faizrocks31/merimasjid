@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDictionary } from "@/i18n";
 import { loadReceipt } from "@/modules/receipts/load";
 import { buildReceiptView } from "@/modules/receipts/view";
-import { renderReceiptPdfChromium } from "@/modules/receipts/pdf-chromium";
+import { renderReceiptPdfLib } from "@/modules/receipts/pdf-lib";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +32,7 @@ export async function GET(
     taxNote: t("taxNote"),
   });
 
-  const pdf = await renderReceiptPdfChromium(view, t("taxNote"));
+  const pdf = await renderReceiptPdfLib(view, t("taxNote"));
   const filename = `receipt-${payment.receiptNo}${duplicate ? "-duplicate" : ""}.pdf`;
 
   return new NextResponse(new Uint8Array(pdf), {

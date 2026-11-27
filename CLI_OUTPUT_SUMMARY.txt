@@ -1,0 +1,46 @@
+VERIFICATION SUMMARY - Vercel Deployment Issues Fixed
+
+=== Issue 1: Collection New Page ===
+Status: FIXED
+Root Cause: showInPaymentReceived field removed from Prisma schema but still referenced in code
+Fix: Added field back to CollectionDefinition model in prisma/schema.prisma
+- Added: showInPaymentReceived Boolean @default(true)
+- Fixed: Removed field from query filter in src/app/(dashboard)/collections/new/page.tsx
+- Result: Build passes, all 233 tests pass
+
+=== Issue 2: Receipt PDF Download ===
+Status: FIXED
+Root Cause: Playwright/Chromium-based PDF generation (pdf-chromium.ts) requires browser binary not available on Vercel
+Fix: Replaced with pure Node.js pdf-lib implementation
+- Created: src/modules/receipts/pdf-lib.ts - PDF generation using pdf-lib library
+- Updated: src/app/api/receipts/[id]/pdf/route.ts - Use new PDF generator
+- Result: Build passes, all 233 tests pass
+
+=== Production DB Setup ===
+Status: COMPLETED (already on main branch)
+- Feature/production-db-setup merged to main
+- Vercel DATABASE_URL configuration required (enable for Build, Production, Preview, Development)
+- Neon PostgreSQL connection configured
+
+=== Build & Test Results ===
+- npm run build: SUCCESS
+- npm run test: 233/233 tests pass
+- Prisma client: Regenerated successfully
+
+=== Files Modified ===
+- prisma/schema.prisma: Added showInPaymentReceived field
+- src/modules/receipts/pdf-lib.ts: New PDF generation with pdf-lib
+- src/app/api/receipts/[id]/pdf/route.ts: Updated to use new PDF generator
+- src/app/(dashboard)/collections/new/page.tsx: Fixed showInPaymentReceived query
+- src/modules/payments/actions.ts: Fixed purposeCode references
+- src/modules/platform/actions.ts: Fixed purposeCode references
+- tests/helpers.ts: Updated to use name field instead of purposeCode
+- tests/tenant-isolation.test.ts: Updated to use name field instead of purposeCode
+- tests/phase2c.test.ts: Updated to use name field instead of purposeCode
+
+=== Vercel Deployment Notes ===
+1. Configure DATABASE_URL in Vercel Dashboard → Project Settings → Environment Variables
+2. Enable DATABASE_URL for: Production, Preview, Development, AND Build environments
+3. Generate AUTH_SECRET: openssl rand -base64 32
+4. Set NEXT_PUBLIC_APP_URL=https://masjidcollection.vercel.app
+5. Run migration on Neon: DATABASE_URL="neon_url" npx prisma migrate deploy
