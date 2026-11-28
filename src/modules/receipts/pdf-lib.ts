@@ -2,19 +2,22 @@ import { PDFDocument, rgb, StandardFonts, PageSizes, type PDFPage, type PDFFont 
 import type { ReceiptView } from "@/modules/receipts/view";
 import { NOTO_SANS_DEVANAGARI_REGULAR_BASE64, NOTO_SANS_DEVANAGARI_BOLD_BASE64 } from "@/lib/font-data";
 
-// Register fontkit for custom font embedding - use lazy registration to avoid build-time issues
+// Register fontkit for custom font embedding - register at module load time
+// Use dynamic import to avoid build-time issues with Turbopack
 let fontkitRegistered = false;
-async function ensureFontkitRegistered(): Promise<void> {
+
+function ensureFontkitRegistered(): void {
   if (!fontkitRegistered) {
     try {
+      // Use require() for reliable module loading in Vercel/Turbopack environment
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fontkitModule = await import("@pdf-lib/fontkit");
-      // @pdf-lib/fontkit exports the fontkit module as default export
-      const fontkit = fontkitModule.default || fontkitModule;
+      const fontkit = require("@pdf-lib/fontkit");
       PDFDocument.registerFontkit(fontkit);
       fontkitRegistered = true;
+      console.log("[PDF] Fontkit registered successfully");
     } catch (e) {
-      console.warn("Fontkit registration failed:", e);
+      console.error("Fontkit registration failed:", e);
+      throw e;
     }
   }
 }
