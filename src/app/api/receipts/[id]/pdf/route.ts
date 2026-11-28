@@ -27,13 +27,21 @@ export async function GET(
     const url = new URL(request.url);
     const duplicate = url.searchParams.get("duplicate") === "1";
 
+    console.log("[PDF] Starting PDF generation for payment:", payment.receiptNo);
     const view = buildReceiptView(payment, {
       duplicate,
       footerText: t("thankYou"),
       taxNote: t("taxNote"),
     });
 
+    console.log("[PDF] View built, generating PDF...");
     const pdf = await renderReceiptPdfLib(view, t("taxNote"));
+    console.log("[PDF] PDF generated, size:", pdf.length, "bytes");
+
+    if (!pdf || pdf.length === 0) {
+      throw new Error("Generated PDF is empty");
+    }
+
     const filename = `receipt-${payment.receiptNo}${duplicate ? "-duplicate" : ""}.pdf`;
 
     return new NextResponse(new Uint8Array(pdf), {
@@ -45,6 +53,8 @@ export async function GET(
     });
   } catch (error) {
     console.error("PDF generation failed:", error);
-    return new NextResponse("PDF generation failed", { status: 500 });
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("PDF generation failed details:", message, error instanceof Error ? error.stack : "");
+    return new NextResponse(`PDF generation failed: ${message}`, { status: 500 });
   }
 }

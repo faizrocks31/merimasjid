@@ -155,23 +155,27 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): 
 }
 
 export async function renderReceiptPdfLib(view: ReceiptView, taxNote: string): Promise<Uint8Array> {
+  console.log("[PDF] Creating PDF document...");
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([A5_WIDTH, A5_HEIGHT]);
 
   // Register fontkit before embedding custom fonts
   await ensureFontkitRegistered();
+  console.log("[PDF] Fontkit registered");
 
   // Load and embed Noto Sans Devanagari fonts for Hindi/Devanagari support
-  // Using base64-encoded font data for Vercel compatibility
   const notoRegularBytes = Uint8Array.from(atob(NOTO_SANS_DEVANAGARI_REGULAR_BASE64), c => c.charCodeAt(0));
   const notoBoldBytes = Uint8Array.from(atob(NOTO_SANS_DEVANAGARI_BOLD_BASE64), c => c.charCodeAt(0));
 
   const notoRegular = await pdfDoc.embedFont(notoRegularBytes);
+  console.log("[PDF] Noto Regular embedded");
   const notoBold = await pdfDoc.embedFont(notoBoldBytes);
+  console.log("[PDF] Noto Bold embedded");
 
   // Also keep Helvetica for English text
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  console.log("[PDF] Helvetica fonts embedded");
 
   // Background
   page.drawRectangle({
@@ -184,34 +188,43 @@ export async function renderReceiptPdfLib(view: ReceiptView, taxNote: string): P
 
   // Watermark (mosque icon) - draw a simple geometric pattern
   drawWatermark(page);
+  console.log("[PDF] Watermark drawn");
 
   // Status watermark (cancelled/duplicate)
   if (view.isDuplicate || view.status === "REVERSED") {
     drawStatusWatermark(page, view.status === "REVERSED" ? "रद्द" : "नकल", notoBold);
+    console.log("[PDF] Status watermark drawn");
   }
 
   // Double border
   drawDoubleBorder(page);
+  console.log("[PDF] Double border drawn");
 
   // Header band
   const headerBandHeight = 140;
   drawHeaderBand(page, view, headerBandHeight, notoBold, notoRegular);
+  console.log("[PDF] Header band drawn");
 
   // Ribbon
   const ribbonY = A5_HEIGHT - MARGIN - headerBandHeight - 30;
   drawRibbon(page, ribbonY, notoBold);
+  console.log("[PDF] Ribbon drawn");
 
   // Fields section
   let currentY = ribbonY - 40;
   currentY = drawFields(page, view, currentY, notoRegular, notoBold);
+  console.log("[PDF] Fields drawn");
 
   // Amount and receiver section
   currentY = drawAmountReceiver(page, view, currentY, notoRegular, notoBold);
+  console.log("[PDF] Amount/Receiver drawn");
 
   // Footer band
   drawFooterBand(page, view, notoRegular);
+  console.log("[PDF] Footer band drawn");
 
   const pdfBytes = await pdfDoc.save();
+  console.log("[PDF] PDF saved, size:", pdfBytes.length, "bytes");
   return new Uint8Array(pdfBytes);
 }
 
