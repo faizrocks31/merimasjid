@@ -146,7 +146,6 @@ function drawWatermark(page: PDFPage) {
   const centerY = A5_HEIGHT / 2;
   const size = 120;
 
-  page.save();
   page.setFillColor(COLORS.watermark);
 
   // Draw a star-like pattern (simplified mosque silhouette)
@@ -164,11 +163,9 @@ function drawWatermark(page: PDFPage) {
       color: COLORS.watermark,
     });
   }
-  page.restore();
 }
 
 function drawStatusWatermark(page: PDFPage, text: string, helveticaBold: PDFFont) {
-  page.save();
   page.translate(A5_WIDTH / 2, A5_HEIGHT / 2);
   page.rotate(-18 * Math.PI / 180);
   page.drawText(text, {
@@ -178,7 +175,6 @@ function drawStatusWatermark(page: PDFPage, text: string, helveticaBold: PDFFont
     font: helveticaBold,
     color: COLORS.statusWatermark,
   });
-  page.restore();
 }
 
 function drawDoubleBorder(page: PDFPage) {
