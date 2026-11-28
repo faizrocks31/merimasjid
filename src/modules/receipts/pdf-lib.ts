@@ -146,7 +146,20 @@ function drawWatermark(page: PDFPage) {
   const centerY = A5_HEIGHT / 2;
   const size = 120;
 
-  // Draw a star-like pattern (simplified mosque silhouette)
+  // Draw a star-like pattern using SVG path (simplified mosque silhouette)
+  // Using drawSvgPath which is supported by pdf-lib PDFPage
+  const watermarkPath = buildWatermarkPath(centerX, centerY, size);
+
+  page.drawSvgPath(watermarkPath, {
+    color: COLORS.watermark,
+    opacity: 0.08,
+  });
+}
+
+function buildWatermarkPath(centerX: number, centerY: number, size: number): string {
+  // Build a star-like pattern (8-pointed star / mosque silhouette) as SVG path
+  let path = '';
+
   for (let i = 0; i < 8; i++) {
     const angle = (i * Math.PI / 4) - Math.PI / 2;
     const x = centerX + Math.cos(angle) * size;
@@ -154,13 +167,14 @@ function drawWatermark(page: PDFPage) {
     const x2 = centerX + Math.cos(angle + Math.PI / 8) * (size * 0.5);
     const y2 = centerY + Math.sin(angle + Math.PI / 8) * (size * 0.5);
 
-    page.drawTriangle({
-      x1: centerX, y1: centerY,
-      x2, y2,
-      x3: x, y3: y,
-      color: COLORS.watermark,
-    });
+    if (i === 0) {
+      path += `M ${centerX} ${centerY} L ${x} ${y} L ${x2} ${y2} L ${centerX} ${centerY} Z`;
+    } else {
+      path += ` M ${centerX} ${centerY} L ${x} ${y} L ${x2} ${y2} L ${centerX} ${centerY} Z`;
+    }
   }
+
+  return path;
 }
 
 function drawStatusWatermark(page: PDFPage, text: string, helveticaBold: PDFFont) {
