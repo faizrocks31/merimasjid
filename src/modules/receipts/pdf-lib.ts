@@ -146,8 +146,6 @@ function drawWatermark(page: PDFPage) {
   const centerY = A5_HEIGHT / 2;
   const size = 120;
 
-  page.setFillColor(COLORS.watermark);
-
   // Draw a star-like pattern (simplified mosque silhouette)
   for (let i = 0; i < 8; i++) {
     const angle = (i * Math.PI / 4) - Math.PI / 2;
