@@ -32,7 +32,32 @@ let fontCache: { regular: Uint8Array; medium: Uint8Array; semiBold: Uint8Array; 
 async function loadFonts(): Promise<{ regular: Uint8Array; medium: Uint8Array; semiBold: Uint8Array; bold: Uint8Array }> {
   if (fontCache) return fontCache;
 
-  const fontDir = join(process.cwd(), "public", "fonts");
+  // Try multiple possible font directories for Vercel compatibility
+  const possibleFontDirs = [
+    join(process.cwd(), "public", "fonts"),
+    join(process.cwd(), ".next", "static", "fonts"),
+    join(process.cwd(), ".vercel", "output", "static", "fonts"),
+    join(__dirname, "..", "..", "..", "public", "fonts"),
+  ];
+
+  let fontDir = "";
+  for (const dir of possibleFontDirs) {
+    try {
+      const stats = readFileSync(join(dir, "Poppins-Regular.woff2"));
+      if (stats) {
+        fontDir = dir;
+        break;
+      }
+    } catch {
+      // Try next directory
+    }
+  }
+
+  if (!fontDir) {
+    console.warn("Font directory not found, using fallback fonts");
+    fontDir = possibleFontDirs[0];
+  }
+
   const fonts = [
     { file: "Poppins-Regular.woff2", weight: 400 },
     { file: "Poppins-Medium.woff2", weight: 500 },
@@ -46,7 +71,7 @@ async function loadFonts(): Promise<{ regular: Uint8Array; medium: Uint8Array; s
       const buffer = readFileSync(join(fontDir, font.file));
       loaded[font.file] = buffer;
     } catch (e) {
-      console.warn(`Font file not found: ${font.file}, using fallback`);
+      console.warn(`Font file not found: ${font.file} in ${fontDir}, using fallback`);
     }
   }
 
