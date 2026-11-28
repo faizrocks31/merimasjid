@@ -1,23 +1,8 @@
 import { PDFDocument, rgb, StandardFonts, PageSizes, type PDFPage, type PDFFont } from "pdf-lib";
-import { readFileSync } from "fs";
-import { join } from "path";
 import type { ReceiptView } from "@/modules/receipts/view";
 
-// Register fontkit for custom font embedding - use dynamic import to avoid Turbopack issues
-// This function is called before embedding any custom fonts
-let fontkitRegistered = false;
-async function ensureFontkitRegistered(): Promise<void> {
-  if (!fontkitRegistered) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fontkit = await import("@pdf-lib/fontkit").then(m => m.default || m);
-      PDFDocument.registerFontkit(fontkit);
-      fontkitRegistered = true;
-    } catch (e) {
-      console.warn("Fontkit registration failed:", e);
-    }
-  }
-}
+// Use standard fonts only (Helvetica) - no custom fonts, no fontkit needed
+// This eliminates fontkit dependency and ensures reliable PDF generation on Vercel
 
 const A5_WIDTH = PageSizes.A5[0]; // 419.528 pt (148mm)
 const A5_HEIGHT = PageSizes.A5[1]; // 595.276 pt (210mm)
@@ -42,43 +27,6 @@ const COLORS = {
   watermark: rgb(0.89, 0.953, 0.918, 0.08), // watermark opacity
   statusWatermark: rgb(0, 0, 0, 0.045),     // status watermark opacity
 };
-
-let fontCache: { regular: Uint8Array; medium: Uint8Array; semiBold: Uint8Array; bold: Uint8Array } | null = null;
-
-async function loadFonts(): Promise<{ regular: Uint8Array; medium: Uint8Array; semiBold: Uint8Array; bold: Uint8Array }> {
-  if (fontCache) return fontCache;
-
-  // Use bundled font data for Vercel compatibility
-  // Font files are loaded at build time and embedded as base64
-  const fonts = [
-    { file: "Poppins-Regular.woff2", weight: 400 },
-    { file: "Poppins-Medium.woff2", weight: 500 },
-    { file: "Poppins-SemiBold.woff2", weight: 600 },
-    { file: "Poppins-Bold.woff2", weight: 700 },
-  ];
-
-  const loaded: Record<string, Uint8Array> = {};
-
-  // Try to load from public/fonts first, then fallback to empty
-  for (const font of fonts) {
-    try {
-      // Use process.cwd() with turbopackIgnore for Vercel compatibility
-      const fontPath = join(process.cwd() /* turbopackIgnore: true */, "public", "fonts", font.file);
-      const buffer = readFileSync(fontPath);
-      loaded[font.file] = buffer;
-    } catch (e) {
-      console.warn(`Font file not found: ${font.file}, using fallback`);
-    }
-  }
-
-  fontCache = {
-    regular: loaded["Poppins-Regular.woff2"] || new Uint8Array(),
-    medium: loaded["Poppins-Medium.woff2"] || new Uint8Array(),
-    semiBold: loaded["Poppins-SemiBold.woff2"] || new Uint8Array(),
-    bold: loaded["Poppins-Bold.woff2"] || new Uint8Array(),
-  };
-  return fontCache;
-}
 
 function escapeHtml(str: string): string {
   const QUOTE_ENTITY = "&#34;";
@@ -144,35 +92,11 @@ export async function renderReceiptPdfLib(view: ReceiptView, taxNote: string): P
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([A5_WIDTH, A5_HEIGHT]);
 
-  // Load fonts
-  const fonts = await loadFonts();
-  let poppinsRegular: PDFFont, poppinsMedium: PDFFont, poppinsSemiBold: PDFFont, poppinsBold: PDFFont;
-
-  try {
-    // Ensure fontkit is registered before embedding custom fonts
-    await ensureFontkitRegistered();
-
-    if (fonts.regular.length > 0) poppinsRegular = await pdfDoc.embedFont(fonts.regular);
-    else poppinsRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
-    if (fonts.medium.length > 0) poppinsMedium = await pdfDoc.embedFont(fonts.medium);
-    else poppinsMedium = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-    if (fonts.semiBold.length > 0) poppinsSemiBold = await pdfDoc.embedFont(fonts.semiBold);
-    else poppinsSemiBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-    if (fonts.bold.length > 0) poppinsBold = await pdfDoc.embedFont(fonts.bold);
-    else poppinsBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  } catch (e) {
-    console.warn('Font embedding failed, using standard fonts:', e);
-    poppinsRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    poppinsMedium = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    poppinsSemiBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    poppinsBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  }
-
-  // Embed standard Helvetica Bold for status watermark
+  // Use standard Helvetica fonts only - no custom fonts, no fontkit needed
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const helveticaOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
+  const helveticaBoldOblique = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
 
   // Background
   page.drawRectangle({
@@ -196,21 +120,21 @@ export async function renderReceiptPdfLib(view: ReceiptView, taxNote: string): P
 
   // Header band
   const headerBandHeight = 140;
-  drawHeaderBand(page, view, headerBandHeight, poppinsBold, poppinsMedium, poppinsSemiBold);
+  drawHeaderBand(page, view, headerBandHeight, helveticaBold, helvetica);
 
   // Ribbon
   const ribbonY = A5_HEIGHT - MARGIN - headerBandHeight - 30;
-  drawRibbon(page, ribbonY, poppinsBold);
+  drawRibbon(page, ribbonY, helveticaBold);
 
   // Fields section
   let currentY = ribbonY - 40;
-  currentY = drawFields(page, view, currentY, poppinsRegular, poppinsMedium, poppinsSemiBold, poppinsBold);
+  currentY = drawFields(page, view, currentY, helvetica, helveticaBold);
 
   // Amount and receiver section
-  currentY = drawAmountReceiver(page, view, currentY, poppinsRegular, poppinsMedium, poppinsSemiBold, poppinsBold);
+  currentY = drawAmountReceiver(page, view, currentY, helvetica, helveticaBold);
 
   // Footer band
-  drawFooterBand(page, view, poppinsRegular);
+  drawFooterBand(page, view, helvetica);
 
   const pdfBytes = await pdfDoc.save();
   return new Uint8Array(pdfBytes);
@@ -264,7 +188,7 @@ function drawDoubleBorder(page: PDFPage) {
   drawRoundedRect(page, MARGIN + 3, MARGIN + 3, A5_WIDTH - 2 * MARGIN - 6, A5_HEIGHT - 2 * MARGIN - 6, 22, COLORS.goldAccent, 1);
 }
 
-function drawHeaderBand(page: PDFPage, view: ReceiptView, height: number, boldFont: PDFFont, mediumFont: PDFFont, semiBoldFont: PDFFont) {
+function drawHeaderBand(page: PDFPage, view: ReceiptView, height: number, boldFont: PDFFont, regularFont: PDFFont) {
   const bandY = A5_HEIGHT - MARGIN - height;
   const bandWidth = A5_WIDTH - 2 * MARGIN;
 
@@ -299,10 +223,10 @@ function drawHeaderBand(page: PDFPage, view: ReceiptView, height: number, boldFo
   if (view.masjid.address || view.masjid.phone) {
     const meta = `${view.masjid.address || ""}${view.masjid.address && view.masjid.phone ? "  |  " : ""}${view.masjid.phone || ""}`;
     page.drawText(meta, {
-      x: MARGIN + bandWidth / 2 - mediumFont.widthOfTextAtSize(meta, 12) / 2,
+      x: MARGIN + bandWidth / 2 - regularFont.widthOfTextAtSize(meta, 12) / 2,
       y: bandY + height - 75,
       size: 12,
-      font: mediumFont,
+      font: regularFont,
       color: COLORS.goldAccent,
     });
   }
@@ -317,34 +241,34 @@ function drawHeaderBand(page: PDFPage, view: ReceiptView, height: number, boldFo
     x: leftX,
     y: receiptInfoY,
     size: 12,
-    font: semiBoldFont,
+    font: helveticaBold,
     color: COLORS.goldAccent,
   });
   page.drawText(view.receiptNo, {
     x: leftX,
     y: receiptInfoY - 20,
     size: 16,
-    font: mediumFont,
+    font: helvetica,
     color: COLORS.white,
   });
 
   // Date
   const dateLabel = "दिनांक";
-  const dateWidth = mediumFont.widthOfTextAtSize(dateLabel, 12);
+  const dateWidth = helvetica.widthOfTextAtSize(dateLabel, 12);
   page.drawText(dateLabel, {
     x: rightX - dateWidth,
     y: receiptInfoY,
     size: 12,
-    font: semiBoldFont,
+    font: helveticaBold,
     color: COLORS.goldAccent,
   });
   const dateValue = view.paymentDate;
-  const dateValueWidth = mediumFont.widthOfTextAtSize(dateValue, 16);
+  const dateValueWidth = helvetica.widthOfTextAtSize(dateValue, 16);
   page.drawText(dateValue, {
     x: rightX - dateValueWidth,
     y: receiptInfoY - 20,
     size: 16,
-    font: mediumFont,
+    font: helvetica,
     color: COLORS.white,
   });
 }
@@ -376,26 +300,26 @@ function drawRibbon(page: PDFPage, y: number, boldFont: PDFFont) {
   });
 }
 
-function drawFields(page: PDFPage, view: ReceiptView, startY: number, regularFont: PDFFont, mediumFont: PDFFont, semiBoldFont: PDFFont, boldFont: PDFFont): number {
+function drawFields(page: PDFPage, view: ReceiptView, startY: number, regularFont: PDFFont, boldFont: PDFFont): number {
   let y = startY;
   const leftX = MARGIN + 24;
   const rightX = A5_WIDTH - MARGIN - 24;
   const fieldWidth = rightX - leftX;
 
   // Donor name
-  y = drawFieldRow(page, "मोहतरम जनाब", view.donorName || "—", leftX, y, fieldWidth, regularFont, mediumFont, boldFont);
+  y = drawFieldRow(page, "मोहतरम जनाब", view.donorName || "—", leftX, y, fieldWidth, regularFont, boldFont);
   y -= 16;
 
   // Amount in words
-  y = drawFieldRow(page, "रुपये शब्दों में", view.amountWords || "—", leftX, y, fieldWidth, regularFont, mediumFont, regularFont);
+  y = drawFieldRow(page, "रुपये शब्दों में", view.amountWords || "—", leftX, y, fieldWidth, regularFont, regularFont);
   y -= 16;
 
   // Category and Payment mode row
   const categoryLabel = "आवंटन श्रेणी";
   const modeLabel = "भुगतान का तरीका";
   const labelWidth = Math.max(
-    semiBoldFont.widthOfTextAtSize(categoryLabel, 15),
-    semiBoldFont.widthOfTextAtSize(modeLabel, 15)
+    boldFont.widthOfTextAtSize(categoryLabel, 15),
+    boldFont.widthOfTextAtSize(modeLabel, 15)
   ) + 12;
 
   const categoryValue = view.purposes.map(p => p.name).join(", ") || "—";
@@ -408,16 +332,16 @@ function drawFields(page: PDFPage, view: ReceiptView, startY: number, regularFon
   const modeValue = modeMap[view.mode] || view.mode;
 
   // Category
-  page.drawText(categoryLabel, { x: leftX, y, size: 15, font: semiBoldFont, color: COLORS.brandPrimary });
+  page.drawText(categoryLabel, { x: leftX, y, size: 15, font: boldFont, color: COLORS.brandPrimary });
   page.drawText(categoryValue, { x: leftX + labelWidth, y, size: 14, font: boldFont, color: COLORS.inkPrimary });
 
   // Mode (right side)
   const modeX = leftX + fieldWidth / 2 + 24;
-  page.drawText(modeLabel, { x: modeX, y, size: 15, font: semiBoldFont, color: COLORS.brandPrimary });
+  page.drawText(modeLabel, { x: modeX, y, size: 15, font: boldFont, color: COLORS.brandPrimary });
 
   // Payment mode checkboxes
   const modes = ["कैश", "यूपीआई", "बैंक ट्रांसफर", "अन्य"];
-  let modeItemX = modeX + semiBoldFont.widthOfTextAtSize(modeLabel + "  ", 15);
+  let modeItemX = modeX + boldFont.widthOfTextAtSize(modeLabel + "  ", 15);
   modes.forEach(m => {
     const isSelected = m === modeValue;
     // Checkbox
@@ -451,8 +375,8 @@ function drawFields(page: PDFPage, view: ReceiptView, startY: number, regularFon
   return y - 40;
 }
 
-function drawFieldRow(page: PDFPage, label: string, value: string, x: number, y: number, width: number, labelFont: PDFFont, valueFont: PDFFont, labelFontBold?: PDFFont): number {
-  const font = labelFontBold || labelFont;
+function drawFieldRow(page: PDFPage, label: string, value: string, x: number, y: number, width: number, labelFont: PDFFont, valueFont: PDFFont): number {
+  const font = labelFont;
   page.drawText(label, { x, y, size: 15, font, color: COLORS.brandPrimary });
 
   // Value line
@@ -469,7 +393,7 @@ function drawFieldRow(page: PDFPage, label: string, value: string, x: number, y:
   return y - 28;
 }
 
-function drawAmountReceiver(page: PDFPage, view: ReceiptView, startY: number, regularFont: PDFFont, mediumFont: PDFFont, semiBoldFont: PDFFont, boldFont: PDFFont): number {
+function drawAmountReceiver(page: PDFPage, view: ReceiptView, startY: number, regularFont: PDFFont, boldFont: PDFFont): number {
   let y = startY;
   const leftX = MARGIN + 24;
   const rightX = A5_WIDTH - MARGIN - 24;
@@ -487,10 +411,10 @@ function drawAmountReceiver(page: PDFPage, view: ReceiptView, startY: number, re
 
   // Amount label
   page.drawText("प्राप्त राशि", {
-    x: amountBoxX + boxWidth / 2 - semiBoldFont.widthOfTextAtSize("प्राप्त राशि", 12) / 2,
+    x: amountBoxX + boxWidth / 2 - boldFont.widthOfTextAtSize("प्राप्त राशि", 12) / 2,
     y: amountBoxY + amountBoxHeight - 24,
     size: 12,
-    font: semiBoldFont,
+    font: boldFont,
     color: COLORS.inkMuted,
   });
 
@@ -524,10 +448,10 @@ function drawAmountReceiver(page: PDFPage, view: ReceiptView, startY: number, re
 
   // Receiver name
   page.drawText("प्राप्तकर्ता:", {
-    x: receiverBoxX + boxWidth - mediumFont.widthOfTextAtSize(`प्राप्तकर्ता: ${view.collector || "—"}`, 12),
+    x: receiverBoxX + boxWidth - regularFont.widthOfTextAtSize(`प्राप्तकर्ता: ${view.collector || "—"}`, 12),
     y: receiverBoxY + amountBoxHeight - 30,
     size: 12,
-    font: mediumFont,
+    font: regularFont,
     color: COLORS.inkPrimary,
   });
 
@@ -540,10 +464,10 @@ function drawAmountReceiver(page: PDFPage, view: ReceiptView, startY: number, re
   });
 
   page.drawText("अधिकृत हस्ताक्षर", {
-    x: receiverBoxX + boxWidth / 2 - mediumFont.widthOfTextAtSize("अधिकृत हस्ताक्षर", 12) / 2,
+    x: receiverBoxX + boxWidth / 2 - regularFont.widthOfTextAtSize("अधिकृत हस्ताक्षर", 12) / 2,
     y: receiverBoxY + 10,
     size: 12,
-    font: mediumFont,
+    font: regularFont,
     color: COLORS.inkMuted,
   });
 
@@ -579,3 +503,6 @@ function drawFooterBand(page: PDFPage, view: ReceiptView, regularFont: PDFFont) 
     color: COLORS.white,
   });
 }
+
+
+
