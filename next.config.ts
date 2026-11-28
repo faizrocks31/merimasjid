@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
     "pg",
     "@prisma/adapter-pg",
     "regenerator-runtime",
+    "@pdf-lib/fontkit",
   ],
   turbopack: {
     rules: {
