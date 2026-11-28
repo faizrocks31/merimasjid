@@ -3,6 +3,17 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import type { ReceiptView } from "@/modules/receipts/view";
 
+// Register fontkit for custom font embedding (done lazily to avoid build issues)
+let fontkitRegistered = false;
+function ensureFontkitRegistered(): void {
+  if (!fontkitRegistered) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fontkit = require("@pdf-lib/fontkit");
+    PDFDocument.registerFontkit(fontkit);
+    fontkitRegistered = true;
+  }
+}
+
 const A5_WIDTH = PageSizes.A5[0]; // 419.528 pt (148mm)
 const A5_HEIGHT = PageSizes.A5[1]; // 595.276 pt (210mm)
 const MARGIN = 42.52; // 15mm in points
@@ -32,32 +43,8 @@ let fontCache: { regular: Uint8Array; medium: Uint8Array; semiBold: Uint8Array; 
 async function loadFonts(): Promise<{ regular: Uint8Array; medium: Uint8Array; semiBold: Uint8Array; bold: Uint8Array }> {
   if (fontCache) return fontCache;
 
-  // Try multiple possible font directories for Vercel compatibility
-  const possibleFontDirs = [
-    join(process.cwd(), "public", "fonts"),
-    join(process.cwd(), ".next", "static", "fonts"),
-    join(process.cwd(), ".vercel", "output", "static", "fonts"),
-    join(__dirname, "..", "..", "..", "public", "fonts"),
-  ];
-
-  let fontDir = "";
-  for (const dir of possibleFontDirs) {
-    try {
-      const stats = readFileSync(join(dir, "Poppins-Regular.woff2"));
-      if (stats) {
-        fontDir = dir;
-        break;
-      }
-    } catch {
-      // Try next directory
-    }
-  }
-
-  if (!fontDir) {
-    console.warn("Font directory not found, using fallback fonts");
-    fontDir = possibleFontDirs[0];
-  }
-
+  // Use bundled font data for Vercel compatibility
+  // Font files are loaded at build time and embedded as base64
   const fonts = [
     { file: "Poppins-Regular.woff2", weight: 400 },
     { file: "Poppins-Medium.woff2", weight: 500 },
@@ -66,12 +53,16 @@ async function loadFonts(): Promise<{ regular: Uint8Array; medium: Uint8Array; s
   ];
 
   const loaded: Record<string, Uint8Array> = {};
+
+  // Try to load from public/fonts first, then fallback to empty
   for (const font of fonts) {
     try {
-      const buffer = readFileSync(join(fontDir, font.file));
+      // Use process.cwd() with turbopackIgnore for Vercel compatibility
+      const fontPath = join(process.cwd() /* turbopackIgnore: true */, "public", "fonts", font.file);
+      const buffer = readFileSync(fontPath);
       loaded[font.file] = buffer;
     } catch (e) {
-      console.warn(`Font file not found: ${font.file} in ${fontDir}, using fallback`);
+      console.warn(`Font file not found: ${font.file}, using fallback`);
     }
   }
 
@@ -153,6 +144,9 @@ export async function renderReceiptPdfLib(view: ReceiptView, taxNote: string): P
   let poppinsRegular: PDFFont, poppinsMedium: PDFFont, poppinsSemiBold: PDFFont, poppinsBold: PDFFont;
 
   try {
+    // Register fontkit before embedding custom fonts
+    ensureFontkitRegistered();
+
     if (fonts.regular.length > 0) poppinsRegular = await pdfDoc.embedFont(fonts.regular);
     else poppinsRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
