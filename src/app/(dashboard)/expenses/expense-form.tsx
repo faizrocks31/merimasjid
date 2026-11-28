@@ -17,6 +17,7 @@ export function ExpenseForm({
 }) {
   const [state, formAction, pending] = useActionState<ExpenseState, FormData>(createExpenseAction, undefined);
   const [idempotencyKey, setIdempotencyKey] = useState<string>("");
+  const [formKey, setFormKey] = useState(0);
 
   // Generate idempotency key on mount
   useEffect(() => {
@@ -71,16 +72,17 @@ export function ExpenseForm({
     formAction(formData);
   };
 
-  // Reset idempotency key after successful submission
+  // Reset form and idempotency key after successful submission
   useEffect(() => {
     if (state?.ok) {
       setIdempotencyKey(crypto.randomUUID());
+      setFormKey((k) => k + 1); // Force form remount to clear uncontrolled fields
     }
   }, [state?.ok]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <SimpleForm fields={fields} values={{ idempotencyKey }} disabled={pending} fieldsOnly uncontrolled={true} />
+      <SimpleForm key={formKey} fields={fields} values={{ idempotencyKey }} disabled={pending} fieldsOnly uncontrolled={true} />
       {state?.error ? (
         <p role="alert" className="rounded-lg border border-[#f0cfcf] bg-[var(--danger-soft)] px-3 py-2 text-[11px] font-medium text-[var(--danger)]">
           {state.error}

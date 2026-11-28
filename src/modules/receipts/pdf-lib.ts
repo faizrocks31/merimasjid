@@ -1,3 +1,4 @@
+import "regenerator-runtime/runtime";
 import { PDFDocument, rgb, StandardFonts, PageSizes, type PDFPage, type PDFFont } from "pdf-lib";
 import type { ReceiptView } from "@/modules/receipts/view";
 import { NOTO_SANS_DEVANAGARI_REGULAR_BASE64, NOTO_SANS_DEVANAGARI_BOLD_BASE64 } from "@/lib/font-data";
