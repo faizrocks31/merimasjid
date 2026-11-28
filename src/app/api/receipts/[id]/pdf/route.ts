@@ -22,24 +22,29 @@ export async function GET(
   const payment = await loadReceipt(id);
   if (!payment) return new NextResponse("Not found", { status: 404 });
 
-  const { t } = await getDictionary();
-  const url = new URL(request.url);
-  const duplicate = url.searchParams.get("duplicate") === "1";
+  try {
+    const { t } = await getDictionary();
+    const url = new URL(request.url);
+    const duplicate = url.searchParams.get("duplicate") === "1";
 
-  const view = buildReceiptView(payment, {
-    duplicate,
-    footerText: t("thankYou"),
-    taxNote: t("taxNote"),
-  });
+    const view = buildReceiptView(payment, {
+      duplicate,
+      footerText: t("thankYou"),
+      taxNote: t("taxNote"),
+    });
 
-  const pdf = await renderReceiptPdfLib(view, t("taxNote"));
-  const filename = `receipt-${payment.receiptNo}${duplicate ? "-duplicate" : ""}.pdf`;
+    const pdf = await renderReceiptPdfLib(view, t("taxNote"));
+    const filename = `receipt-${payment.receiptNo}${duplicate ? "-duplicate" : ""}.pdf`;
 
-  return new NextResponse(new Uint8Array(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "private, no-store",
-    },
-  });
+    return new NextResponse(new Uint8Array(pdf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
+  } catch (error) {
+    console.error("PDF generation failed:", error);
+    return new NextResponse("PDF generation failed", { status: 500 });
+  }
 }
