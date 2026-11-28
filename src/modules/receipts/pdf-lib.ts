@@ -3,21 +3,21 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import type { ReceiptView } from "@/modules/receipts/view";
 
-// Register fontkit for custom font embedding - done lazily at runtime to avoid build issues
-function ensureFontkitRegistered(): void {
-  if (typeof PDFDocument.registerFontkit === "function") {
+// Register fontkit for custom font embedding - use dynamic import to avoid Turbopack issues
+// This function is called before embedding any custom fonts
+let fontkitRegistered = false;
+async function ensureFontkitRegistered(): Promise<void> {
+  if (!fontkitRegistered) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fontkit = require("@pdf-lib/fontkit");
+      const fontkit = await import("@pdf-lib/fontkit").then(m => m.default || m);
       PDFDocument.registerFontkit(fontkit);
+      fontkitRegistered = true;
     } catch (e) {
       console.warn("Fontkit registration failed:", e);
     }
   }
 }
-
-// Ensure fontkit is registered immediately
-ensureFontkitRegistered();
 
 const A5_WIDTH = PageSizes.A5[0]; // 419.528 pt (148mm)
 const A5_HEIGHT = PageSizes.A5[1]; // 595.276 pt (210mm)
@@ -149,6 +149,9 @@ export async function renderReceiptPdfLib(view: ReceiptView, taxNote: string): P
   let poppinsRegular: PDFFont, poppinsMedium: PDFFont, poppinsSemiBold: PDFFont, poppinsBold: PDFFont;
 
   try {
+    // Ensure fontkit is registered before embedding custom fonts
+    await ensureFontkitRegistered();
+
     if (fonts.regular.length > 0) poppinsRegular = await pdfDoc.embedFont(fonts.regular);
     else poppinsRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
