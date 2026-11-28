@@ -303,34 +303,34 @@ function drawHeaderBand(page: PDFPage, view: ReceiptView, height: number, boldFo
     x: leftX,
     y: receiptInfoY,
     size: 12,
-    font: helveticaBold,
+    font: boldFont,
     color: COLORS.goldAccent,
   });
   page.drawText(view.receiptNo, {
     x: leftX,
     y: receiptInfoY - 20,
     size: 16,
-    font: helvetica,
+    font: regularFont,
     color: COLORS.white,
   });
 
   // Date
   const dateLabel = "दिनांक";
-  const dateWidth = helvetica.widthOfTextAtSize(dateLabel, 12);
+  const dateWidth = regularFont.widthOfTextAtSize(dateLabel, 12);
   page.drawText(dateLabel, {
     x: rightX - dateWidth,
     y: receiptInfoY,
     size: 12,
-    font: helveticaBold,
+    font: boldFont,
     color: COLORS.goldAccent,
   });
   const dateValue = view.paymentDate;
-  const dateValueWidth = helvetica.widthOfTextAtSize(dateValue, 16);
+  const dateValueWidth = regularFont.widthOfTextAtSize(dateValue, 16);
   page.drawText(dateValue, {
     x: rightX - dateValueWidth,
     y: receiptInfoY - 20,
     size: 16,
-    font: helvetica,
+    font: regularFont,
     color: COLORS.white,
   });
 }
