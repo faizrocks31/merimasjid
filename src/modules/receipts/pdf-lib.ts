@@ -9,10 +9,11 @@ let fontkitRegistered = false;
 function ensureFontkitRegistered(): void {
   if (!fontkitRegistered) {
     try {
-      // Use require() for reliable module loading in Vercel/Turbopack environment
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fontkit = require("@pdf-lib/fontkit");
-      PDFDocument.registerFontkit(fontkit);
+      // @pdf-lib/fontkit module itself IS the fontkit instance
+      // Register fontkit on PDFDocument.prototype (where registerFontkit method exists)
+      require("@pdf-lib/fontkit");
+      PDFDocument.prototype.registerFontkit(require("@pdf-lib/fontkit"));
       fontkitRegistered = true;
       console.log("[PDF] Fontkit registered successfully");
     } catch (e) {
