@@ -8,7 +8,9 @@ async function ensureFontkitRegistered(): Promise<void> {
   if (!fontkitRegistered) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fontkit = await import("@pdf-lib/fontkit").then(m => m.default || m);
+      const fontkitModule = await import("@pdf-lib/fontkit");
+      // @pdf-lib/fontkit exports the fontkit module as default export
+      const fontkit = fontkitModule.default || fontkitModule;
       PDFDocument.registerFontkit(fontkit);
       fontkitRegistered = true;
     } catch (e) {
