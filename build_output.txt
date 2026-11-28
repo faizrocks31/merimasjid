@@ -1,53 +1,276 @@
+
+> masjid-collection@1.0.0 build
+> next build
+
 ▲ Next.js 16.4.6 (Turbopack)
-- Environments: .env
-✓ Running next.config.ts took 41ms
+- Environments: .env.local, .env.production, .env
+⚠ `eslint` configuration in next.config.ts is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+⚠ Invalid next.config.ts options detected: 
+⚠     Unrecognized key(s) in object: 'eslint'
+⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+✓ Running next.config.ts took 45ms
 
   Creating an optimized production build ...
+✓ Compiled successfully in 4.3s
+  Skipping validation of types
+  Finished TypeScript config validation in 32ms ...
+  Collecting page data using 3 workers ...
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+⚠️  Telegram not configured - add TELEGRAM_BOT_TOKEN to .env
+🤖 TELEGRAM BOT SETUP (5 minutes, FREE forever)
+
+1. Open Telegram → Search @BotFather
+2. Send: /newbot
+3. Name: "Masjid Collection Bot"
+   Username: "yourmasjidbot" (must end with 'bot')
+4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+5. Add to .env:
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_CHANNEL_ID=-100xxxxxxxxxx (for broadcasts)
+
+6. For channel broadcasts:
+   - Create a Channel in Telegram
+   - Add your bot as Admin (with "Post Messages" permission)
+   - Forward any message from channel to @userinfobot to get Channel ID
+   - Channel ID looks like: -1001234567890
+
+7. For member-specific messages:
+   - Ask members to message your bot once
+   - Or use a "deep link": https://t.me/yourmasjidbot?start=member_123
+   - Save their chat_id in Member.telegramChatId field
+
+That's it! No verification, no monthly fees, unlimited messages.
+Error: Failed to collect configuration for /api/receipts/[id]/pdf
+    at ignore-listed frames {
+  [cause]: TypeError: oJ.registerFontkit is not a function
+      at module evaluation (src\modules\receipts\pdf-lib.ts:8:13)
+      at <unknown> (src\app\api\receipts\[id]\pdf\route.ts:6:1)
+     6 | // Register fontkit for custom font embedding - done at module load
+     7 | import fontkit from "@pdf-lib/fontkit";
+  >  8 | PDFDocument.registerFontkit(fontkit);
+       |             ^
+     9 |
+    10 | const A5_WIDTH = PageSizes.A5[0]; // 419.528 pt (148mm)
+    11 | const A5_HEIGHT = PageSizes.A5[1]; // 595.276 pt (210mm)
+}
 
 > Build error occurred
-Error: Turbopack build failed with 3 errors:
-./src/app/api/collections/due-status/periods/route.ts:299:7
-Error: Expected ',', got ';'
-  [90m297 |[0m           outstandingAmountPaise: m.expectedAmountPaise - m.paidAmountPaise,
-  [90m298 |[0m         }))
-[31m[1m>[0m [90m299 |[0m     });
-  [90m    |[0m       [31m[1m^[0m
-  [90m300 |[0m
-  [90m301 |[0m     [90m// Also return collection info[0m
-  [90m302 |[0m     [36mconst[0m collectionInfo = {
-
-Parsing ecmascript source code failed
-
-
-./src/app/api/collections/due-status/periods/[periodKey]/members/route.ts:143:5
-Error: Unexpected token `)`. Expected identifier, string literal, numeric literal or [ for the computed key
-  [90m141 |[0m       },
-  [90m142 |[0m       orderBy: { periodStart: [32m"asc"[0m },
-[31m[1m>[0m [90m143 |[0m     );
-  [90m    |[0m     [31m[1m^[0m
-  [90m144 |[0m
-  [90m145 |[0m     [90m// Get member details with payment info[0m
-  [90m146 |[0m     [36mconst[0m members: [33mArray[0m<{
-
-Parsing ecmascript source code failed
-
-
-./src/app/(dashboard)/collections/due-status/due-status-client.tsx:476:20
-Error: Unterminated regexp literal
-  [90m474 |[0m                         </[33mTableRow[0m>
-  [90m475 |[0m                       ))
-[31m[1m>[0m [90m476 |[0m                   </[33mTableBody[0m>
-  [90m    |[0m                    [31m[1m^^^^^^^^^^^[0m
-  [90m477 |[0m                 </[33mTable[0m>
-  [90m478 |[0m               </div>
-  [90m479 |[0m             )
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Server Component:
-    ./src/app/(dashboard)/collections/due-status/due-status-client.tsx
-    ./src/app/(dashboard)/collections/due-status/page.tsx
-
-
-    at ignore-listed frames
+Error: Failed to collect page data for /api/receipts/[id]/pdf
+    at ignore-listed frames {
+  type: 'Error'
+}

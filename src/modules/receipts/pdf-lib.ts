@@ -1,8 +1,21 @@
 import { PDFDocument, rgb, StandardFonts, PageSizes, type PDFPage, type PDFFont } from "pdf-lib";
 import type { ReceiptView } from "@/modules/receipts/view";
+import { NOTO_SANS_DEVANAGARI_REGULAR_BASE64, NOTO_SANS_DEVANAGARI_BOLD_BASE64 } from "@/lib/font-data";
 
-// Use standard fonts only (Helvetica) - no custom fonts, no fontkit needed
-// This eliminates fontkit dependency and ensures reliable PDF generation on Vercel
+// Register fontkit for custom font embedding - use lazy registration to avoid build-time issues
+let fontkitRegistered = false;
+async function ensureFontkitRegistered(): Promise<void> {
+  if (!fontkitRegistered) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fontkit = await import("@pdf-lib/fontkit").then(m => m.default || m);
+      PDFDocument.registerFontkit(fontkit);
+      fontkitRegistered = true;
+    } catch (e) {
+      console.warn("Fontkit registration failed:", e);
+    }
+  }
+}
 
 const A5_WIDTH = PageSizes.A5[0]; // 419.528 pt (148mm)
 const A5_HEIGHT = PageSizes.A5[1]; // 595.276 pt (210mm)
@@ -143,11 +156,20 @@ export async function renderReceiptPdfLib(view: ReceiptView, taxNote: string): P
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([A5_WIDTH, A5_HEIGHT]);
 
-  // Use standard Helvetica fonts only - no custom fonts, no fontkit needed
+  // Register fontkit before embedding custom fonts
+  await ensureFontkitRegistered();
+
+  // Load and embed Noto Sans Devanagari fonts for Hindi/Devanagari support
+  // Using base64-encoded font data for Vercel compatibility
+  const notoRegularBytes = Uint8Array.from(atob(NOTO_SANS_DEVANAGARI_REGULAR_BASE64), c => c.charCodeAt(0));
+  const notoBoldBytes = Uint8Array.from(atob(NOTO_SANS_DEVANAGARI_BOLD_BASE64), c => c.charCodeAt(0));
+
+  const notoRegular = await pdfDoc.embedFont(notoRegularBytes);
+  const notoBold = await pdfDoc.embedFont(notoBoldBytes);
+
+  // Also keep Helvetica for English text
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const helveticaOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
-  const helveticaBoldOblique = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
 
   // Background
   page.drawRectangle({
@@ -163,7 +185,7 @@ export async function renderReceiptPdfLib(view: ReceiptView, taxNote: string): P
 
   // Status watermark (cancelled/duplicate)
   if (view.isDuplicate || view.status === "REVERSED") {
-    drawStatusWatermark(page, view.status === "REVERSED" ? "रद्द" : "नकल", helveticaBold);
+    drawStatusWatermark(page, view.status === "REVERSED" ? "रद्द" : "नकल", notoBold);
   }
 
   // Double border
@@ -171,21 +193,21 @@ export async function renderReceiptPdfLib(view: ReceiptView, taxNote: string): P
 
   // Header band
   const headerBandHeight = 140;
-  drawHeaderBand(page, view, headerBandHeight, helveticaBold, helvetica);
+  drawHeaderBand(page, view, headerBandHeight, notoBold, notoRegular);
 
   // Ribbon
   const ribbonY = A5_HEIGHT - MARGIN - headerBandHeight - 30;
-  drawRibbon(page, ribbonY, helveticaBold);
+  drawRibbon(page, ribbonY, notoBold);
 
   // Fields section
   let currentY = ribbonY - 40;
-  currentY = drawFields(page, view, currentY, helvetica, helveticaBold);
+  currentY = drawFields(page, view, currentY, notoRegular, notoBold);
 
   // Amount and receiver section
-  currentY = drawAmountReceiver(page, view, currentY, helvetica, helveticaBold);
+  currentY = drawAmountReceiver(page, view, currentY, notoRegular, notoBold);
 
   // Footer band
-  drawFooterBand(page, view, helvetica);
+  drawFooterBand(page, view, notoRegular);
 
   const pdfBytes = await pdfDoc.save();
   return new Uint8Array(pdfBytes);
@@ -231,14 +253,14 @@ function drawWatermark(page: PDFPage) {
   }
 }
 
-function drawStatusWatermark(page: PDFPage, text: string, helveticaBold: PDFFont) {
+function drawStatusWatermark(page: PDFPage, text: string, boldFont: PDFFont) {
   page.translate(A5_WIDTH / 2, A5_HEIGHT / 2);
   page.rotate(-18 * Math.PI / 180);
   page.drawText(text, {
     x: -100,
     y: 0,
     size: 48,
-    font: helveticaBold,
+    font: boldFont,
     color: COLORS.statusWatermark,
   });
 }
