@@ -40,20 +40,71 @@ function escapeHtml(str: string): string {
 }
 
 function drawRoundedRect(page: PDFPage, x: number, y: number, width: number, height: number, radius: number, borderColor: any, borderWidth: number, fillColor?: any) {
-  const path = page.moveTo(x + radius, y)
-    .lineTo(x + width - radius, y)
-    .quadraticCurveTo(x + width, y, x + width, y + radius)
-    .lineTo(x + width, y + height - radius)
-    .quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
-    .lineTo(x + radius, y + height)
-    .quadraticCurveTo(x, y + height, x, y + height - radius)
-    .lineTo(x, y + radius)
-    .quadraticCurveTo(x, y, x + radius, y);
-
-  if (fillColor) {
-    page.drawPath(path, { fillColor });
-  }
-  page.drawPath(path, { borderColor, borderWidth });
+  // Draw rounded rectangle using lines (supported by pdf-lib PDFPage)
+  // Top edge
+  page.drawLine({
+    start: { x: x + radius, y: y },
+    end: { x: x + width - radius, y: y },
+    thickness: borderWidth,
+    color: borderColor,
+  });
+  // Top-right corner (approximate with 2 lines)
+  page.drawLine({
+    start: { x: x + width - radius, y: y },
+    end: { x: x + width, y: y + radius },
+    thickness: borderWidth,
+    color: borderColor,
+  });
+  // Right edge
+  page.drawLine({
+    start: { x: x + width, y: y + radius },
+    end: { x: x + width, y: y + height - radius },
+    thickness: borderWidth,
+    color: borderColor,
+  });
+  // Bottom-right corner
+  page.drawLine({
+    start: { x: x + width - radius, y: y + height },
+    end: { x: x + width, y: y + height - radius },
+    thickness: borderWidth,
+    color: borderColor,
+  });
+  // Bottom edge
+  page.drawLine({
+    start: { x: x + radius, y: y + height },
+    end: { x: x + width - radius, y: y + height },
+    thickness: borderWidth,
+    color: borderColor,
+  });
+  // Bottom-left corner
+  page.drawLine({
+    start: { x: x, y: y + height - radius },
+    end: { x: x + radius, y: y + height },
+    thickness: borderWidth,
+    color: borderColor,
+  });
+  // Left edge
+  page.drawLine({
+    start: { x: x, y: y + radius },
+    end: { x: x, y: y + height - radius },
+    thickness: borderWidth,
+    color: borderColor,
+  });
+  // Top-left corner
+  page.drawLine({
+    start: { x: x, y: y + radius },
+    end: { x: x + radius, y: y },
+    thickness: borderWidth,
+    color: borderColor,
+  });
+  // Top edge
+  page.drawLine({
+    start: { x: x + radius, y: y },
+    end: { x: x + width - radius, y: y },
+    thickness: borderWidth,
+    color: borderColor,
+  });
+  // Note: fillColor is not supported with this line-based approach
 }
 
 function drawText(page: PDFPage, text: string, x: number, y: number, font: PDFFont, size: number, color: any, options?: { maxWidth?: number; lineHeight?: number }) {
